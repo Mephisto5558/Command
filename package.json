@@ -1,0 +1,43 @@
+{
+  "name": "command",
+  "version": "1.0.0",
+  "description": "Discord.js command class for slash- and prefix commands",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "index.d.ts"
+  ],
+  "keywords": [
+    "discord",
+    "discord.js",
+    "command"
+  ],
+  "author": "Mephisto5558",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.9.0"
+  },
+  "devDependencies": {
+    "@mephisto5558/eslint-config": "^1.2.4",
+    "@stylistic/eslint-plugin": "^2.1.0",
+    "@typescript-eslint/eslint-plugin": "^7.8.0",
+    "discord.js": "^14.14.1",
+    "eslint-plugin-jsdoc": "^48.2.4",
+    "eslint-plugin-sonarjs": "^1.0.3",
+    "eslint-plugin-unicorn": "^54.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mephisto5558/Command.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Mephisto5558/Command/issues"
+  },
+  "homepage": "https://github.com/Mephisto5558/Command#readme",
+  "dependencies": {
+    "@mephisto5558/i18n": "^1.2.1"
+  }
+}

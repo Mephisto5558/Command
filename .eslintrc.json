@@ -1,0 +1,10 @@
+{
+  "root": true,
+  "extends": "@mephisto5558/eslint-config",
+  "ignorePatterns": [
+    "Templates/*"
+  ],
+  "globals": {
+    "BaseCommand":"readonly"
+  }
+}
