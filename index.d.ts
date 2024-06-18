@@ -1,39 +1,41 @@
 import Discord from 'discord.js';
 import I18nProvider from '@mephisto5558/i18n';
 
-export { BaseCommand, SlashCommand, PrefixCommand, CommandOptions, lang };
+export { BaseCommand, BaseCommandInitOptions, SlashCommand, PrefixCommand, CommandOptions, lang };
+
+type BaseCommandInitOptions = {
+  /** @deprecated Do not set manually.*/
+  name?: Lowercase<string>;
+
+  /** @deprecated Do not set manually.*/
+  description?: string;
+  aliases?: { slash?: BaseCommand['name'][]; prefix?: BaseCommand['name'][] };
+
+  /**
+   * Command usage information for the end-user.
+   * Should be in the command file if its language-independent, otherwise in the language files.
+   *
+   * Gets modified upon initialization.*/
+  usage: { usage?: string; examples?: string };
+  permissions?: {
+    client?: (keyof Discord.PermissionFlags)[];
+    user?: (keyof Discord.PermissionFlags)[];
+  };
+
+  /** Cooldowns in milliseconds. Will be set to 0 if negative or undefined.*/
+  cooldowns?: { guild?: number; channel?: number; user?: number };
+  dmPermission?: boolean;
+  disabled?: boolean;
+  disabledReason?: string;
+  options: commandOption[];
+  beta?: boolean;
+  filePath?: string;
+
+  run: (this: Discord.ChatInputCommandInteraction | Discord.Message, lang: lang, client: Discord.Client<true>) => Promise<never>;
+};
 
 class BaseCommand<guildOnly extends boolean = true> {
-  constructor(options: {
-
-    /** @deprecated Do not set manually.*/
-    name?: Lowercase<string>;
-
-    /** @deprecated Do not set manually.*/
-    description?: string;
-    aliases?: { slash?: BaseCommand['name'][]; prefix?: BaseCommand['name'][] };
-
-    /**
-     * Command usage information for the end-user.
-     * Should be in the command file if its language-independent, otherwise in the language files.
-     *
-     * Gets modified upon initialization.*/
-    usage: { usage?: string; examples?: string };
-    permissions?: {
-      client?: (keyof Discord.PermissionFlags)[];
-      user?: (keyof Discord.PermissionFlags)[];
-    };
-
-    /** Cooldowns in milliseconds*/
-    cooldowns?: { guild?: number; channel?: number; user?: number };
-    dmPermission?: boolean;
-    disabled?: boolean;
-    disabledReason?: string;
-    options: commandOption[];
-    beta?: boolean;
-
-    run: (this: Discord.ChatInputCommandInteraction | Discord.Message, lang: lang, client: Discord.Client<true>) => Promise<never>;
-  });
+  constructor(options: BaseCommandInitOptions);
 
   /** Gets set to the command's filename.*/
   name: readonly Lowercase<string>;
@@ -77,6 +79,13 @@ class BaseCommand<guildOnly extends boolean = true> {
 
   /** Numbers in milliseconds*/
   cooldowns: { guild: number; channel: number; user: number };
+
+  /** Used in subclasses. */
+  slashCommand: undefined;
+
+  /** Used in subclasses. */
+
+  prefixCommand: undefined;
 
   /** Makes the command also work in direct messages.*/
   dmPermission: guildOnly extends true ? false : true;
