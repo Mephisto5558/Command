@@ -1,7 +1,12 @@
 import Discord from 'discord.js';
 import I18nProvider from '@mephisto5558/i18n';
 
-export { BaseCommand, BaseCommandInitOptions, SlashCommand, PrefixCommand, CommandOptions, lang };
+export { BaseCommand, BaseCommandInitOptions,
+  SlashCommand, SlashCommandInitOptions,
+  PrefixCommand, PrefixCommandInitOptions,
+  MixedCommand, MixedCommandInitOptions,
+  CommandOptions, CommandOptionsInitOptions,
+  lang };
 
 type BaseCommandInitOptions = {
   /** @deprecated Do not set manually.*/
@@ -38,44 +43,44 @@ class BaseCommand<guildOnly extends boolean = true> {
   constructor(options: BaseCommandInitOptions);
 
   /** Gets set to the command's filename.*/
-  name: readonly Lowercase<string>;
+  name: Lowercase<string>;
 
   /** Currently not in use*/
-  nameLocalizations?: readonly Record<typeof BaseCommand['name'], BaseCommand['name']>;
+  nameLocalizations?: Record<typeof BaseCommand['name'], BaseCommand['name']>;
 
   /**
    * Gets set automatically from language files.
    * Can not be longer then 100 chars.*/
-  description: readonly string;
+  description: string;
 
   /**
    * Gets set automatically from language files.
    * @see {@link BaseCommand.description}**/
-  descriptionLocalizations: readonly Record<string, BaseCommand['description']>;
+  descriptionLocalizations: Record<string, BaseCommand['description']>;
 
   aliases: { slash?: BaseCommand['name'][]; prefix?: BaseCommand['name'][] };
 
   /** Command usage information for the end-user.*/
-  usage: readonly { usage?: string; examples?: string };
+  usage: { usage?: string; examples?: string };
 
   /**
    * Gets set automatically from language files.
    * @see {@link BaseCommand.usage}*/
-  usageLocalizations: readonly Record<string, BaseCommand['usage']>;
+  usageLocalizations: Record<string, BaseCommand['usage']>;
 
   /** Gets set from the command's folder name.*/
-  category: readonly Lowercase<string>;
+  category: Lowercase<string>;
 
-  permissions: readonly {
+  permissions: {
     client: Set<Discord.PermissionFlags>;
     user: Set<Discord.PermissionFlags>;
   };
 
   /** If the command instance is an alias, this property will have the original name.*/
-  aliasOf?: readonly BaseCommand['name'];
+  aliasOf?: BaseCommand['name'];
 
   /** The command's full file path, useful for e.g. reloading the command.*/
-  filePath: readonly string;
+  filePath: string;
 
   /** Numbers in milliseconds*/
   cooldowns: { guild: number; channel: number; user: number };
@@ -84,7 +89,6 @@ class BaseCommand<guildOnly extends boolean = true> {
   slashCommand: undefined;
 
   /** Used in subclasses. */
-
   prefixCommand: undefined;
 
   /** Makes the command also work in direct messages.*/
@@ -102,132 +106,143 @@ class BaseCommand<guildOnly extends boolean = true> {
   run: (this: Discord.ChatInputCommandInteraction | Discord.Message, lang: lang, client: Discord.Client<true>) => Promise<never>;
 }
 
+type SlashCommandInitOptions = BaseCommandInitOptions & { noDefer?: boolean; ephemeralDefer?: boolean };
 class SlashCommand<guildOnly extends boolean = true> extends BaseCommand<guildOnly> {
-  constructor(options: { noDefer?: boolean; ephemeralDefer?: boolean });
+  constructor(options: SlashCommandInitOptions);
 
-  slashCommand: readonly true;
-  prefixCommand: readonly false;
-  dmPermission: readonly boolean;
+  slashCommand: true;
+  prefixCommand: false;
 
   /** Do not deferReply to the interaction*/
-  noDefer: readonly boolean;
+  noDefer: boolean;
 
   /**
    * Do `interaction.deferReply({ ephemeral: true })`.
    *
    * Gets ignored if {@link SlashCommand.noDefer} is `true`.*/
-  ephemeralDefer: readonly boolean;
+  ephemeralDefer: boolean;
 
-  id: readonly Discord.Snowflake;
-  type: readonly Discord.ApplicationCommandType.ChatInput;
-  defaultMemberPermissions: readonly Discord.PermissionsBitField;
+  id: Discord.Snowflake;
+  type: Discord.ApplicationCommandType.ChatInput;
+  defaultMemberPermissions: Discord.PermissionsBitField;
 
   options?: CommandOptions[];
 
   run: (this: Discord.ChatInputCommandInteraction<guildOnly extends true ? 'cached' : Discord.CacheType>, lang: lang, client: Discord.Client<true>) => Promise<never>;
 }
 
+type PrefixCommandInitOptions = BaseCommandInitOptions;
 class PrefixCommand<guildOnly extends boolean = true> extends BaseCommand<guildOnly> {
+  constructor(options: PrefixCommandInitOptions);
   slashCommand: false;
   prefixCommand: true;
-  dmPermission: boolean;
 
   run: (this: Discord.Message<guildOnly>, lang: lang, client: Discord.Client<true>) => Promise<never>;
 }
 
-class CommandOptions {
-  constructor(
-    name: Lowercase<string>,
-    type: keyof typeof Discord.ApplicationCommandOptionType,
+type MixedCommandInitOptions = SlashCommandInitOptions & PrefixCommandInitOptions;
+class MixedCommand<guildOnly extends boolean = true> extends BaseCommand<guildOnly> implements SlashCommand, PrefixCommand {}
 
-    /** Numbers in milliseconds*/
-    cooldowns?: BaseCommand['cooldowns'],
-    required?: boolean,
+type CommandOptionsInitOptions = {
+  name: Lowercase<string>;
+  type: keyof typeof Discord.ApplicationCommandOptionType;
 
-    /**
-     * Only existent for {@link CommandOptions.type} `SubcommandGroup` and `Subcommand`.
-     *
-     * Makes the subcommand also work in direct messages.*/
-    dmPermission?: boolean,
-
-    /** Choices the user must choose from. Can not be more then 25.*/
-    choices?: (string | number | {
-      name: string;
-      nameLocalizations?: __local.BaseCommand<true>['nameLocalizations'];
-      value: string | number;
-    })[],
-
-    /** Like choices, but not enforced unless {@link CommandOptions.strictAutocomplete} is enabled.*/
-    autocompleteOptions?: string
-    | autocompleteOptions[]
-    | ((this: Discord.AutocompleteInteraction) => autocompleteOptions[] | Promise<autocompleteOptions>),
-
-    /**
-     * Return an error message to the user, if their input is not included in {@link CommandOptions.autocompleteOptions}.
-     * Note that this happens for Messages as well.*/
-    strictAutocomplete?: boolean,
-
-    channelTypes?: (typeof Discord.ChannelType)[],
-    minValue?: number,
-    maxValue?: number,
-    minLength?: number,
-    maxLength?: number,
-
-    options?: CommandOptions[]
-  );
-
-  name: readonly Lowercase<string>;
-  nameLocalizations?: readonly BaseCommand['nameLocalizations'];
-
-  /**
-   * Gets set automatically from language files.
-   * @see {@link BaseCommand.description}*/
-  description: readonly local.BaseCommand['description'];
-
-  /**
-   * Gets set automatically from language files.
-   * @see {@link BaseCommand.descriptionLocalizations}*/
-  descriptionLocalizations: readonly BaseCommand['descriptionLocalizations'];
-
-  type: readonly typeof Discord.ApplicationCommandOptionType;
+  permissions?: BaseCommandInitOptions['permissions'];
 
   /** Numbers in milliseconds*/
-  cooldowns: readonly BaseCommand['cooldowns'];
-
-  /** If true, the user must provide a value to this option. This is also enforced for prefix commands.*/
-  required: readonly boolean;
+  cooldowns?: BaseCommandInitOptions['cooldowns'];
+  required?: boolean;
 
   /**
    * Only existent for {@link CommandOptions.type} `SubcommandGroup` and `Subcommand`.
    *
    * Makes the subcommand also work in direct messages.*/
-  dmPermission: readonly boolean;
+  dmPermission?: BaseCommandInitOptions['dmPermission'];
 
   /** Choices the user must choose from. Can not be more then 25.*/
-  choices?: readonly {
+  choices?: (string | number | {
     name: string;
     nameLocalizations?: BaseCommand['nameLocalizations'];
     value: string | number;
-  }[];
-
-  autocomplete: readonly boolean;
+  })[];
 
   /** Like choices, but not enforced unless {@link CommandOptions.strictAutocomplete} is enabled.*/
-  autocompleteOptions?: readonly autocompleteOptions[]
+  autocompleteOptions?: string
+  | autocompleteOptions[]
   | ((this: Discord.AutocompleteInteraction) => autocompleteOptions[] | Promise<autocompleteOptions>);
 
   /**
    * Return an error message to the user, if their input is not included in {@link CommandOptions.autocompleteOptions}.
    * Note that this happens for Messages as well.*/
-  strictAutocomplete?: readonly boolean;
+  strictAutocomplete?: boolean;
+
+  channelTypes?: (keyof typeof Discord.ChannelType)[];
+  minValue?: number;
+  maxValue?: number;
+  minLength?: number;
+  maxLength?: number;
+
+  /** Only existent for {@link CommandOptions.type} `SubcommandGroup` and `Subcommand`.*/
+  options?: CommandOptions[];
+};
+
+class CommandOptions {
+  constructor(options: CommandOptionsInitOptions);
+
+  name: Lowercase<string>;
+  nameLocalizations?: BaseCommand['nameLocalizations'];
+
+  /**
+   * Gets set automatically from language files.
+   * @see {@link BaseCommand.description}*/
+  description: BaseCommand['description'];
+
+  /**
+   * Gets set automatically from language files.
+   * @see {@link BaseCommand.descriptionLocalizations}*/
+  descriptionLocalizations: BaseCommand['descriptionLocalizations'];
+
+  type: typeof Discord.ApplicationCommandOptionType;
+
+  permissions: BaseCommand['permissions'];
+
+  /** Numbers in milliseconds*/
+  cooldowns: BaseCommand['cooldowns'];
+
+  /** If true, the user must provide a value to this option. This is also enforced for prefix commands.*/
+  required: boolean;
+
+  /**
+   * Only existent for {@link CommandOptions.type} `SubcommandGroup` and `Subcommand`.
+   *
+   * Makes the subcommand also work in direct messages.*/
+  dmPermission: boolean;
+
+  /** Choices the user must choose from. Can not be more then 25.*/
+  choices?: {
+    name: string;
+    nameLocalizations?: BaseCommand['nameLocalizations'];
+    value: string | number;
+  }[];
+
+  autocomplete: boolean;
+
+  /** Like choices, but not enforced unless {@link CommandOptions.strictAutocomplete} is enabled.*/
+  autocompleteOptions?: autocompleteOptions[]
+  | ((this: Discord.AutocompleteInteraction) => autocompleteOptions[] | Promise<autocompleteOptions>);
+
+  /**
+   * Return an error message to the user, if their input is not included in {@link CommandOptions.autocompleteOptions}.
+   * Note that this happens for Messages as well.*/
+  strictAutocomplete?: boolean;
 
   channelTypes?: Discord.ChannelType[];
-  minValue?: readonly number;
-  maxValue?: readonly number;
-  minLength?: readonly number;
-  maxLength?: readonly number;
+  minValue?: number;
+  maxValue?: number;
+  minLength?: number;
+  maxLength?: number;
 
-  options?: readonly CommandOptions[];
+  options?: CommandOptions[];
 }
 
 type bBoundFunction<OF, T extends CallableFunction> = T & {

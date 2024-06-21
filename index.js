@@ -1,3 +1,4 @@
+const { ApplicationCommandType, ApplicationCommandOptionType, PermissionFlagsBits } = require('discord.js');
 const { resolve, dirname, basename } = require('node:path');
 
 function getCallerFilePath() {
@@ -11,10 +12,27 @@ function getCallerFilePath() {
 }
 
 /**
+ * {@link https://stackoverflow.com/a/61860802/17580213 Source}
+ * @param {Function[]}bases class*/
+function classes(...bases) {
+  class Bases {
+    constructor() {
+      for (const Base of bases) Object.assign(this, new Base());
+    }
+  }
+
+  for (const Base of bases) {
+    for (const prop of Object.getOwnPropertyNames(Base.prototype))
+      if (prop != 'constructor') Bases.prototype[prop] = Base.prototype[prop];
+  }
+
+  return Bases;
+}
+
+/**
  * @typedef {import('.').BaseCommand}BaseCommand
  * @typedef {import('.').CommandOptions}CommandOptions*/
 
-/** @type {BaseCommand} */
 class BaseCommand {
   // Thanks to this I have types in the constructor
   name; category; description; descriptionLocalizations; type; filePath;
@@ -23,64 +41,126 @@ class BaseCommand {
   disabledReason; options; beta; run;
 
   /** @param {import('.').BaseCommandInitOptions}options*/
-  constructor({
-    name, description,
-    aliases = {}, usage = {},
-    permissions = { }, cooldowns = { },
-    dmPermission = false,
-    disabled = false, disabledReason,
-    options = [],
-    beta = false,
-    filePath = getCallerFilePath(),
-    run
-  } = {}) {
-    this.filePath = resolve(filePath);
-    this.name = (name ?? basename(this.filePath)).toLowerCase();
+  constructor(options = {}) {
+    this.filePath = resolve(options.filePath ?? getCallerFilePath());
+    this.name = (options.name ?? basename(this.filePath)).toLowerCase();
     this.nameLocalizations = undefined;
     this.category = basename(dirname(this.filePath));
-    this.description = description;
+    this.description = options.description;
     this.descriptionLocalizations = undefined;
-    this.aliases = aliases;
-    this.usage = usage;
-    this.permissions = permissions;
+    this.aliases = options.aliases ?? {};
+    this.usage = options.usage ?? {};
+    this.permissions = {
+      client: new Set(options.permissions?.client?.map(e => typeof e == 'string' ? PermissionFlagsBits[e] : e)),
+      user: new Set(options.permissions?.client?.map(e => typeof e == 'string' ? PermissionFlagsBits[e] : e))
+    };
     this.cooldowns = {
-      guild: Math.max(cooldowns.guild ?? 0, 0),
-      channel: Math.max(cooldowns.channel ?? 0, 0),
-      user: Math.max(cooldowns.user ?? 0, 0)
+      guild: Math.max(options.cooldowns?.guild ?? 0, 0),
+      channel: Math.max(options.cooldowns?.channel ?? 0, 0),
+      user: Math.max(options.cooldowns?.user ?? 0, 0)
     };
     this.slashCommand = undefined;
     this.prefixCommand = undefined;
-    this.dmPermission = dmPermission;
-    this.disabled = disabled;
-    this.disabledReason = disabledReason;
-    this.options = options;
-    this.beta = beta;
-    this.run = run;
+    this.dmPermission = options.dmPermission ?? false;
+    this.disabled = options.disabled ?? false;
+    this.disabledReason = options.disabledReason;
+    this.options = options ?? [];
+    this.beta = options.beta ?? false;
+    this.run = options.run;
 
     this.#validateData();
-    this.localize();
+    this.#setLocalization();
   }
 
   #validateData() {
 
   }
+
+  #setLocalization() {
+
+  }
 }
 
 class SlashCommand extends BaseCommand {
+  noDefer; ephemeralDefer; id;
 
-}
-
-class PrefixCommand extends BaseCommand {
-  constructor() {
-    super();
+  /** @param {import('.').SlashCommandInitOptions}options*/
+  constructor(options = {}) {
+    super(options);
 
     this.slashCommand = true;
     this.prefixCommand = false;
+
+    this.defaultMemberPermissions = undefined;
+    this.noDefer = options.noDefer ?? false;
+    this.ephemeralDefer = options.ephemeralDefer ?? false;
+
+    this.id = undefined;
+    this.type = ApplicationCommandType.ChatInput;
+  }
+}
+
+class PrefixCommand extends BaseCommand {
+  /** @param {import('.').PrefixCommandInitOptions}options*/
+  constructor(options = {}) {
+    super(options);
+
+    this.slashCommand = false;
+    this.prefixCommand = true;
+  }
+}
+
+class MixedCommand extends classes(SlashCommand, PrefixCommand) {
+  /** @param {import('.').MixedCommandInitOptions}options*/
+  constructor(options = {}) {
+    super(options);
   }
 }
 
 class CommandOptions {
+  name; nameLocalizations; description; descriptionLocalizations;
+  type; cooldowns; required; dmPermission; choices; autocomplete;
+  strictAutocomplete; channelTypes; minValue; maxValue; minLength; maxLength;
+  options;
 
+  /** @param {import('.').CommandOptionsInitOptions}options*/
+  constructor(options = {}) {
+    this.name = options.name;
+    this.nameLocalizations = undefined;
+    this.description = options.description;
+    this.descriptionLocalizations = undefined;
+    this.type = typeof options.type == 'string' ? ApplicationCommandOptionType[options.type] : options.type;
+    this.permissions = {
+      client: new Set(options.permissions?.client?.map(e => typeof e == 'string' ? PermissionFlagsBits[e] : e)),
+      user: new Set(options.permissions?.client?.map(e => typeof e == 'string' ? PermissionFlagsBits[e] : e))
+    };
+    this.cooldowns = options.cooldowns ?? {
+      guild: Math.max(options.cooldowns?.guild ?? 0, 0),
+      channel: Math.max(options.cooldowns?.channel ?? 0, 0),
+      user: Math.max(options.cooldowns?.user ?? 0, 0)
+    };
+    this.required = options.required ?? false;
+    this.dmPermission = options.dmPermission ?? false;
+
+    this.choices = options.choices ?? [];
+    if (!Array.isArray(this.choices)) this.choices = [this.choices];
+
+    this.autocomplete = !!options.autocompleteOptions;
+    if (options.autocompleteOptions) {
+      this.strictAutocomplete = options.strictAutocomplete ?? false;
+
+      this.autocompleteOptions = options.autocompleteOptions ?? [];
+      if (!Array.isArray(this.autocompleteOptions)) this.autocompleteOptions = [this.autocompleteOptions];
+    }
+
+    this.channelTypes = options.channelTypes;
+    this.minValue = options.minValue;
+    this.maxValue = options.maxValue;
+    this.minLength = options.minLength;
+    this.maxLength = options.maxLength;
+
+    this.options = options.options;
+  }
 }
 
-module.exports = { BaseCommand, SlashCommand, PrefixCommand, CommandOptions };
+module.exports = { BaseCommand, SlashCommand, PrefixCommand, MixedCommand, CommandOptions };
