@@ -43,10 +43,10 @@ class BaseCommand {
   /** @param {import('.').BaseCommandInitOptions}options*/
   constructor(options = {}) {
     this.filePath = resolve(options.filePath ?? getCallerFilePath());
-    this.name = (options.name ?? basename(this.filePath)).toLowerCase();
+    this.name = (options.name ?? basename(this.filePath)).toLowerCase(); // NOSONAR
     this.nameLocalizations = undefined;
     this.category = basename(dirname(this.filePath));
-    this.description = options.description;
+    this.description = options.description; // NOSONAR
     this.descriptionLocalizations = undefined;
     this.aliases = options.aliases ?? {};
     this.usage = options.usage ?? {};
