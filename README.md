@@ -6,8 +6,7 @@
 [![wakatime](https://wakatime.com/badge/github/Mephisto5558/Command.svg)](https://wakatime.com/badge/github/Mephisto5558/Command)<br>
 [![CodeQL](https://github.com/Mephisto5558/Command/actions/workflows/codeql.yml/badge.svg)](https://github.com/Mephisto5558/Command/actions/workflows/codeql.yml)
 [![ESLint](https://github.com/Mephisto5558/Command/actions/workflows/eslint.yml/badge.svg?branch=main)](https://github.com/Mephisto5558/Command/actions/workflows/eslint.yml)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Mephisto5558_Command&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Mephisto5558_Command)
-[![Crowdin](https://badges.crowdin.net/Command/localized.svg)](https://crowdin.com/project/Command)<br>
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Mephisto5558_Command&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Mephisto5558_Command)<br>
 [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=Mephisto5558_Command&metric=security_rating)](https://sonarcloud.io/component_measures?metric=Security&id=Mephisto5558_Command)
 [![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=Mephisto5558_Command&metric=sqale_rating)](https://sonarcloud.io/component_measures?metric=Maintainability&id=Mephisto5558_Command)
 [![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=Mephisto5558_Command&metric=reliability_rating)](https://sonarcloud.io/component_measures?metric=Reliability&id=Mephisto5558_Command)
