@@ -1,6 +1,6 @@
 {
-  "name": "command",
-  "version": "1.0.0",
+  "name": "@mephisto5558/command",
+  "version": "0.0.0",
   "description": "Discord.js command class for slash- and prefix commands",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -28,7 +28,7 @@
     "discord.js": "^14.14.1",
     "eslint-plugin-jsdoc": "^48.2.4",
     "eslint-plugin-sonarjs": "^1.0.3",
-    "eslint-plugin-unicorn": "^54.0.0"
+    "eslint-plugin-unicorn": "^55.0.0"
   },
   "repository": {
     "type": "git",
