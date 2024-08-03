@@ -1,14 +1,11 @@
-import Discord from 'discord.js';
-import I18nProvider from '@mephisto5558/i18n';
+import type Discord from 'discord.js';
+import type I18nProvider from '@mephisto5558/i18n';
 
-export { BaseCommand, BaseCommandInitOptions,
-  SlashCommand, SlashCommandInitOptions,
-  PrefixCommand, PrefixCommandInitOptions,
-  MixedCommand, MixedCommandInitOptions,
-  CommandOptions, CommandOptionsInitOptions,
-  lang };
+export { BaseCommand, SlashCommand, PrefixCommand, MixedCommand, CommandOptions };
+export type { BaseCommandInitOptions, SlashCommandInitOptions, PrefixCommandInitOptions, MixedCommandInitOptions, CommandOptionsInitOptions, lang };
 
 type BaseCommandInitOptions = {
+
   /** @deprecated Do not set manually.*/
   name?: Lowercase<string>;
 
@@ -21,7 +18,7 @@ type BaseCommandInitOptions = {
    * Should be in the command file if its language-independent, otherwise in the language files.
    *
    * Gets modified upon initialization.*/
-  usage: { usage?: string; examples?: string };
+  usage?: { usage?: string; examples?: string };
   permissions?: {
     client?: (keyof Discord.PermissionFlags)[];
     user?: (keyof Discord.PermissionFlags)[];
@@ -32,14 +29,14 @@ type BaseCommandInitOptions = {
   dmPermission?: boolean;
   disabled?: boolean;
   disabledReason?: string;
-  options: commandOption[];
+  options?: (CommandOptions | CommandOptionsInitOptions)[];
   beta?: boolean;
   filePath?: string;
 
-  run: (this: Discord.ChatInputCommandInteraction | Discord.Message, lang: lang, client: Discord.Client<true>) => Promise<never>;
+  run(this: Discord.ChatInputCommandInteraction | Discord.Message, lang: lang, client: Discord.Client<true>): Promise<never>;
 };
 
-class BaseCommand<guildOnly extends boolean = true> {
+declare class BaseCommand<guildOnly extends boolean = true> {
   constructor(options: BaseCommandInitOptions);
 
   /** Gets set to the command's filename.*/
@@ -85,12 +82,6 @@ class BaseCommand<guildOnly extends boolean = true> {
   /** Numbers in milliseconds*/
   cooldowns: { guild: number; channel: number; user: number };
 
-  /** Used in subclasses. */
-  slashCommand: undefined;
-
-  /** Used in subclasses. */
-  prefixCommand: undefined;
-
   /** Makes the command also work in direct messages.*/
   dmPermission: guildOnly extends true ? false : true;
 
@@ -103,11 +94,11 @@ class BaseCommand<guildOnly extends boolean = true> {
   /** If enabled in {@link ./config.json} and set here, will be shown to the user when they try to run the command.*/
   disabledReason?: string;
 
-  run: (this: Discord.ChatInputCommandInteraction | Discord.Message, lang: lang, client: Discord.Client<true>) => Promise<never>;
+  options?: CommandOptions[];
 }
 
 type SlashCommandInitOptions = BaseCommandInitOptions & { noDefer?: boolean; ephemeralDefer?: boolean };
-class SlashCommand<guildOnly extends boolean = true> extends BaseCommand<guildOnly> {
+declare class SlashCommand<guildOnly extends boolean = true> extends BaseCommand<guildOnly> {
   constructor(options: SlashCommandInitOptions);
 
   slashCommand: true;
@@ -126,13 +117,11 @@ class SlashCommand<guildOnly extends boolean = true> extends BaseCommand<guildOn
   type: Discord.ApplicationCommandType.ChatInput;
   defaultMemberPermissions: Discord.PermissionsBitField;
 
-  options?: CommandOptions[];
-
   run: (this: Discord.ChatInputCommandInteraction<guildOnly extends true ? 'cached' : Discord.CacheType>, lang: lang, client: Discord.Client<true>) => Promise<never>;
 }
 
 type PrefixCommandInitOptions = BaseCommandInitOptions;
-class PrefixCommand<guildOnly extends boolean = true> extends BaseCommand<guildOnly> {
+declare class PrefixCommand<guildOnly extends boolean = true> extends BaseCommand<guildOnly> {
   constructor(options: PrefixCommandInitOptions);
   slashCommand: false;
   prefixCommand: true;
@@ -141,7 +130,20 @@ class PrefixCommand<guildOnly extends boolean = true> extends BaseCommand<guildO
 }
 
 type MixedCommandInitOptions = SlashCommandInitOptions & PrefixCommandInitOptions;
-class MixedCommand<guildOnly extends boolean = true> extends BaseCommand<guildOnly> implements SlashCommand, PrefixCommand {}
+declare class MixedCommand<guildOnly extends boolean = true> extends BaseCommand<guildOnly> implements SlashCommand, PrefixCommand {
+  // @ts-expect-error overwriting
+  slashCommand: true;
+
+  // @ts-expect-error overwriting
+  prefixCommand: true;
+  noDefer: boolean;
+  ephemeralDefer: boolean;
+  id: string;
+  type: Discord.ApplicationCommandType.ChatInput;
+  defaultMemberPermissions: Discord.PermissionsBitField;
+  options?: CommandOptions[] | undefined;
+  run: (this: Discord.ChatInputCommandInteraction<'cached'> | Discord.Message<true>, lang: lang, client: Discord.Client<true>) => Promise<never>;
+}
 
 type CommandOptionsInitOptions = {
   name: Lowercase<string>;
@@ -183,10 +185,10 @@ type CommandOptionsInitOptions = {
   maxLength?: number;
 
   /** Only existent for {@link CommandOptions.type} `SubcommandGroup` and `Subcommand`.*/
-  options?: CommandOptions[];
+  options?: BaseCommandInitOptions['options'];
 };
 
-class CommandOptions {
+declare class CommandOptions {
   constructor(options: CommandOptionsInitOptions);
 
   name: Lowercase<string>;
@@ -202,7 +204,7 @@ class CommandOptions {
    * @see {@link BaseCommand.descriptionLocalizations}*/
   descriptionLocalizations: BaseCommand['descriptionLocalizations'];
 
-  type: typeof Discord.ApplicationCommandOptionType;
+  type: Discord.ApplicationCommandOptionType;
 
   permissions: BaseCommand['permissions'];
 
@@ -242,7 +244,7 @@ class CommandOptions {
   minLength?: number;
   maxLength?: number;
 
-  options?: CommandOptions[];
+  options?: BaseCommand['options'];
 }
 
 type bBoundFunction<OF, T extends CallableFunction> = T & {
