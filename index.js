@@ -1,5 +1,7 @@
-const { ApplicationCommandType, ApplicationCommandOptionType, PermissionFlagsBits } = require('discord.js');
-const { resolve, dirname, basename } = require('node:path');
+const
+  { ApplicationCommandType, ApplicationCommandOptionType, PermissionFlagsBits } = require('discord.js'),
+  /* eslint-disable-next-line @typescript-eslint/unbound-method -- not an issue with `node:path`*/
+  { resolve, dirname, basename } = require('node:path');
 
 function getCallerFilePath() {
   /* eslint-disable-next-line unicorn/error-message */
@@ -64,8 +66,10 @@ class BaseCommand {
     this.dmPermission = options.dmPermission ?? false;
     this.disabled = options.disabled ?? false;
     this.disabledReason = options.disabledReason;
-    this.options = options ?? [];
+    this.options = options.options ?? [];
     this.beta = options.beta ?? false;
+
+    /* eslint-disable-next-line @typescript-eslint/unbound-method -- false positive here*/
     this.run = options.run;
 
     this.#validateData();
