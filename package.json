@@ -22,7 +22,7 @@
     "node": ">=20.11.0"
   },
   "devDependencies": {
-    "@mephisto5558/eslint-config": "^2.0.0",
+    "@mephisto5558/eslint-config": "^2.0.1",
     "@mephisto5558/i18n": "^1.2.2",
     "discord.js": "^14.15.3",
     "eslint": "^9.9.0"
