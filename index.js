@@ -149,8 +149,8 @@ class CommandOptions {
     this.choices = options.choices ?? [];
     if (!Array.isArray(this.choices)) this.choices = [this.choices];
 
-    this.autocomplete = !!options.autocompleteOptions;
-    if (options.autocompleteOptions) {
+    this.autocomplete = Boolean(options.autocompleteOptions);
+    if (this.autocomplete) {
       this.strictAutocomplete = options.strictAutocomplete ?? false;
 
       this.autocompleteOptions = options.autocompleteOptions ?? [];
