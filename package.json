@@ -26,7 +26,7 @@
   },
   "devDependencies": {
     "@mephisto5558/eslint-config": "^2.0.2",
-    "@mephisto5558/i18n": "^1.2.2",
+    "@mephisto5558/i18n": "file:../i18n",
     "discord.js": "^14.15.3",
     "eslint": "^9.9.1"
   },
