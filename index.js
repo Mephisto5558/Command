@@ -4,8 +4,9 @@
  * @typedef {import('./commands').PrefixCommand}PrefixCommand
  * @typedef {import('./commands').MixedCommand}MixedCommand*/
 
+module.exports = require('./commands');
 
-module.exports = class SlashCommandCollection {
+module.exports.SlashCommandCollection = class SlashCommandCollection {
   client;
 
   /** @param {import('discord.js').Client<true>}client*/

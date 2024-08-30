@@ -4,6 +4,7 @@ import type { SlashCommand } from './commands';
 
 export type { lang };
 export { SlashCommandCollection };
+export * from './commands';
 
 declare module 'discord.js' {
   // @ts-expect-error Overwriting
