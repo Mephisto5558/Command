@@ -54,7 +54,7 @@ class BaseCommand {
     this.descriptionLocalizations = new Map(); // gets filled in #setLocalization()
     this.aliases = options.aliases ?? {};
     this.aliasOf = undefined;
-    this.usage = options.usage ?? {};
+    this.usage = {}; // gets filled in #setLocalization()
     this.usageLocalizations = new Map(); // gets filled in #setLocalization()
     this.permissions = {
       client: new Set(options.permissions?.client?.map(e => typeof e == 'string' ? PermissionFlagsBits[e] : e)),
@@ -83,6 +83,17 @@ class BaseCommand {
    * @param {I18nProvider}i18n*/
   #setLocalization(i18n) {
     for (const locale of i18n.availableLocales.keys()) {
+      const usageLocalization = {
+        usage: this.usage.usage ?? i18n.__({ locale, undefinedNotFound: true }, `${this.langId}.usage.usage`),
+        examples: this.usage.examples ?? i18n.__({ locale, undefinedNotFound: true }, `${this.langId}.usage.examples`)
+      };
+      usageLocalization.usage &&= `{prefix}{cmdName} ${usageLocalization.usage}`.replaceAll('{cmdName}', this.name);
+      usageLocalization.examples &&= `{prefix}{cmdName} ${usageLocalization.examples}`.replaceAll('{cmdName}', this.name);
+
+      if (locale == i18n.config.defaultLocale) this.usage = usageLocalization;
+      else this.usageLocalizations.set(locale, usageLocalization);
+
+
       if (locale == i18n.config.defaultLocale) continue;
 
       const nameLocalization = i18n.__({ locale, undefinedNotFound: true }, `${this.langId}.name`);
@@ -90,9 +101,6 @@ class BaseCommand {
 
       const descriptionLocalization = i18n.__({ locale, undefinedNotFound: true }, `${this.langId}.description`);
       if (descriptionLocalization) this.descriptionLocalizations.set(locale, descriptionLocalization);
-
-      const usageLocalization = i18n.__({ locale, undefinedNotFound: true }, `${this.langId}.usage`);
-      if (usageLocalization) this.usageLocalizations.set(locale, usageLocalization);
     }
   }
 
