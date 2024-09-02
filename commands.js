@@ -13,7 +13,7 @@ const
 
 /**
  * @typedef {import('./commands').BaseCommand}BaseCommand
- * @typedef {import('./commands').CommandOptions}CommandOptions
+ * @typedef {import('./commands').CommandOption}CommandOption
  * @typedef {{ error: typeof console['error'], warn: typeof console['warn'] }}logger*/
 
 // Source: https://stackoverflow.com/a/61860802/17580213
@@ -41,7 +41,7 @@ class BaseCommand {
   slashCommand; prefixCommand; dmPermission; disabled; disabledReason; options; beta;
 
   /**
-   * @param {import('./commands').BaseCommandInitOptions}options
+   * @param {import('./commands').BaseCommandInitOptions<boolean>}options
    * @param {logger}logger
    * @param {I18nProvider | undefined}i18n*/
   constructor(options, logger, i18n = defaultI18nProvider) {
@@ -183,15 +183,15 @@ class MixedCommand extends classes(SlashCommand, PrefixCommand) {
   }
 }
 
-class CommandOptions {
+class CommandOption {
   name; nameLocalizations; description; descriptionLocalizations;
   type; cooldowns; required; dmPermission; choices; autocomplete;
   strictAutocomplete; channelTypes; minValue; maxValue; minLength; maxLength;
   options;
 
   /**
-   * @param {import('./commands').CommandOptionsInitOptions}options
-   * @param {import('./commands').BaseCommand | import('./commands').CommandOptions}parent
+   * @param {import('./commands').CommandOptionInitOptions<boolean>}options
+   * @param {import('./commands').BaseCommand<boolean> | import('./commands').CommandOption}parent
    * @param {logger} logger
    * @param {I18nProvider | undefined}i18n*/
   constructor(options, parent, logger, i18n = defaultI18nProvider) {
@@ -214,7 +214,7 @@ class CommandOptions {
     this.dmPermission = options.dmPermission ?? false;
 
     const choices = options.choices ?? [];
-    this.choices = (Array.isArray(choices) ? choices : [choices]).map(/** @param {import('./commands').CommandOptions['choices'][number] | string | number}choice*/ choice => {
+    this.choices = (Array.isArray(choices) ? choices : [choices]).map(/** @param {import('./commands').CommandOption['choices'][number] | string | number}choice*/ choice => {
       if (typeof choice == 'object') {
         choice.__NO_LOCALIZATION = true; // Removed in #setLocalization()
         return choice;
@@ -327,4 +327,4 @@ class CommandOptions {
   }
 }
 
-module.exports = { BaseCommand, SlashCommand, PrefixCommand, MixedCommand, CommandOptions };
+module.exports = { BaseCommand, SlashCommand, PrefixCommand, MixedCommand, CommandOption };
