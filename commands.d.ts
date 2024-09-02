@@ -38,7 +38,7 @@ type BaseCommandInitOptions = {
 };
 
 declare class BaseCommand<guildOnly extends boolean = boolean, T_name extends Lowercase<string> = Lowercase<string>, T_category extends Lowercase<string> = Lowercase<string>> {
-  constructor(options: BaseCommandInitOptions, i18n: I18nProvider);
+  constructor(options: BaseCommandInitOptions, i18n?: I18nProvider);
 
   /** The command's full file path, useful for e.g. reloading the command.*/
   filePath: string;
@@ -105,7 +105,7 @@ type SlashCommandInitOptions = BaseCommandInitOptions & {
   run(this: Discord.ChatInputCommandInteraction, lang: lang, client: Discord.Client<true>): Promise<never>;
 };
 declare class SlashCommand<guildOnly extends boolean = boolean> extends BaseCommand<guildOnly> {
-  constructor(options: SlashCommandInitOptions, i18n: I18nProvider);
+  constructor(options: SlashCommandInitOptions, i18n?: I18nProvider);
 
   slashCommand: true;
   prefixCommand: false;
@@ -131,7 +131,7 @@ type PrefixCommandInitOptions = BaseCommandInitOptions & {
   run(this: Discord.Message, lang: lang, client: Discord.Client<true>): Promise<never>;
 };
 declare class PrefixCommand<guildOnly extends boolean = boolean> extends BaseCommand<guildOnly> {
-  constructor(options: PrefixCommandInitOptions, i18n: I18nProvider);
+  constructor(options: PrefixCommandInitOptions, i18n?: I18nProvider);
   slashCommand: false;
   prefixCommand: true;
 
@@ -140,7 +140,7 @@ declare class PrefixCommand<guildOnly extends boolean = boolean> extends BaseCom
 
 type MixedCommandInitOptions = SlashCommandInitOptions & PrefixCommandInitOptions;
 declare class MixedCommand<guildOnly extends boolean = boolean> extends BaseCommand<guildOnly> implements SlashCommand<guildOnly>, PrefixCommand<guildOnly> {
-  constructor(options: MixedCommandInitOptions, i18n: I18nProvider);
+  constructor(options: MixedCommandInitOptions, i18n?: I18nProvider);
 
   // @ts-expect-error overwriting
   slashCommand: true;
@@ -212,7 +212,7 @@ type CommandOptionsInitOptions = {
 };
 
 declare class CommandOptions<T_parent extends BaseCommand | CommandOptions = BaseCommand, T_name extends Lowercase<string> = Lowercase<string>> {
-  constructor(options: CommandOptionsInitOptions, parent: T_parent, i18n: I18nProvider);
+  constructor(options: CommandOptionsInitOptions, parent: T_parent, i18n?: I18nProvider);
 
   name: T_name;
   nameLocalizations?: BaseCommand['nameLocalizations'];

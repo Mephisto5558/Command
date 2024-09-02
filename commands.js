@@ -1,14 +1,15 @@
 const
   { ApplicationCommandType, ApplicationCommandOptionType, PermissionFlagsBits, PermissionsBitField, ChannelType } = require('discord.js'),
   /* eslint-disable-next-line @typescript-eslint/unbound-method -- not an issue with `node:path`*/
-  { resolve, dirname, basename } = require('node:path'),
+  { join, resolve, dirname, basename } = require('node:path'),
+  I18nProvider = require('@mephisto5558/i18n'),
   getCallerFilePath = require('./utils/getCallerFilePath.js');
 
 const
   MAX_DESCRIPTION_LENGTH = 100,
   MIN_CHOICE_NAME_LENGTH = 2,
-  MAX_CHOICE_NAME_LENGTH = 32;
-
+  MAX_CHOICE_NAME_LENGTH = 32,
+  defaultI18nProvider = new I18nProvider({ undefinedNotFound: true, localesPath: join(process.cwd(), 'Locales') });
 
 /**
  * @typedef {import('./commands').BaseCommand}BaseCommand
@@ -42,8 +43,8 @@ class BaseCommand {
   /**
    * @param {import('./commands').BaseCommandInitOptions}options
    * @param {logger}logger
-   * @param {import('@mephisto5558/i18n')}i18n*/
-  constructor(options, logger, i18n) {
+   * @param {I18nProvider | undefined}i18n*/
+  constructor(options, logger, i18n = defaultI18nProvider) {
     this.filePath = resolve(options.filePath ?? getCallerFilePath());
     this.name = (options.name ?? basename(this.filePath)).toLowerCase(); // NOSONAR
     this.nameLocalizations = new Map(); // gets filled in #setLocalization()
@@ -79,7 +80,7 @@ class BaseCommand {
 
   /**
    * Sets the localization for `name`, `description` and `usage`.
-   * @param {import('@mephisto5558/i18n')}i18n*/
+   * @param {I18nProvider}i18n*/
   #setLocalization(i18n) {
     for (const locale of i18n.availableLocales.keys()) {
       if (locale == i18n.config.defaultLocale) continue;
@@ -97,7 +98,7 @@ class BaseCommand {
 
   /**
    * @param {logger}logger
-   * @param {import('@mephisto5558/i18n')}i18n
+   * @param {I18nProvider}i18n
    * @throws {TypeError} upon wrong command.run type*/
   #validateData(logger, i18n) {
     if (this.disabled) return;
@@ -133,8 +134,8 @@ class SlashCommand extends BaseCommand {
   /**
    * @param {import('./commands').SlashCommandInitOptions}options
    * @param {logger}logger
-   * @param {import('@mephisto5558/i18n')}i18n*/
-  constructor(options, logger, i18n) {
+   * @param {I18nProvider | undefined}i18n*/
+  constructor(options, logger, i18n = defaultI18nProvider) {
     super(options, logger, i18n);
 
     this.slashCommand = true;
@@ -156,8 +157,8 @@ class PrefixCommand extends BaseCommand {
   /**
    * @param {import('./commands').PrefixCommandInitOptions}options
    * @param {logger}logger
-   * @param {import('@mephisto5558/i18n')}i18n*/
-  constructor(options, logger, i18n) {
+   * @param {I18nProvider | undefined}i18n*/
+  constructor(options, logger, i18n = defaultI18nProvider) {
     super(options, logger, i18n);
 
     this.slashCommand = false;
@@ -173,8 +174,8 @@ class MixedCommand extends classes(SlashCommand, PrefixCommand) {
    * @this {SlashCommand & PrefixCommand}
    * @param {import('./commands').MixedCommandInitOptions}options
    * @param {logger}logger
-   * @param {import('@mephisto5558/i18n')}i18n*/
-  constructor(options, logger, i18n) {
+   * @param {I18nProvider | undefined}i18n*/
+  constructor(options, logger, i18n = defaultI18nProvider) {
     super(options, logger, i18n);
 
     this.slashCommand = true;
@@ -192,8 +193,8 @@ class CommandOptions {
    * @param {import('./commands').CommandOptionsInitOptions}options
    * @param {import('./commands').BaseCommand | import('./commands').CommandOptions}parent
    * @param {logger} logger
-   * @param {import('@mephisto5558/i18n')}i18n*/
-  constructor(options, parent, logger, i18n) {
+   * @param {I18nProvider | undefined}i18n*/
+  constructor(options, parent, logger, i18n = defaultI18nProvider) {
     this.name = options.name;
     this.nameLocalizations = new Map(); // gets filled in #setLocalization()
     this.langId = `${parent.langId}.options.${this.name}`;
@@ -248,7 +249,7 @@ class CommandOptions {
 
   /**
    * Sets the localization for `name`, `description` and `choices`.
-   * @param {import('@mephisto5558/i18n')}i18n*/
+   * @param {I18nProvider}i18n*/
   #setLocalization(i18n) {
     for (const locale of i18n.availableLocales.keys()) {
       if (locale == i18n.config.defaultLocale) continue;
@@ -274,7 +275,7 @@ class CommandOptions {
 
   /**
    * @param {logger}logger
-   * @param {import('@mephisto5558/i18n')}i18n
+   * @param {I18nProvider}i18n
    * @throws {TypeError} on invalid type, channelType or minLength/minValue missmatch.*/
   #validateData(logger, i18n) {
     if (this.disabled) return;
