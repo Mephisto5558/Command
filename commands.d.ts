@@ -46,6 +46,8 @@ type BaseCommandInitOptions<canBeDM extends boolean | undefined = undefined> = {
   disabledReason?: string;
   options?: CommandOption[];
   beta?: boolean;
+
+  /** @deprecated Do not set manually.*/
   filePath?: string;
 };
 
