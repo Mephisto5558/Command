@@ -14,7 +14,7 @@ type CombineTypes<A, B> = {
 };
 /* eslint-enable @typescript-eslint/no-invalid-void-type */
 
-export type { BaseCommand, SlashCommand, PrefixCommand, MixedCommand, CommandOption };
+export { BaseCommand, SlashCommand, PrefixCommand, MixedCommand, CommandOption };
 export type { BaseCommandInitOptions, SlashCommandInitOptions, PrefixCommandInitOptions, MixedCommandInitOptions, CommandOptionInitOptions };
 
 type autocompleteOptions = string | number | { name: string; value: string };

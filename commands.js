@@ -14,7 +14,7 @@ const
 /**
  * @typedef {import('./commands').BaseCommand}BaseCommand
  * @typedef {import('./commands').CommandOption}CommandOption
- * @typedef {{ error: typeof console['error'], warn: typeof console['warn'] }}logger*/
+ * @typedef {{ log: typeof console['log'], error: typeof console['error'], warn: typeof console['warn'] }}logger*/
 
 // Source: https://stackoverflow.com/a/61860802/17580213
 function classes(...bases) {
