@@ -1,9 +1,6 @@
-module.exports = function getCallerFilePath() {
+module.exports = function getCallerFilePath(dirname) {
   /* eslint-disable-next-line unicorn/error-message */
-  const stack = new Error().stack.split('\n');
+  const line = new Error().stack.split('\n').find(e => e.includes(dirname));
 
-  return stack[2].slice(
-    stack[2].lastIndexOf('(') + 1,
-    stack[2].lastIndexOf('.js') + 3
-  );
+  return line.slice(line.lastIndexOf('(') + 1, line.lastIndexOf('.js') + 3);
 };

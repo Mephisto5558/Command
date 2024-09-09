@@ -108,7 +108,7 @@ declare class BaseCommand<canBeDM extends boolean | undefined = undefined, T_nam
   /** If enabled in {@link ./config.json} and set here, will be shown to the user when they try to run the command.*/
   disabledReason?: string;
 
-  options?: CommandOption<BaseCommand>[];
+  options?: CommandOption[];
 
   /** Beta commands are the only commands that get loaded when `client.env == 'dev'`.*/
   beta: boolean;
@@ -231,13 +231,13 @@ type CommandOptionInitOptions<canBeDM extends boolean | undefined = undefined> =
   options?: CommandOption['options'];
 };
 
-declare class CommandOption<T_parent extends SlashCommand | PrefixCommand | MixedCommand | BaseCommand | CommandOption = MixedCommand, T_name extends Lowercase<string> = Lowercase<string>> {
-  constructor(options: CommandOptionInitOptions, parent: T_parent, i18n?: I18nProvider);
+declare class CommandOption<T_name extends Lowercase<string> = Lowercase<string>> {
+  constructor(options: CommandOptionInitOptions, i18n?: I18nProvider);
 
   name: T_name;
   nameLocalizations?: BaseCommand['nameLocalizations'];
 
-  langId: `${T_parent['langId']}.options.${T_name}}`;
+  langId?: `${BaseCommand['langId']}.options.${T_name}}`;
 
   /**
    * Gets set automatically from language files.
@@ -293,5 +293,5 @@ declare class CommandOption<T_parent extends SlashCommand | PrefixCommand | Mixe
   disabled: BaseCommand['disabled'];
   disabledReason: BaseCommand['disabledReason'];
 
-  options?: CommandOption<CommandOption>;
+  options?: CommandOption;
 }

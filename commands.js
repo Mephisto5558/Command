@@ -45,8 +45,8 @@ class BaseCommand {
    * @param {logger}logger
    * @param {I18nProvider | undefined}i18n*/
   constructor(options, logger, i18n = defaultI18nProvider) {
-    this.filePath = resolve(options.filePath ?? getCallerFilePath());
-    this.name = (options.name ?? basename(this.filePath)).toLowerCase(); // NOSONAR
+    this.filePath = resolve(options.filePath ?? getCallerFilePath('Commands'));
+    this.name = (options.name ?? basename(this.filePath).split('.')[0]).toLowerCase(); // NOSONAR
     this.nameLocalizations = new Map(); // gets filled in #setLocalization()
     this.category = basename(dirname(this.filePath)).toLowerCase();
     this.langId = `commands.${this.category}.${this.name}`;
@@ -199,13 +199,12 @@ class CommandOption {
 
   /**
    * @param {import('./commands').CommandOptionInitOptions<boolean>}options
-   * @param {import('./commands').BaseCommand<boolean> | import('./commands').CommandOption}parent
-   * @param {logger} logger
+   * @param {logger?}logger
    * @param {I18nProvider | undefined}i18n*/
-  constructor(options, parent, logger, i18n = defaultI18nProvider) {
+  constructor(options, logger = console, i18n = defaultI18nProvider) {
     this.name = options.name;
     this.nameLocalizations = new Map(); // gets filled in #setLocalization()
-    this.langId = `${parent.langId}.options.${this.name}`;
+    this.langId = undefined; // gets set in #_setParent()
     this.description = options.description;
     this.descriptionLocalizations = new Map(); // gets filled in #setLocalization()
     this.type = typeof options.type == 'string' ? ApplicationCommandOptionType[options.type] : options.type;
@@ -290,9 +289,9 @@ class CommandOption {
 
     if (!(this.type in ApplicationCommandOptionType)) throw new TypeError(`Missing or invalid type for option "${this.langId}.type", got "${this.type}."`);
 
-    if ([ApplicationCommandOptionType.Number, ApplicationCommandOptionType.Integer].includes(this.type) && ('minLength' in this || 'maxLength' in this))
+    if ([ApplicationCommandOptionType.Number, ApplicationCommandOptionType.Integer].includes(this.type) && (this.minLength != undefined || this.maxLength != undefined))
       throw new TypeError(`Number and Integer options do not support "minLength" and "maxLength" (${this.langId})`);
-    if (this.type == ApplicationCommandOptionType.String && ('minValue' in this || 'maxValue' in this))
+    if (this.type == ApplicationCommandOptionType.String && (this.minValue != undefined || this.maxValue != undefined))
       throw new TypeError(`String options do not support "minValue" and "maxValue" (${this.langId})`);
 
     this.channelTypes = this.channelTypes?.map((e, i) => {
@@ -332,6 +331,11 @@ class CommandOption {
         }
       }
     }
+  }
+
+  _setParent(parent) {
+    this.langId = `${parent.langId}.options.${this.name}`;
+    delete this._setParent;
   }
 }
 
