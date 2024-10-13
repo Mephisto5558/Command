@@ -210,8 +210,8 @@ type CommandOptionInitOptions<canBeDM extends boolean | undefined = undefined> =
 
   /** Like choices, but not enforced unless {@link CommandOption.strictAutocomplete} is enabled.*/
   autocompleteOptions?: string
-  | autocompleteOptions[]
-  | ((this: Discord.AutocompleteInteraction) => autocompleteOptions[] | Promise<autocompleteOptions>);
+    | autocompleteOptions[]
+    | ((this: Discord.AutocompleteInteraction) => autocompleteOptions[] | Promise<autocompleteOptions>);
 
   /**
    * Return an error message to the user, if their input is not included in {@link CommandOption.autocompleteOptions}.
@@ -277,7 +277,7 @@ declare class CommandOption<T_name extends Lowercase<string> = Lowercase<string>
 
   /** Like choices, but not enforced unless {@link CommandOption.strictAutocomplete} is enabled.*/
   autocompleteOptions?: autocompleteOptions[]
-  | ((this: Discord.AutocompleteInteraction) => autocompleteOptions[] | Promise<autocompleteOptions>);
+    | ((this: Discord.AutocompleteInteraction) => autocompleteOptions[] | Promise<autocompleteOptions>);
 
   /**
    * Return an error message to the user, if their input is not included in {@link CommandOption.autocompleteOptions}.

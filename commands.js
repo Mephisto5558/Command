@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-deprecated -- wip*/
 const
   { ApplicationCommandType, ApplicationCommandOptionType, PermissionFlagsBits, PermissionsBitField, ChannelType } = require('discord.js'),
   /* eslint-disable-next-line @typescript-eslint/unbound-method -- not an issue with `node:path`*/
@@ -121,7 +122,7 @@ class BaseCommand {
       this.description = this.description.slice(0, MAX_DESCRIPTION_LENGTH);
     }
 
-    if (!/^(async )?function/.test(this.run))
+    if (!/^(?:async )?function/.test(this.run))
       throw new TypeError(`The "run" property of command "${this.name}" (${this.langId}.run) is not a function or async function (Got "${typeof this.run}")! You cannot use an arrow function.`);
 
     for (const [locale] of i18n.availableLocales.keys()) {
