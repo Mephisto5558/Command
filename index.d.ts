@@ -14,7 +14,7 @@ declare function updateApplicationCommands<CMDs extends Map<string, Commands.Sla
 
 declare module 'discord.js' {
   // @ts-expect-error Overwriting
-  type Snowflake = `${number}`;
+  type Snowflake = `${bigint}`;
 }
 
 type bBoundFunction<OF, T extends CallableFunction> = T & {
