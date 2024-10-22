@@ -171,7 +171,7 @@ declare class MixedCommand<canBeDM extends boolean | undefined = undefined> exte
   ephemeralDefer: boolean;
   id: Discord.Snowflake;
   type: Discord.ApplicationCommandType.ChatInput;
-  options?: CommandOption[] | undefined;
+  options?: CommandOption[];
 
   // @ts-expect-error This is fine and compatible.
   run: (

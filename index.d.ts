@@ -3,6 +3,7 @@ import type I18nProvider from '@mephisto5558/i18n';
 import type Commands from './commands';
 
 export type { lang, logger };
+/* eslint-disable-next-line sonarjs/no-wildcard-import -- everything is needed.*/
 export * from './commands';
 export { updateApplicationCommands };
 
