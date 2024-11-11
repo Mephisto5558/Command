@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-deprecated -- wip*/
 const
   { ApplicationCommandType, ApplicationCommandOptionType, PermissionFlagsBits, PermissionsBitField, ChannelType } = require('discord.js'),
-  /* eslint-disable-next-line @typescript-eslint/unbound-method -- not an issue with `node:path`*/
   { join, resolve, dirname, basename } = require('node:path'),
   I18nProvider = require('@mephisto5558/i18n'),
   getCallerFilePath = require('./utils/getCallerFilePath.js');
@@ -20,7 +19,7 @@ const
 // Source: https://stackoverflow.com/a/61860802/17580213
 function classes(...bases) {
   /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
-  class Bases { // NOSONAR
+  class Bases {
     constructor(...args) {
       for (const Base of bases) Object.assign(this, new Base(...args));
     }
