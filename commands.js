@@ -156,7 +156,7 @@ class SlashCommand extends BaseCommand {
     this.id = undefined;
     this.type = ApplicationCommandType.ChatInput;
 
-    /* eslint-disable-next-line @typescript-eslint/unbound-method */
+    /* eslint-disable-next-line custom/unbound-method */
     this.run = options.run;
   }
 }
@@ -172,7 +172,7 @@ class PrefixCommand extends BaseCommand {
     this.slashCommand = false;
     this.prefixCommand = true;
 
-    /* eslint-disable-next-line @typescript-eslint/unbound-method */
+    /* eslint-disable-next-line custom/unbound-method */
     this.run = options.run;
   }
 }
