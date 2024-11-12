@@ -10,6 +10,8 @@ on:
     branches: [ main ]
   schedule:
     - cron: '00 00 01 * *'
+permissions:
+  contents: read
 jobs:
   njsscan:
     runs-on: ubuntu-latest
