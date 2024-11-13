@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/github/license/Mephisto5558/Command)](https://github.com/Mephisto5558/Command/blob/main/LICENSE)
 [![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=Mephisto5558_Command&metric=ncloc)](https://sonarcloud.io/component_measures?metric=ncloc&id=Mephisto5558_Command)
 [![wakatime](https://wakatime.com/badge/github/Mephisto5558/Command.svg)](https://wakatime.com/badge/github/Mephisto5558/Command)<br>
-[![CodeQL](https://github.com/Mephisto5558/Command/actions/workflows/codeql.yml/badge.svg)](https://github.com/Mephisto5558/Command/actions/workflows/codeql.yml)
+[![CodeQL](https://github.com/Mephisto5558/Command/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/Mephisto5558/Command/actions/workflows/github-code-scanning/codeql)
 [![ESLint](https://github.com/Mephisto5558/Command/actions/workflows/eslint.yml/badge.svg?branch=main)](https://github.com/Mephisto5558/Command/actions/workflows/eslint.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Mephisto5558_Command&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Mephisto5558_Command)<br>
 [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=Mephisto5558_Command&metric=security_rating)](https://sonarcloud.io/component_measures?metric=Security&id=Mephisto5558_Command)
