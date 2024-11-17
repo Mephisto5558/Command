@@ -174,7 +174,7 @@ class BaseCommand {
     if (!/^(?:async )?function/.test(this.run))
       throw new TypeError(`The "run" property of command "${this.name}" (${this.langId}.run) is not a function or async function (Got "${typeof this.run}")! You cannot use an arrow function.`);
 
-    for (const [locale] of i18n.availableLocales.keys()) {
+    for (const locale of i18n.availableLocales.keys()) {
       const descriptionLocalization = this.descriptionLocalizations.get(locale);
       if (!descriptionLocalization) this.#logger.warn(`Missing description localization for option "${this.name}" (${this.langId}.descriptionLocalizations.${locale})`);
       else if (descriptionLocalization.length > MAX_DESCRIPTION_LENGTH) {
@@ -392,7 +392,7 @@ class CommandOption {
       return Number.isNaN(Number.parseInt(e)) ? ChannelType[e] : Number.parseInt(e);
     });
 
-    for (const [locale] of i18n.availableLocales.keys()) {
+    for (const locale of i18n.availableLocales.keys()) {
       const descriptionLocalization = this.descriptionLocalizations.get(locale);
       if (!descriptionLocalization) this.#logger.warn(`Missing description localization for option "${this.langId}.descriptionLocalizations.${locale}"`);
       else if (descriptionLocalization.length > MAX_DESCRIPTION_LENGTH) {
