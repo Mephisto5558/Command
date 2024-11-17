@@ -50,6 +50,12 @@ type BaseCommandInitOptions<canBeDM extends boolean = false> = {
 };
 
 declare abstract class BaseCommand<canBeDM extends boolean = false, T_name extends Lowercase<string> = Lowercase<string>, T_category extends Lowercase<string> = Lowercase<string>> {
+  /** Sets the localization for `name`, `description` and `usage`.*/
+  static setLocalization(command: MixedCommand, i18n: I18nProvider): void;
+
+  /** @throws {TypeError} upon invalid run function, otherwise just logs. */
+  static validateData(command: MixedCommand, logger: logger, i18n: I18nProvider): void;
+
   // @ts-expect-error `logger` is intended to be bound by the lib user.
   constructor(logger?: logger, options: BaseCommandInitOptions<canBeDM>, i18n?: I18nProvider, devMode?: boolean);
 

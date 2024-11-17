@@ -43,7 +43,7 @@ function flipDevMode(logger) {
     delete logger._warn;
     delete logger._error;
 
-    return;
+    return logger;
   }
 
   logger._warn = logger.warn;
@@ -59,6 +59,8 @@ function flipDevMode(logger) {
     debugger;
     return logger._error(...args);
   };
+
+  return logger;
 }
 
 
@@ -67,7 +69,6 @@ class BaseCommand {
   filePath; name; nameLocalizations; category; langId; description; descriptionLocalizations;
   aliases; aliasOf; usage; usageLocalizations; permissions; cooldowns;
   slashCommand; prefixCommand; context; disabled; disabledReason; options; beta;
-  #logger;
 
   /**
    * @param {import('.').logger | undefined}logger
@@ -105,83 +106,78 @@ class BaseCommand {
     this.beta = options.beta ?? false;
     this.run = undefined;
 
-    this.#logger = logger;
-    if (devMode) flipDevMode(this.#logger);
-
-    this.#setLocalization(i18n);
-    this.#validateData(i18n, devMode);
+    if (devMode) flipDevMode(logger);
 
     for (const option of this.options) option.__init(`${this.langId}.options`, i18n);
   }
 
-  /**
-   * Sets the localization for `name`, `description` and `usage`.
-   * @param {I18nProvider}i18n*/
-  #setLocalization(i18n) {
+  /** @type {typeof import('./commands').BaseCommand['setLocalization']}*/
+  static setLocalization(command, i18n) {
     for (const locale of i18n.availableLocales.keys()) {
       const usageLocalization = {
-        usage: this.usage.usage ?? i18n.__({ locale, undefinedNotFound: true }, `${this.langId}.usage.usage`),
-        examples: this.usage.examples ?? i18n.__({ locale, undefinedNotFound: true }, `${this.langId}.usage.examples`)
+        usage: command.usage.usage ?? i18n.__({ locale, undefinedNotFound: true }, `${command.langId}.usage.usage`),
+        examples: command.usage.examples ?? i18n.__({ locale, undefinedNotFound: true }, `${command.langId}.usage.examples`)
       };
-      usageLocalization.usage &&= `{prefix}{cmdName} ${usageLocalization.usage}`.replaceAll('{cmdName}', this.name);
-      usageLocalization.examples &&= `{prefix}{cmdName} ${usageLocalization.examples}`.replaceAll('{cmdName}', this.name);
+      usageLocalization.usage &&= `{prefix}{cmdName} ${usageLocalization.usage}`.replaceAll('{cmdName}', command.name);
+      usageLocalization.examples &&= `{prefix}{cmdName} ${usageLocalization.examples}`.replaceAll('{cmdName}', command.name);
 
-      if (locale == i18n.config.defaultLocale) this.usage = usageLocalization;
-      else this.usageLocalizations.set(locale, usageLocalization);
+      if (locale == i18n.config.defaultLocale) command.usage = usageLocalization;
+      else command.usageLocalizations.set(locale, usageLocalization);
 
 
       if (locale == i18n.config.defaultLocale) continue;
 
-      const nameLocalization = i18n.__({ locale, undefinedNotFound: true }, `${this.langId}.name`);
-      if (nameLocalization) this.nameLocalizations.set(locale, nameLocalization);
+      const nameLocalization = i18n.__({ locale, undefinedNotFound: true }, `${command.langId}.name`);
+      if (nameLocalization) command.nameLocalizations.set(locale, nameLocalization);
 
-      const descriptionLocalization = i18n.__({ locale, undefinedNotFound: true }, `${this.langId}.description`);
-      if (descriptionLocalization) this.descriptionLocalizations.set(locale, descriptionLocalization);
+      const descriptionLocalization = i18n.__({ locale, undefinedNotFound: true }, `${command.langId}.description`);
+      if (descriptionLocalization) command.descriptionLocalizations.set(locale, descriptionLocalization);
     }
   }
 
-  /**
-   * @param {I18nProvider}i18n
-   * @throws {TypeError} upon wrong command.run type*/
-  #validateData(i18n) {
-    if (this.disabled) return;
+  /** @type {typeof import('./commands').BaseCommand['validateData']}*/
+  static validateData(command, logger, i18n) {
+    if (command.disabled) return;
 
-    if (this.name.includes('A-Z')) {
-      this.#logger.error(`"${this.name}" (${this.langId}.name) has uppercase letters! Fixing.`);
-      this.name = this.name.toLowerCase();
+    if (command.name.includes('A-Z')) {
+      logger.error(`"${command.name}" (${command.langId}.name) has uppercase letters! Fixing.`);
+      command.name = command.name.toLowerCase();
     }
 
-    if (this.description.length > MAX_DESCRIPTION_LENGTH) {
-      this.#logger.warn(`Description of command "${this.name}" (${this.langId}.description) is too long (max. length is ${MAX_DESCRIPTION_LENGTH})! Slicing.`);
-      this.description = this.description.slice(0, MAX_DESCRIPTION_LENGTH);
+    if (command.description.length > MAX_DESCRIPTION_LENGTH) {
+      logger.warn(`Description of command "${command.name}" (${command.langId}.description) is too long (max. length is ${MAX_DESCRIPTION_LENGTH})! Slicing.`);
+      command.description = command.description.slice(0, MAX_DESCRIPTION_LENGTH);
     }
 
-    if (!this.context.includes(InteractionContextType.Guild)) {
-      if (this.context.includes('-Guild')) this.context = this.context.filter(e => e != '-Guild');
+    if (!command.context.includes(InteractionContextType.Guild)) {
+      if (command.context.includes('-Guild')) command.context = command.context.filter(e => e != '-Guild');
       else {
-        this.#logger.warn(
-          `Context of command "${this.name}" (${this.langId}.context) does not include "Guild" context (${InteractionContextType.Guild}), meaning it will not be registered in guilds!\n`
+        logger.warn(
+          `Context of command "${command.name}" (${command.langId}.context) does not include "Guild" context (${InteractionContextType.Guild}), meaning it will not be registered in guilds!\n`
           + 'If this is intentional, add "-Guild" to the context.'
         );
       }
     }
 
-    for (let i = 0; i < this.options.length; i++) {
-      if (!(this.options[i] instanceof CommandOption))
-        throw new TypeError(`Invalid options array value, expected instance of CommandOption, got "${this.options[i].constructor.name}"! (${this.langId}.options.${i})`);
+    for (let i = 0; i < command.options.length; i++) {
+      if (!(command.options[i] instanceof CommandOption))
+        throw new TypeError(`Invalid options array value, expected instance of CommandOption, got "${command.options[i].constructor.name}"! (${command.langId}.options.${i})`);
     }
 
-    if (!/^(?:async )?function/.test(this.run))
-      throw new TypeError(`The "run" property of command "${this.name}" (${this.langId}.run) is not a function or async function (Got "${typeof this.run}")! You cannot use an arrow function.`);
+    if (!/^(?:async )?function/.test(command.run)) {
+      throw new TypeError(
+        `The "run" property of command "${command.name}" (${command.langId}.run) is not a function or async function (Got "${typeof command.run}")! You cannot use an arrow function.`
+      );
+    }
 
     for (const locale of i18n.availableLocales.keys()) {
       if (locale == i18n.config.defaultLocale) continue;
 
-      const descriptionLocalization = this.descriptionLocalizations.get(locale);
-      if (!descriptionLocalization) this.#logger.warn(`Missing description localization for option "${this.name}" (${this.langId}.descriptionLocalizations.${locale})`);
+      const descriptionLocalization = command.descriptionLocalizations.get(locale);
+      if (!descriptionLocalization) logger.warn(`Missing description localization for option "${command.name}" (${command.langId}.descriptionLocalizations.${locale})`);
       else if (descriptionLocalization.length > MAX_DESCRIPTION_LENGTH) {
-        this.#logger.warn(`Description localization of option "${this.name}" (${this.langId}.descriptionLocalizations.${locale}) is too long (max. length is ${MAX_DESCRIPTION_LENGTH})! Slicing.`);
-        this.descriptionLocalizations.set(locale, descriptionLocalization.slice(0, MAX_DESCRIPTION_LENGTH));
+        logger.warn(`Description localization of option "${command.name}" (${command.langId}.descriptionLocalizations.${locale}) is too long (max. length is ${MAX_DESCRIPTION_LENGTH})! Slicing.`);
+        command.descriptionLocalizations.set(locale, descriptionLocalization.slice(0, MAX_DESCRIPTION_LENGTH));
       }
     }
   }
@@ -212,6 +208,10 @@ class SlashCommand extends BaseCommand {
 
     /* eslint-disable-next-line custom/unbound-method */
     this.run = options.run;
+
+    // Object.getPrototypeOf(this.constructor) == `super` class
+    Object.getPrototypeOf(this.constructor).setLocalization(this, i18n);
+    Object.getPrototypeOf(this.constructor).validateData(this, logger, i18n);
   }
 
   static [Symbol.hasInstance](value) {
@@ -236,6 +236,10 @@ class PrefixCommand extends BaseCommand {
 
     /* eslint-disable-next-line custom/unbound-method */
     this.run = options.run;
+
+    // Object.getPrototypeOf(this.constructor) == `super` class
+    Object.getPrototypeOf(this.constructor).setLocalization(this, i18n);
+    Object.getPrototypeOf(this.constructor).validateData(this, logger, i18n);
   }
 
   static [Symbol.hasInstance](value) {
@@ -258,6 +262,10 @@ class MixedCommand extends classes(SlashCommand, PrefixCommand) {
 
     this.slashCommand = true;
     this.prefixCommand = true;
+
+    // Object.getPrototypeOf(this.constructor) == `super` class
+    Object.getPrototypeOf(this.constructor).setLocalization(this, i18n);
+    Object.getPrototypeOf(this.constructor).validateData(this, logger, i18n);
   }
 
   static [Symbol.hasInstance](value) {
