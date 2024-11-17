@@ -164,7 +164,7 @@ class BaseCommand {
         throw new TypeError(`Invalid options array value, expected instance of CommandOption, got "${command.options[i].constructor.name}"! (${command.langId}.options.${i})`);
     }
 
-    if (!/^(?:async )?function/.test(command.run)) {
+    if (!/^(?:async |function)/.test(command.run)) {
       throw new TypeError(
         `The "run" property of command "${command.name}" (${command.langId}.run) is not a function or async function (Got "${typeof command.run}")! You cannot use an arrow function.`
       );
