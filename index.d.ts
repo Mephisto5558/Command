@@ -1,16 +1,25 @@
-import type Discord from 'discord.js';
+import type { ApplicationCommand, ClientApplication } from 'discord.js';
 import type I18nProvider from '@mephisto5558/i18n';
 import type Commands from './commands';
 
-export type { lang, logger };
-/* eslint-disable-next-line sonarjs/no-wildcard-import -- everything is needed.*/
-export * from './commands';
-export { updateApplicationCommands };
+/* eslint-disable-next-line sonarjs/no-wildcard-import */
+export * from './commands.js';
 
-declare function updateApplicationCommands<CMDs extends Map<string, Commands.SlashCommand<boolean> | Commands.MixedCommand<boolean>>>(
-  app: Discord.ClientApplication, commands: CMDs,
-  logger: logger, loggerOptions: { hideDisabledCommandLog?: boolean; hideNonBetaCommandLog?: boolean }
-): Promise<CMDs>;
+/** @returns `true` if both are undefined, otherwise compares their values.*/
+export declare function mapsEqual(a: Map<string, string | number | null | undefined> | undefined, b: typeof a): boolean;
+
+export declare function slashCommandsEqual(
+  a: Commands.SlashCommand | Commands.MixedCommand | Commands.CommandOption | ApplicationCommand | undefined,
+  b: typeof a
+): boolean;
+
+type loggerOptions = { hideDisabledCommandLog?: boolean; hideNonBetaCommandLog?: boolean };
+export declare function updateApplicationCommands<CMD extends Commands.SlashCommand | Commands.MixedCommand>(
+  app: ClientApplication, commands: Map<CMD['name'], CMD & { skip?: true }>,
+  loggerOptions: loggerOptions, logger?: logger
+): Promise<Map<CMD['name'], CMD>>;
+
+export declare function logWrapper(this: logger, options: loggerOptions, type: keyof logger): void;
 
 declare module 'discord.js' {
   // @ts-expect-error Overwriting
@@ -30,6 +39,11 @@ type bBoundFunction<OF, T extends CallableFunction> = T & {
 };
 
 /** bBinded I18nProvider.__ function*/
-type lang = bBoundFunction<I18nProvider['__'], (this: I18nProvider, key: string, replacements?: string | object) => string>;
+export type lang = bBoundFunction<I18nProvider['__'], (this: I18nProvider, key: string, replacements?: string | object) => string>;
 
-type logger = { log: typeof console['log']; warn: typeof console['warn']; error: typeof console['error'] };
+export type logger = {
+  log: typeof console.log;
+  info: typeof console.info;
+  warn: typeof console.warn;
+  error: typeof console.error;
+};
