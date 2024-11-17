@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-use-before-define */
+/* eslint-disable max-lines -- TODO */
+
 const
   { ApplicationCommandType, ApplicationCommandOptionType, PermissionFlagsBits, PermissionsBitField, ChannelType, InteractionContextType } = require('discord.js'),
   { join, resolve, dirname, basename } = require('node:path'),
@@ -8,12 +11,12 @@ const
   MAX_DESCRIPTION_LENGTH = 100,
   MIN_CHOICE_NAME_LENGTH = 2,
   MAX_CHOICE_NAME_LENGTH = 32,
+  DEV_MODE = true, // TODO
   defaultI18nProvider = new I18nProvider({ undefinedNotFound: true, localesPath: join(process.cwd(), 'Locales') });
 
 /**
  * @typedef {import('./commands').BaseCommand}BaseCommand
- * @typedef {import('./commands').CommandOption}CommandOption
- * @typedef {{ log: typeof console['log'], error: typeof console['error'], warn: typeof console['warn'] }}logger*/
+ * @typedef {import('./commands').CommandOption}CommandOptionInitOptions*/
 
 // Source: https://stackoverflow.com/a/61860802/17580213
 function classes(...bases) {
@@ -32,17 +35,47 @@ function classes(...bases) {
   return Bases;
 }
 
+/** @param {import('.').logger}logger*/
+function flipDevMode(logger) {
+  if (logger._warn) {
+    logger.warn = logger._warn;
+    logger.error = logger._error;
+    delete logger._warn;
+    delete logger._error;
+
+    return;
+  }
+
+  logger._warn = logger.warn;
+  logger._error = logger.error;
+
+  logger.warn = (...args) => {
+    /* eslint-disable-next-line no-debugger -- intentional*/
+    debugger;
+    return logger._warn(...args);
+  };
+  logger.error = (...args) => {
+    /* eslint-disable-next-line no-debugger -- intentional*/
+    debugger;
+    return logger._error(...args);
+  };
+}
+
+
 class BaseCommand {
   // Thanks to this I have types in the constructor
   filePath; name; nameLocalizations; category; langId; description; descriptionLocalizations;
   aliases; aliasOf; usage; usageLocalizations; permissions; cooldowns;
   slashCommand; prefixCommand; context; disabled; disabledReason; options; beta;
+  #logger;
 
   /**
+   * @param {import('.').logger | undefined}logger
    * @param {import('./commands').BaseCommandInitOptions}options
-   * @param {logger}logger
-   * @param {I18nProvider | undefined}i18n*/
-  constructor(options, logger, i18n = defaultI18nProvider) {
+   * @param {I18nProvider | undefined}i18n
+   * @param {boolean}devMode @default devMode=false*/
+  /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user*/
+  constructor(logger = console, options, i18n = defaultI18nProvider, devMode = DEV_MODE) {
     this.filePath = resolve(getCallerFilePath('Commands'));
     this.name = basename(this.filePath).split('.')[0].toLowerCase();
     this.nameLocalizations = new Map(); // gets filled in #setLocalization()
@@ -72,8 +105,13 @@ class BaseCommand {
     this.beta = options.beta ?? false;
     this.run = undefined;
 
+    this.#logger = logger;
+    if (devMode) flipDevMode(this.#logger);
+
     this.#setLocalization(i18n);
-    this.#validateData(logger, i18n);
+    this.#validateData(i18n, devMode);
+
+    for (const option of this.options) option.__init(`${this.langId}.options`, i18n);
   }
 
   /**
@@ -103,30 +141,34 @@ class BaseCommand {
   }
 
   /**
-   * @param {logger}logger
    * @param {I18nProvider}i18n
    * @throws {TypeError} upon wrong command.run type*/
-  #validateData(logger, i18n) {
+  #validateData(i18n) {
     if (this.disabled) return;
 
     if (this.name.includes('A-Z')) {
-      logger.error(`"${this.name}" (${this.langId}.name) has uppercase letters! Fixing.`);
+      this.#logger.error(`"${this.name}" (${this.langId}.name) has uppercase letters! Fixing.`);
       this.name = this.name.toLowerCase();
     }
 
     if (this.description.length > MAX_DESCRIPTION_LENGTH) {
-      logger.warn(`Description of command "${this.name}" (${this.langId}.description) is too long (max. length is ${MAX_DESCRIPTION_LENGTH})! Slicing.`);
+      this.#logger.warn(`Description of command "${this.name}" (${this.langId}.description) is too long (max. length is ${MAX_DESCRIPTION_LENGTH})! Slicing.`);
       this.description = this.description.slice(0, MAX_DESCRIPTION_LENGTH);
     }
 
     if (!this.context.includes(InteractionContextType.Guild)) {
       if (this.context.includes('-Guild')) this.context = this.context.filter(e => e != '-Guild');
       else {
-        logger.warn(
+        this.#logger.warn(
           `Context of command "${this.name}" (${this.langId}.context) does not include "Guild" context (${InteractionContextType.Guild}), meaning it will not be registered in guilds!\n`
           + 'If this is intentional, add "-Guild" to the context.'
         );
       }
+    }
+
+    for (let i = 0; i < this.options.length; i++) {
+      if (!(this.options[i] instanceof CommandOption))
+        throw new TypeError(`Invalid options array value, expected instance of CommandOption, got "${this.options[i].constructor.name}"! (${this.langId}.options.${i})`);
     }
 
     if (!/^(?:async )?function/.test(this.run))
@@ -134,9 +176,9 @@ class BaseCommand {
 
     for (const [locale] of i18n.availableLocales.keys()) {
       const descriptionLocalization = this.descriptionLocalizations.get(locale);
-      if (!descriptionLocalization) logger.warn(`Missing description localization for option "${this.name}" (${this.langId}.descriptionLocalizations.${locale})`);
+      if (!descriptionLocalization) this.#logger.warn(`Missing description localization for option "${this.name}" (${this.langId}.descriptionLocalizations.${locale})`);
       else if (descriptionLocalization.length > MAX_DESCRIPTION_LENGTH) {
-        logger.warn(`Description localization of option "${this.name}" (${this.langId}.descriptionLocalizations.${locale}) is too long (max. length is ${MAX_DESCRIPTION_LENGTH})! Slicing.`);
+        this.#logger.warn(`Description localization of option "${this.name}" (${this.langId}.descriptionLocalizations.${locale}) is too long (max. length is ${MAX_DESCRIPTION_LENGTH})! Slicing.`);
         this.descriptionLocalizations.set(locale, descriptionLocalization.slice(0, MAX_DESCRIPTION_LENGTH));
       }
     }
@@ -148,11 +190,13 @@ class SlashCommand extends BaseCommand {
   noDefer; ephemeralDefer; id; type; run;
 
   /**
+   * @param {import('.').logger | undefined}logger
    * @param {import('./commands').SlashCommandInitOptions}options
-   * @param {logger}logger
-   * @param {I18nProvider | undefined}i18n*/
-  constructor(options, logger, i18n = defaultI18nProvider) {
-    super(options, logger, i18n);
+   * @param {I18nProvider | undefined}i18n
+   * @param {boolean}devMode @default devMode=false*/
+  /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user*/
+  constructor(logger = console, options, i18n = defaultI18nProvider, devMode = DEV_MODE) {
+    super(logger, options, i18n, devMode);
 
     this.slashCommand = true;
     this.prefixCommand = false;
@@ -170,7 +214,6 @@ class SlashCommand extends BaseCommand {
 
   static [Symbol.hasInstance](value) {
     for (let proto = Object.getPrototypeOf(value); proto != undefined; proto = Object.getPrototypeOf(proto))
-      /* eslint-disable-next-line @typescript-eslint/no-use-before-define -- fine here - and there is no other way to do it.*/
       if (proto === SlashCommand.prototype || proto === MixedCommand.prototype) return true;
     return false;
   }
@@ -178,11 +221,13 @@ class SlashCommand extends BaseCommand {
 
 class PrefixCommand extends BaseCommand {
   /**
+   * @param {import('.').logger | undefined}logger
    * @param {import('./commands').PrefixCommandInitOptions}options
-   * @param {logger}logger
-   * @param {I18nProvider | undefined}i18n*/
-  constructor(options, logger, i18n = defaultI18nProvider) {
-    super(options, logger, i18n);
+   * @param {I18nProvider | undefined}i18n
+   * @param {boolean}devMode @default devMode=false*/
+  /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user*/
+  constructor(logger = console, options, i18n = defaultI18nProvider, devMode = DEV_MODE) {
+    super(logger, options, i18n, devMode);
 
     this.slashCommand = false;
     this.prefixCommand = true;
@@ -193,7 +238,6 @@ class PrefixCommand extends BaseCommand {
 
   static [Symbol.hasInstance](value) {
     for (let proto = Object.getPrototypeOf(value); proto != undefined; proto = Object.getPrototypeOf(proto))
-      /* eslint-disable-next-line @typescript-eslint/no-use-before-define -- fine here - and there is no other way to do it.*/
       if (proto === PrefixCommand.prototype || proto === MixedCommand.prototype) return true;
     return false;
   }
@@ -201,12 +245,14 @@ class PrefixCommand extends BaseCommand {
 
 class MixedCommand extends classes(SlashCommand, PrefixCommand) {
   /**
-   * @this {SlashCommand & PrefixCommand}
+   * @this {import('./commands').MixedCommand}
+   * @param {import('.').logger | undefined}logger
    * @param {import('./commands').MixedCommandInitOptions}options
-   * @param {logger}logger
-   * @param {I18nProvider | undefined}i18n*/
-  constructor(options, logger, i18n = defaultI18nProvider) {
-    super(options, logger, i18n);
+   * @param {I18nProvider | undefined}i18n
+   * @param {boolean}devMode @default devMode=false*/
+  /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user*/
+  constructor(logger = console, options, i18n = defaultI18nProvider, devMode = DEV_MODE) {
+    super(logger, options, i18n, devMode);
 
     this.slashCommand = true;
     this.prefixCommand = true;
@@ -224,15 +270,18 @@ class CommandOption {
   type; cooldowns; required; dmPermission; choices; autocomplete;
   strictAutocomplete; channelTypes; minValue; maxValue; minLength; maxLength;
   options;
+  #logger;
 
   /**
+   * @param {import('.').logger | undefined}logger
    * @param {import('./commands').CommandOptionInitOptions<boolean>}options
-   * @param {logger?}logger
-   * @param {I18nProvider | undefined}i18n*/
-  constructor(options, logger = console, i18n = defaultI18nProvider) {
+   * @param {I18nProvider | undefined}i18n
+   * @param {boolean}devMode @default devMode=false*/
+  /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user*/
+  constructor(logger = console, options, i18n = defaultI18nProvider, devMode = DEV_MODE) {
     this.name = options.name;
     this.nameLocalizations = new Map(); // gets filled in #setLocalization()
-    this.langId = undefined; // gets set in #_setParent()
+    this.langId = undefined; // gets set in __init()
     this.description = options.description;
     this.descriptionLocalizations = new Map(); // gets filled in #setLocalization()
     this.type = typeof options.type == 'string' ? ApplicationCommandOptionType[options.type] : options.type;
@@ -278,8 +327,18 @@ class CommandOption {
 
     this.options = options.options;
 
+    this.#logger = logger;
+    if (devMode) flipDevMode(this.#logger);
+  }
+
+  /** @type {import('./commands').CommandOption['__init']} */
+  __init(langId, i18n = defaultI18nProvider) {
+    this.langId = `${langId}.${this.name}`;
+
     this.#setLocalization(i18n);
-    this.#validateData(logger, i18n);
+    this.#validateData(i18n);
+
+    if (this.options) for (const option of this.options) option.__init(this.langId + '.options', i18n);
   }
 
   /**
@@ -309,10 +368,9 @@ class CommandOption {
   }
 
   /**
-   * @param {logger}logger
    * @param {I18nProvider}i18n
    * @throws {TypeError} on invalid type, channelType or minLength/minValue missmatch.*/
-  #validateData(logger, i18n) {
+  #validateData(i18n) {
     if (this.disabled) return;
 
     if (!(this.type in ApplicationCommandOptionType)) throw new TypeError(`Missing or invalid type for option "${this.langId}.type", got "${this.type}."`);
@@ -322,6 +380,13 @@ class CommandOption {
     if (this.type == ApplicationCommandOptionType.String && (this.minValue != undefined || this.maxValue != undefined))
       throw new TypeError(`String options do not support "minValue" and "maxValue" (${this.langId})`);
 
+    if (this.options) {
+      for (let i = 0; i < this.options.length; i++) {
+        if (!(this.options[i] instanceof CommandOption))
+          throw new TypeError(`Invalid options array value, expected instance of CommandOption, got "${this.options[i].constructor.name}"! (${this.langId}.options.${i})`);
+      }
+    }
+
     this.channelTypes = this.channelTypes?.map((e, i) => {
       if (!(e in ChannelType)) throw new TypeError(`Invalid channelType for option "${this.langId}.channelTypes.${i}", got ${JSON.stringify(e)}`);
       return Number.isNaN(Number.parseInt(e)) ? ChannelType[e] : Number.parseInt(e);
@@ -329,41 +394,40 @@ class CommandOption {
 
     for (const [locale] of i18n.availableLocales.keys()) {
       const descriptionLocalization = this.descriptionLocalizations.get(locale);
-      if (!descriptionLocalization) logger.warn(`Missing description localization for option "${this.langId}.descriptionLocalizations.${locale}"`);
+      if (!descriptionLocalization) this.#logger.warn(`Missing description localization for option "${this.langId}.descriptionLocalizations.${locale}"`);
       else if (descriptionLocalization.length > MAX_DESCRIPTION_LENGTH) {
-        logger.warn(`Description localization of option "${this.langId}.descriptionLocalizations.${locale}" is too long (maximum length is ${MAX_DESCRIPTION_LENGTH})! Slicing.`);
+        this.#logger.warn(`Description localization of option "${this.langId}.descriptionLocalizations.${locale}" is too long (maximum length is ${MAX_DESCRIPTION_LENGTH})! Slicing.`);
         this.descriptionLocalizations.set(locale, descriptionLocalization.slice(0, MAX_DESCRIPTION_LENGTH));
       }
 
       for (const choice of this.choices) {
         if (choice.name.length < MIN_CHOICE_NAME_LENGTH) {
-          logger.error(`Choice name for option "${this.langId}.choices.${this.value}" is too short (minimum length is ${MIN_CHOICE_NAME_LENGTH})! Removing.`);
+          this.#logger.error(`Choice name for option "${this.langId}.choices.${this.value}" is too short (minimum length is ${MIN_CHOICE_NAME_LENGTH})! Removing.`);
           this.choices = this.choices.filter(e => e.name != choice.name);
           continue;
         }
         else if (choice.name.length > MAX_CHOICE_NAME_LENGTH) {
-          logger.warn(`Choice name for option "${this.langId}.choices.${this.value}" is too long (maximum length is ${MAX_CHOICE_NAME_LENGTH})! Slicing.`);
+          this.#logger.warn(`Choice name for option "${this.langId}.choices.${this.value}" is too long (maximum length is ${MAX_CHOICE_NAME_LENGTH})! Slicing.`);
           choice.name = choice.name.slice(0, MAX_CHOICE_NAME_LENGTH);
         }
 
         const choiceLocalization = choice.nameLocalizations.get(locale);
 
-        if (!choiceLocalization && choice.name != choice.value) logger.warn(`Missing choice name localization for option "${this.langId}.choices.${this.value}.nameLocalizations.${locale}"`);
+        if (!choiceLocalization && choice.name != choice.value) this.#logger.warn(`Missing choice name localization for option "${this.langId}.choices.${this.value}.nameLocalizations.${locale}"`);
         else if (choiceLocalization.length < MIN_CHOICE_NAME_LENGTH) {
-          logger.error(`Choice name localization for option "${this.langId}.choices.${this.value}.nameLocalizations.${locale}" is too short (minimum length is ${MIN_CHOICE_NAME_LENGTH})! Removing.`);
+          this.#logger.error(
+            `Choice name localization for option "${this.langId}.choices.${this.value}.nameLocalizations.${locale}" is too short (minimum length is ${MIN_CHOICE_NAME_LENGTH})! Removing.`
+          );
           choice.nameLocalizations.delete(locale);
         }
         else if (choiceLocalization.length > MAX_CHOICE_NAME_LENGTH) {
-          logger.warn(`Choice name localization for option "${this.langId}.choices.${this.value}.nameLocalizations.${locale}" is too long (maximum length is ${MAX_CHOICE_NAME_LENGTH})! Slicing.`);
+          this.#logger.warn(
+            `Choice name localization for option "${this.langId}.choices.${this.value}.nameLocalizations.${locale}" is too long (maximum length is ${MAX_CHOICE_NAME_LENGTH})! Slicing.`
+          );
           choice.nameLocalizations.set(locale, choiceLocalization.slice(0, MAX_CHOICE_NAME_LENGTH));
         }
       }
     }
-  }
-
-  _setParent(parent) {
-    this.langId = `${parent.langId}.options.${this.name}`;
-    delete this._setParent;
   }
 }
 

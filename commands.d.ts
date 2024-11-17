@@ -1,6 +1,6 @@
 import type Discord from 'discord.js';
 import type I18nProvider from '@mephisto5558/i18n';
-import type { lang } from '.';
+import type { lang, logger } from '.';
 
 /* eslint-disable @typescript-eslint/no-invalid-void-type */
 type CombineTypes<A, B> = {
@@ -50,7 +50,8 @@ type BaseCommandInitOptions<canBeDM extends boolean = false> = {
 };
 
 declare abstract class BaseCommand<canBeDM extends boolean = false, T_name extends Lowercase<string> = Lowercase<string>, T_category extends Lowercase<string> = Lowercase<string>> {
-  constructor(options: BaseCommandInitOptions<canBeDM>, i18n?: I18nProvider);
+  // @ts-expect-error `logger` is intended to be bound by the lib user.
+  constructor(logger?: logger, options: BaseCommandInitOptions<canBeDM>, i18n?: I18nProvider, devMode?: boolean);
 
   /** The command's full file path, useful for e.g. reloading the command.*/
   filePath: string;
@@ -122,7 +123,9 @@ type SlashCommandInitOptions<canBeDM extends boolean = false> = BaseCommandInitO
   run(this: Discord.ChatInputCommandInteraction<canBeDM extends true ? Discord.CacheType : 'cached'>, lang: lang, client: Discord.Client<true>): Promise<never>;
 };
 declare class SlashCommand<canBeDM extends boolean = boolean> extends BaseCommand<canBeDM> {
-  constructor(options: SlashCommandInitOptions<canBeDM>, i18n?: I18nProvider);
+  /** @param {logger}logger is intended to be bound by the lib user*/
+  // @ts-expect-error `logger` is intended to be bound by the lib user.
+  constructor(logger?: logger, options: SlashCommandInitOptions<canBeDM>, i18n?: I18nProvider);
   static [Symbol.hasInstance](value: unknown): this is SlashCommand | MixedCommand;
 
   slashCommand: true;
@@ -149,7 +152,9 @@ type PrefixCommandInitOptions<canBeDM extends boolean = false> = BaseCommandInit
   run(this: Discord.Message<canBeDM extends true ? boolean : true>, lang: lang, client: Discord.Client<true>): Promise<never>;
 };
 declare class PrefixCommand<canBeDM extends boolean = boolean> extends BaseCommand {
-  constructor(options: PrefixCommandInitOptions<canBeDM>, i18n?: I18nProvider);
+  /** @param {logger}logger is intended to be bound by the lib user*/
+  // @ts-expect-error `logger` is intended to be bound by the lib user.
+  constructor(logger?: logger, options: PrefixCommandInitOptions<canBeDM>, i18n?: I18nProvider);
   static [Symbol.hasInstance](value: unknown): this is PrefixCommand | MixedCommand;
 
   slashCommand: false;
@@ -165,7 +170,9 @@ type MixedCommandInitOptions<canBeDM extends boolean = false> = Omit<SlashComman
   ): ReturnType<SlashCommandInitOptions<canBeDM>['run'] | PrefixCommandInitOptions<canBeDM>['run']>;
 };
 declare class MixedCommand<canBeDM extends boolean = boolean> extends BaseCommand implements SlashCommand<canBeDM>, PrefixCommand<canBeDM> {
-  constructor(options: MixedCommandInitOptions<canBeDM>, i18n?: I18nProvider);
+  /** @param {logger}logger is intended to be bound by the lib user*/
+  // @ts-expect-error `logger` is intended to be bound by the lib user.
+  constructor(logger?: logger, options: MixedCommandInitOptions<canBeDM>, i18n?: I18nProvider);
   static [Symbol.hasInstance](value: unknown): this is MixedCommand | SlashCommand | PrefixCommand;
 
   // @ts-expect-error overwriting
@@ -241,7 +248,14 @@ declare class CommandOption<
   T_name extends Lowercase<string> = Lowercase<string>,
   T_langId extends Lowercase<`${BaseCommand['langId']}.options${string}`> = `${BaseCommand['langId']}.options`
 > {
-  constructor(options: CommandOptionInitOptions, i18n?: I18nProvider);
+  /** @param {logger}logger is intended to be bound by the lib user*/
+  // @ts-expect-error `logger` is intended to be bound by the lib user.
+  constructor(logger?: logger, options: CommandOptionInitOptions, devMode?: boolean);
+
+  /**
+   * Runs data validation and assigns localizations.
+   * The lib user does not need to run this (even tho it won't hurt them).*/
+  __init(langId: T_langId, i18n?: I18nProvider): void;
 
   name: T_name;
   nameLocalizations?: BaseCommand['nameLocalizations'];

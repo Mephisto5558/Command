@@ -45,5 +45,11 @@ export type logger = {
   log: typeof console.log;
   info: typeof console.info;
   warn: typeof console.warn;
+
+  /** Internally used */
+  _warn?: typeof console.warn;
   error: typeof console.error;
+
+  /** Internally used */
+  _error?: typeof console.error;
 };
