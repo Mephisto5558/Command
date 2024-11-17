@@ -263,9 +263,8 @@ class MixedCommand extends classes(SlashCommand, PrefixCommand) {
     this.slashCommand = true;
     this.prefixCommand = true;
 
-    // Object.getPrototypeOf(this.constructor) == `super` class
-    Object.getPrototypeOf(this.constructor).setLocalization(this, i18n);
-    Object.getPrototypeOf(this.constructor).validateData(this, logger, i18n);
+    BaseCommand.setLocalization(this, i18n);
+    BaseCommand.validateData(this, logger, i18n);
   }
 
   static [Symbol.hasInstance](value) {
