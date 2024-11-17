@@ -20,12 +20,6 @@ export type { BaseCommandInitOptions, SlashCommandInitOptions, PrefixCommandInit
 type autocompleteOptions = string | number | { name: string; value: string };
 
 type BaseCommandInitOptions<canBeDM extends boolean | undefined = undefined> = {
-
-  /** @deprecated Do not set manually.*/
-  name?: Lowercase<string>;
-
-  /** @deprecated Do not set manually.*/
-  description?: string;
   aliases?: { slash?: BaseCommand<canBeDM>['name'][]; prefix?: BaseCommand<canBeDM>['name'][] };
 
   /**
@@ -46,12 +40,9 @@ type BaseCommandInitOptions<canBeDM extends boolean | undefined = undefined> = {
   disabledReason?: string;
   options?: CommandOption[];
   beta?: boolean;
-
-  /** @deprecated Do not set manually.*/
-  filePath?: string;
 };
 
-declare class BaseCommand<canBeDM extends boolean | undefined = undefined, T_name extends Lowercase<string> = Lowercase<string>, T_category extends Lowercase<string> = Lowercase<string>> {
+declare abstract class BaseCommand<canBeDM extends boolean | undefined = undefined, T_name extends Lowercase<string> = Lowercase<string>, T_category extends Lowercase<string> = Lowercase<string>> {
   constructor(options: BaseCommandInitOptions<canBeDM>, i18n?: I18nProvider);
 
   /** The command's full file path, useful for e.g. reloading the command.*/
@@ -75,7 +66,7 @@ declare class BaseCommand<canBeDM extends boolean | undefined = undefined, T_nam
 
   /**
    * Gets set automatically from language files.
-   * @see {@link BaseCommand.description}**/
+   * @see {@link BaseCommand.description}*/
   descriptionLocalizations: Map<string, BaseCommand<canBeDM>['description']>;
 
   aliases: { slash?: BaseCommand<canBeDM>['name'][]; prefix?: BaseCommand<canBeDM>['name'][] };

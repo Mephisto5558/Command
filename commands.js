@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-deprecated -- wip*/
 const
   { ApplicationCommandType, ApplicationCommandOptionType, PermissionFlagsBits, PermissionsBitField, ChannelType } = require('discord.js'),
   { join, resolve, dirname, basename } = require('node:path'),
@@ -33,10 +32,9 @@ function classes(...bases) {
   return Bases;
 }
 
-
 class BaseCommand {
   // Thanks to this I have types in the constructor
-  filePath; nameLocalizations; category; langId; description; descriptionLocalizations;
+  filePath; name; nameLocalizations; category; langId; description; descriptionLocalizations;
   aliases; aliasOf; usage; usageLocalizations; permissions; cooldowns;
   slashCommand; prefixCommand; dmPermission; disabled; disabledReason; options; beta;
 
@@ -45,12 +43,12 @@ class BaseCommand {
    * @param {logger}logger
    * @param {I18nProvider | undefined}i18n*/
   constructor(options, logger, i18n = defaultI18nProvider) {
-    this.filePath = resolve(options.filePath ?? getCallerFilePath('Commands'));
-    this.name = (options.name ?? basename(this.filePath).split('.')[0]).toLowerCase(); // NOSONAR
+    this.filePath = resolve(getCallerFilePath('Commands'));
+    this.name = basename(this.filePath).split('.')[0].toLowerCase();
     this.nameLocalizations = new Map(); // gets filled in #setLocalization()
     this.category = basename(dirname(this.filePath)).toLowerCase();
     this.langId = `commands.${this.category}.${this.name}`;
-    this.description = options.description ?? i18n.__({ errorNotFound: true }, `${this.langId}.description`); // NOSONAR
+    this.description = i18n.__({ errorNotFound: true }, `${this.langId}.description`);
     this.descriptionLocalizations = new Map(); // gets filled in #setLocalization()
     this.aliases = options.aliases ?? {};
     this.aliasOf = undefined;
