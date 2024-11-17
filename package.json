@@ -28,9 +28,9 @@
     "@mephisto5558/i18n": "^1.2.2"
   },
   "devDependencies": {
-    "@mephisto5558/eslint-config": "^3.0.4",
+    "@mephisto5558/eslint-config": "latest",
     "discord.js": "^14.16.3",
-    "eslint": "^9.14.0"
+    "eslint": "9.14.0"
   },
   "repository": {
     "type": "git",
