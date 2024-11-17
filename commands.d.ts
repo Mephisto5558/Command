@@ -19,8 +19,8 @@ export type { BaseCommandInitOptions, SlashCommandInitOptions, PrefixCommandInit
 
 type autocompleteOptions = string | number | { name: string; value: string };
 
-type BaseCommandInitOptions<canBeDM extends boolean | undefined = undefined> = {
-  aliases?: { slash?: BaseCommand<canBeDM>['name'][]; prefix?: BaseCommand<canBeDM>['name'][] };
+type BaseCommandInitOptions<canBeDM extends boolean = false> = {
+  aliases?: { slash?: BaseCommand['name'][]; prefix?: BaseCommand['name'][] };
 
   /**
    * Command usage information for the end-user.
@@ -35,6 +35,13 @@ type BaseCommandInitOptions<canBeDM extends boolean | undefined = undefined> = {
 
   /** Cooldowns in milliseconds. Will be set to 0 if negative or undefined.*/
   cooldowns?: { guild?: number; channel?: number; user?: number };
+
+  /**
+   * The contexts the command will run in.
+   * @default [InteractionContextType.Guild]*/
+  context?: (keyof typeof Discord.InteractionContextType)[];
+
+  /** This does the same as {@link BaseCommandInitOptions.context} but still exists to correctly type the `run` function*/
   dmPermission?: canBeDM;
   disabled?: boolean;
   disabledReason?: string;
@@ -42,7 +49,7 @@ type BaseCommandInitOptions<canBeDM extends boolean | undefined = undefined> = {
   beta?: boolean;
 };
 
-declare abstract class BaseCommand<canBeDM extends boolean | undefined = undefined, T_name extends Lowercase<string> = Lowercase<string>, T_category extends Lowercase<string> = Lowercase<string>> {
+declare abstract class BaseCommand<canBeDM extends boolean = false, T_name extends Lowercase<string> = Lowercase<string>, T_category extends Lowercase<string> = Lowercase<string>> {
   constructor(options: BaseCommandInitOptions<canBeDM>, i18n?: I18nProvider);
 
   /** The command's full file path, useful for e.g. reloading the command.*/
@@ -52,7 +59,7 @@ declare abstract class BaseCommand<canBeDM extends boolean | undefined = undefin
   name: T_name;
 
   /** Currently not in use*/
-  nameLocalizations: Map<typeof BaseCommand<canBeDM>['name'], BaseCommand<canBeDM>['name']>;
+  nameLocalizations: Map<Discord.LocaleString, BaseCommand['name']>;
 
   /** Gets set from the command's folder name.*/
   category: T_category;
@@ -67,12 +74,12 @@ declare abstract class BaseCommand<canBeDM extends boolean | undefined = undefin
   /**
    * Gets set automatically from language files.
    * @see {@link BaseCommand.description}*/
-  descriptionLocalizations: Map<string, BaseCommand<canBeDM>['description']>;
+  descriptionLocalizations: Map<Discord.LocaleString, BaseCommand['description']>;
 
-  aliases: { slash?: BaseCommand<canBeDM>['name'][]; prefix?: BaseCommand<canBeDM>['name'][] };
+  aliases: { slash?: BaseCommand['name'][]; prefix?: BaseCommand['name'][] };
 
   /** If the command instance is an alias, this property will have the original name.*/
-  aliasOf?: BaseCommand<canBeDM>['name'];
+  aliasOf?: BaseCommand['name'];
 
   /** Command usage information for the end-user.*/
   usage: { usage?: string; examples?: string };
@@ -80,7 +87,7 @@ declare abstract class BaseCommand<canBeDM extends boolean | undefined = undefin
   /**
    * Gets set automatically from language files.
    * @see {@link BaseCommand.usage}*/
-  usageLocalizations?: Map<string, BaseCommand<canBeDM>['usage']>;
+  usageLocalizations?: Map<string, BaseCommand['usage']>;
 
   permissions: {
     client: Set<Discord.PermissionFlags>;
@@ -90,8 +97,13 @@ declare abstract class BaseCommand<canBeDM extends boolean | undefined = undefin
   /** Numbers in milliseconds*/
   cooldowns: { guild: number; channel: number; user: number };
 
-  /** Makes the command also work in direct messages.*/
-  dmPermission: canBeDM;
+  /** The contexts the command will run in.*/
+  context: Discord.InteractionContextType[];
+
+  /**
+   * Same as {@link BaseCommand.context} having {@link Discord.InteractionContextType.BotDM}.
+   * @deprecated Do not use. Just here for typing reasons. **Does not exist in code!***/
+  private dmPermission: canBeDM;
 
   /** This command will not be loaded*/
   disabled: boolean;
@@ -105,12 +117,13 @@ declare abstract class BaseCommand<canBeDM extends boolean | undefined = undefin
   beta: boolean;
 }
 
-type SlashCommandInitOptions<canBeDM extends boolean | undefined = undefined> = BaseCommandInitOptions<canBeDM> & {
+type SlashCommandInitOptions<canBeDM extends boolean = false> = BaseCommandInitOptions<canBeDM> & {
   noDefer?: boolean; ephemeralDefer?: boolean;
   run(this: Discord.ChatInputCommandInteraction<canBeDM extends true ? Discord.CacheType : 'cached'>, lang: lang, client: Discord.Client<true>): Promise<never>;
 };
-declare class SlashCommand<canBeDM extends boolean | undefined = undefined> extends BaseCommand<canBeDM> {
+declare class SlashCommand<canBeDM extends boolean = boolean> extends BaseCommand<canBeDM> {
   constructor(options: SlashCommandInitOptions<canBeDM>, i18n?: I18nProvider);
+  static [Symbol.hasInstance](value: unknown): this is SlashCommand | MixedCommand;
 
   slashCommand: true;
   prefixCommand: false;
@@ -132,25 +145,28 @@ declare class SlashCommand<canBeDM extends boolean | undefined = undefined> exte
   run: (this: Discord.ChatInputCommandInteraction<canBeDM extends true ? Discord.CacheType : 'cached'>, lang: lang, client: Discord.Client<true>) => Promise<never>;
 }
 
-type PrefixCommandInitOptions<canBeDM extends boolean | undefined = undefined> = BaseCommandInitOptions<canBeDM> & {
+type PrefixCommandInitOptions<canBeDM extends boolean = false> = BaseCommandInitOptions & {
   run(this: Discord.Message<canBeDM extends true ? boolean : true>, lang: lang, client: Discord.Client<true>): Promise<never>;
 };
-declare class PrefixCommand<canBeDM extends boolean | undefined = undefined> extends BaseCommand<canBeDM> {
+declare class PrefixCommand<canBeDM extends boolean = boolean> extends BaseCommand {
   constructor(options: PrefixCommandInitOptions<canBeDM>, i18n?: I18nProvider);
+  static [Symbol.hasInstance](value: unknown): this is PrefixCommand | MixedCommand;
+
   slashCommand: false;
   prefixCommand: true;
 
   run: (this: Discord.Message<canBeDM extends true ? boolean : true>, lang: lang, client: Discord.Client<true>) => Promise<never>;
 }
 
-type MixedCommandInitOptions<canBeDM extends boolean | undefined = undefined> = Omit<SlashCommandInitOptions<canBeDM> & PrefixCommandInitOptions<canBeDM>, 'run'> & {
+type MixedCommandInitOptions<canBeDM extends boolean = false> = Omit<SlashCommandInitOptions<canBeDM> & PrefixCommandInitOptions<canBeDM>, 'run'> & {
   run(
     this: CombineTypes<ThisParameterType<SlashCommandInitOptions<canBeDM>['run']>, ThisParameterType<PrefixCommandInitOptions<canBeDM>['run']>>,
     lang: lang, client: Discord.Client<true>
   ): ReturnType<SlashCommandInitOptions<canBeDM>['run'] | PrefixCommandInitOptions<canBeDM>['run']>;
 };
-declare class MixedCommand<canBeDM extends boolean | undefined = undefined> extends BaseCommand<canBeDM> implements SlashCommand<canBeDM>, PrefixCommand<canBeDM> {
+declare class MixedCommand<canBeDM extends boolean = boolean> extends BaseCommand implements SlashCommand<canBeDM>, PrefixCommand<canBeDM> {
   constructor(options: MixedCommandInitOptions<canBeDM>, i18n?: I18nProvider);
+  static [Symbol.hasInstance](value: unknown): this is MixedCommand | SlashCommand | PrefixCommand;
 
   // @ts-expect-error overwriting
   slashCommand: true;
@@ -162,7 +178,6 @@ declare class MixedCommand<canBeDM extends boolean | undefined = undefined> exte
   ephemeralDefer: boolean;
   id: Discord.Snowflake;
   type: Discord.ApplicationCommandType.ChatInput;
-  options?: CommandOption[];
 
   // @ts-expect-error This is fine and compatible.
   run: (
@@ -171,7 +186,7 @@ declare class MixedCommand<canBeDM extends boolean | undefined = undefined> exte
   ) => ReturnType<SlashCommand<canBeDM>['run'] | PrefixCommand<canBeDM>['run']>;
 }
 
-type CommandOptionInitOptions<canBeDM extends boolean | undefined = undefined> = {
+type CommandOptionInitOptions<canBeDM extends boolean = false> = {
   name: Lowercase<string>;
 
   /**
@@ -180,22 +195,22 @@ type CommandOptionInitOptions<canBeDM extends boolean | undefined = undefined> =
   description: string;
   type: keyof typeof Discord.ApplicationCommandOptionType;
 
-  permissions?: BaseCommandInitOptions<canBeDM>['permissions'];
+  permissions?: BaseCommandInitOptions['permissions'];
 
   /** Numbers in milliseconds*/
-  cooldowns?: BaseCommandInitOptions<canBeDM>['cooldowns'];
+  cooldowns?: BaseCommandInitOptions['cooldowns'];
   required?: boolean;
 
   /**
    * Only existent for {@link CommandOption.type} `SubcommandGroup` and `Subcommand`.
    *
    * Makes the subcommand also work in direct messages.*/
-  dmPermission?: BaseCommandInitOptions<canBeDM>['dmPermission'];
+  dmPermission?: BaseCommandInitOptions<canBeDM>['dmPermission']; // todo
 
   /** Choices the user must choose from. Can not be more then 25.*/
   choices?: (string | number | {
     name: string;
-    nameLocalizations?: BaseCommand<canBeDM>['nameLocalizations'];
+    nameLocalizations?: BaseCommand['nameLocalizations'];
     value: string | number;
   })[];
 
@@ -215,20 +230,23 @@ type CommandOptionInitOptions<canBeDM extends boolean | undefined = undefined> =
   minLength?: number;
   maxLength?: number;
 
-  disabled: BaseCommandInitOptions<canBeDM>['disabled'];
-  disabledReason: BaseCommandInitOptions<canBeDM>['disabledReason'];
+  disabled: BaseCommandInitOptions['disabled'];
+  disabledReason: BaseCommandInitOptions['disabledReason'];
 
   /** Only existent for {@link CommandOption.type} `SubcommandGroup` and `Subcommand`.*/
   options?: CommandOption['options'];
 };
 
-declare class CommandOption<T_name extends Lowercase<string> = Lowercase<string>> {
+declare class CommandOption<
+  T_name extends Lowercase<string> = Lowercase<string>,
+  T_langId extends Lowercase<`${BaseCommand['langId']}.options${string}`> = `${BaseCommand['langId']}.options`
+> {
   constructor(options: CommandOptionInitOptions, i18n?: I18nProvider);
 
   name: T_name;
   nameLocalizations?: BaseCommand['nameLocalizations'];
 
-  langId?: `${BaseCommand['langId']}.options.${T_name}}`;
+  langId?: `${T_langId}.${T_name}`;
 
   /**
    * Gets set automatically from language files.
@@ -251,9 +269,8 @@ declare class CommandOption<T_name extends Lowercase<string> = Lowercase<string>
   required: boolean;
 
   /**
-   * Only existent for {@link CommandOption.type} `SubcommandGroup` and `Subcommand`.
-   *
-   * Makes the subcommand also work in direct messages.*/
+   * On {@link CommandOption} only used for {@link CommandOption.type} `SubcommandGroup` and `Subcommand`.
+   * @see {@link BaseCommand.dmPermission}*/
   dmPermission: boolean;
 
   /** Choices the user must choose from. Can not be more then 25.*/
@@ -284,5 +301,5 @@ declare class CommandOption<T_name extends Lowercase<string> = Lowercase<string>
   disabled: BaseCommand['disabled'];
   disabledReason: BaseCommand['disabledReason'];
 
-  options?: CommandOption;
+  options?: CommandOption<Lowercase<string>, Lowercase<`${BaseCommand['langId']}.options.${T_name}.options`>>[];
 }

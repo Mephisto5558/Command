@@ -1,5 +1,5 @@
 const
-  { ApplicationCommandType, ApplicationCommandOptionType, PermissionFlagsBits, PermissionsBitField, ChannelType } = require('discord.js'),
+  { ApplicationCommandType, ApplicationCommandOptionType, PermissionFlagsBits, PermissionsBitField, ChannelType, InteractionContextType } = require('discord.js'),
   { join, resolve, dirname, basename } = require('node:path'),
   I18nProvider = require('@mephisto5558/i18n'),
   getCallerFilePath = require('./utils/getCallerFilePath.js');
@@ -36,10 +36,10 @@ class BaseCommand {
   // Thanks to this I have types in the constructor
   filePath; name; nameLocalizations; category; langId; description; descriptionLocalizations;
   aliases; aliasOf; usage; usageLocalizations; permissions; cooldowns;
-  slashCommand; prefixCommand; dmPermission; disabled; disabledReason; options; beta;
+  slashCommand; prefixCommand; context; disabled; disabledReason; options; beta;
 
   /**
-   * @param {import('./commands').BaseCommandInitOptions<boolean>}options
+   * @param {import('./commands').BaseCommandInitOptions}options
    * @param {logger}logger
    * @param {I18nProvider | undefined}i18n*/
   constructor(options, logger, i18n = defaultI18nProvider) {
@@ -65,7 +65,7 @@ class BaseCommand {
     };
     this.slashCommand = undefined;
     this.prefixCommand = undefined;
-    this.dmPermission = options.dmPermission ?? false;
+    this.context = options.context ? this.context.map(e => typeof e == 'string' && e != '-Guild' ? InteractionContextType[e] : e) : [InteractionContextType.Guild];
     this.disabled = options.disabled ?? false;
     this.disabledReason = options.disabledReason;
     this.options = options.options ?? [];
@@ -119,6 +119,16 @@ class BaseCommand {
       this.description = this.description.slice(0, MAX_DESCRIPTION_LENGTH);
     }
 
+    if (!this.context.includes(InteractionContextType.Guild)) {
+      if (this.context.includes('-Guild')) this.context = this.context.filter(e => e != '-Guild');
+      else {
+        logger.warn(
+          `Context of command "${this.name}" (${this.langId}.context) does not include "Guild" context (${InteractionContextType.Guild}), meaning it will not be registered in guilds!\n`
+          + 'If this is intentional, add "-Guild" to the context.'
+        );
+      }
+    }
+
     if (!/^(?:async )?function/.test(this.run))
       throw new TypeError(`The "run" property of command "${this.name}" (${this.langId}.run) is not a function or async function (Got "${typeof this.run}")! You cannot use an arrow function.`);
 
@@ -157,6 +167,13 @@ class SlashCommand extends BaseCommand {
     /* eslint-disable-next-line custom/unbound-method */
     this.run = options.run;
   }
+
+  static [Symbol.hasInstance](value) {
+    for (let proto = Object.getPrototypeOf(value); proto != undefined; proto = Object.getPrototypeOf(proto))
+      /* eslint-disable-next-line @typescript-eslint/no-use-before-define -- fine here - and there is no other way to do it.*/
+      if (proto === SlashCommand.prototype || proto === MixedCommand.prototype) return true;
+    return false;
+  }
 }
 
 class PrefixCommand extends BaseCommand {
@@ -173,6 +190,13 @@ class PrefixCommand extends BaseCommand {
     /* eslint-disable-next-line custom/unbound-method */
     this.run = options.run;
   }
+
+  static [Symbol.hasInstance](value) {
+    for (let proto = Object.getPrototypeOf(value); proto != undefined; proto = Object.getPrototypeOf(proto))
+      /* eslint-disable-next-line @typescript-eslint/no-use-before-define -- fine here - and there is no other way to do it.*/
+      if (proto === PrefixCommand.prototype || proto === MixedCommand.prototype) return true;
+    return false;
+  }
 }
 
 class MixedCommand extends classes(SlashCommand, PrefixCommand) {
@@ -186,6 +210,12 @@ class MixedCommand extends classes(SlashCommand, PrefixCommand) {
 
     this.slashCommand = true;
     this.prefixCommand = true;
+  }
+
+  static [Symbol.hasInstance](value) {
+    for (let proto = Object.getPrototypeOf(value); proto != undefined; proto = Object.getPrototypeOf(proto))
+      if (proto === this.prototype || proto === SlashCommand.prototype || proto === PrefixCommand.prototype) return true;
+    return false;
   }
 }
 
