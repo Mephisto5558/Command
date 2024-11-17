@@ -175,6 +175,8 @@ class BaseCommand {
       throw new TypeError(`The "run" property of command "${this.name}" (${this.langId}.run) is not a function or async function (Got "${typeof this.run}")! You cannot use an arrow function.`);
 
     for (const locale of i18n.availableLocales.keys()) {
+      if (locale == i18n.config.defaultLocale) continue;
+
       const descriptionLocalization = this.descriptionLocalizations.get(locale);
       if (!descriptionLocalization) this.#logger.warn(`Missing description localization for option "${this.name}" (${this.langId}.descriptionLocalizations.${locale})`);
       else if (descriptionLocalization.length > MAX_DESCRIPTION_LENGTH) {
@@ -393,6 +395,8 @@ class CommandOption {
     });
 
     for (const locale of i18n.availableLocales.keys()) {
+      if (locale == i18n.config.defaultLocale) continue;
+
       const descriptionLocalization = this.descriptionLocalizations.get(locale);
       if (!descriptionLocalization) this.#logger.warn(`Missing description localization for option "${this.langId}.descriptionLocalizations.${locale}"`);
       else if (descriptionLocalization.length > MAX_DESCRIPTION_LENGTH) {
