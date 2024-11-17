@@ -39,8 +39,8 @@ type bBoundFunction<OF, T extends CallableFunction> = T & {
 };
 
 /** bBinded I18nProvider.__ function*/
-export type lang = bBoundFunction<I18nProvider['__'], (this: I18nProvider, key: string, replacements?: string | object) => string>;
-
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-function-type */// @ts-expect-error Intentional little trick
+export type lang = Function['bBind'] extends never ? never : bBoundFunction<I18nProvider['__'], (this: I18nProvider, key: string, replacements?: string | object) => string>;
 export type logger = {
   log: typeof console.log;
   info: typeof console.info;
