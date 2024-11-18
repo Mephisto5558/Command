@@ -164,7 +164,7 @@ class BaseCommand {
         throw new TypeError(`Invalid options array value, expected instance of CommandOption, got "${command.options[i].constructor.name}"! (${command.langId}.options.${i})`);
     }
 
-    if (!/^(?:async |function)/.test(command.run)) {
+    if (!/^(?:async )?(?:function\s?)?\w*\s*\(/.test(command.run)) {
       throw new TypeError(
         `The "run" property of command "${command.name}" (${command.langId}.run) is not a function or async function (Got "${typeof command.run}")! You cannot use an arrow function.`
       );
@@ -424,7 +424,9 @@ class CommandOption {
 
         const choiceLocalization = choice.nameLocalizations.get(locale);
 
-        if (!choiceLocalization && choice.name != choice.value) this.#logger.warn(`Missing choice name localization for option "${this.langId}.choices.${this.value}.nameLocalizations.${locale}"`);
+        if (!choiceLocalization) {
+          if (choice.name != choice.value) this.#logger.warn(`Missing choice name localization for option "${this.langId}.choices.${this.value}.nameLocalizations.${locale}"`);
+        }
         else if (choiceLocalization.length < MIN_CHOICE_NAME_LENGTH) {
           this.#logger.error(
             `Choice name localization for option "${this.langId}.choices.${this.value}.nameLocalizations.${locale}" is too short (minimum length is ${MIN_CHOICE_NAME_LENGTH})! Removing.`
