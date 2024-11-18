@@ -8,10 +8,14 @@ const
   getCallerFilePath = require('./utils/getCallerFilePath.js');
 
 const
+
+  // https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-choice-structure
   MAX_DESCRIPTION_LENGTH = 100,
-  MIN_CHOICE_NAME_LENGTH = 2,
+
+  // https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-choice-structure
+  MIN_CHOICE_NAME_LENGTH = 1,
   MAX_CHOICE_NAME_LENGTH = 32,
-  DEV_MODE = true, // TODO
+  DEV_MODE = false,
   defaultI18nProvider = new I18nProvider({ undefinedNotFound: true, localesPath: join(process.cwd(), 'Locales') });
 
 /**
