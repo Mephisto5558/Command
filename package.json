@@ -30,7 +30,7 @@
   "devDependencies": {
     "@mephisto5558/eslint-config": "latest",
     "discord.js": "^14.16.3",
-    "eslint": "^9.15.0"
+    "eslint": "^9.16.0"
   },
   "repository": {
     "type": "git",

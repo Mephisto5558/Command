@@ -4,7 +4,7 @@
 const
   { ApplicationCommandType, ApplicationCommandOptionType, PermissionFlagsBits, PermissionsBitField, ChannelType, InteractionContextType } = require('discord.js'),
   { join, resolve, dirname, basename } = require('node:path'),
-  I18nProvider = require('@mephisto5558/i18n'),
+  I18nProvider = require('@mephisto5558/i18n').default,
   getCallerFilePath = require('./utils/getCallerFilePath.js');
 
 const
