@@ -20,7 +20,7 @@ const
 
 /**
  * @typedef {import('./commands').BaseCommand}BaseCommand
- * @typedef {import('./commands').CommandOption}CommandOptionInitOptions*/
+ * @typedef {import('./commands').CommandOption}CommandOptionInitOptions */
 
 // Source: https://stackoverflow.com/a/61860802/17580213
 function classes(...bases) {
@@ -39,7 +39,7 @@ function classes(...bases) {
   return Bases;
 }
 
-/** @param {import('.').logger}logger*/
+/** @param {import('.').logger}logger */
 function flipDevMode(logger) {
   if (logger._warn) {
     logger.warn = logger._warn;
@@ -54,12 +54,12 @@ function flipDevMode(logger) {
   logger._error = logger.error;
 
   logger.warn = (...args) => {
-    /* eslint-disable-next-line no-debugger -- intentional*/
+    /* eslint-disable-next-line no-debugger -- intentional */
     debugger;
     return logger._warn(...args);
   };
   logger.error = (...args) => {
-    /* eslint-disable-next-line no-debugger -- intentional*/
+    /* eslint-disable-next-line no-debugger -- intentional */
     debugger;
     return logger._error(...args);
   };
@@ -78,8 +78,8 @@ class BaseCommand {
    * @param {import('.').logger | undefined}logger
    * @param {import('./commands').BaseCommandInitOptions}options
    * @param {I18nProvider | undefined}i18n
-   * @param {boolean}devMode @default devMode=false*/
-  /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user*/
+   * @param {boolean}devMode @default devMode=false */
+  /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user */
   constructor(logger = console, options, i18n = defaultI18nProvider, devMode = DEV_MODE) {
     this.filePath = resolve(getCallerFilePath('Commands'));
     this.name = basename(this.filePath).split('.')[0].toLowerCase();
@@ -115,7 +115,7 @@ class BaseCommand {
     for (const option of this.options) option.__init(`${this.langId}.options`, i18n);
   }
 
-  /** @type {typeof import('./commands').BaseCommand['setLocalization']}*/
+  /** @type {typeof import('./commands').BaseCommand['setLocalization']} */
   static setLocalization(command, i18n) {
     for (const locale of i18n.availableLocales.keys()) {
       const usageLocalization = {
@@ -139,7 +139,7 @@ class BaseCommand {
     }
   }
 
-  /** @type {typeof import('./commands').BaseCommand['validateData']}*/
+  /** @type {typeof import('./commands').BaseCommand['validateData']} */
   static validateData(command, logger, i18n) {
     if (command.disabled) return;
 
@@ -195,8 +195,8 @@ class SlashCommand extends BaseCommand {
    * @param {import('.').logger | undefined}logger
    * @param {import('./commands').SlashCommandInitOptions}options
    * @param {I18nProvider | undefined}i18n
-   * @param {boolean}devMode @default devMode=false*/
-  /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user*/
+   * @param {boolean}devMode @default devMode=false */
+  /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user */
   constructor(logger = console, options, i18n = defaultI18nProvider, devMode = DEV_MODE) {
     super(logger, options, i18n, devMode);
 
@@ -230,8 +230,8 @@ class PrefixCommand extends BaseCommand {
    * @param {import('.').logger | undefined}logger
    * @param {import('./commands').PrefixCommandInitOptions}options
    * @param {I18nProvider | undefined}i18n
-   * @param {boolean}devMode @default devMode=false*/
-  /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user*/
+   * @param {boolean}devMode @default devMode=false */
+  /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user */
   constructor(logger = console, options, i18n = defaultI18nProvider, devMode = DEV_MODE) {
     super(logger, options, i18n, devMode);
 
@@ -259,8 +259,8 @@ class MixedCommand extends classes(SlashCommand, PrefixCommand) {
    * @param {import('.').logger | undefined}logger
    * @param {import('./commands').MixedCommandInitOptions}options
    * @param {I18nProvider | undefined}i18n
-   * @param {boolean}devMode @default devMode=false*/
-  /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user*/
+   * @param {boolean}devMode @default devMode=false */
+  /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user */
   constructor(logger = console, options, i18n = defaultI18nProvider, devMode = DEV_MODE) {
     super(logger, options, i18n, devMode);
 
@@ -289,8 +289,8 @@ class CommandOption {
    * @param {import('.').logger | undefined}logger
    * @param {import('./commands').CommandOptionInitOptions<boolean>}options
    * @param {I18nProvider | undefined}i18n
-   * @param {boolean}devMode @default devMode=false*/
-  /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user*/
+   * @param {boolean}devMode @default devMode=false */
+  /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user */
   constructor(logger = console, options, i18n = defaultI18nProvider, devMode = DEV_MODE) {
     this.name = options.name;
     this.nameLocalizations = new Map(); // gets filled in #setLocalization()
@@ -311,7 +311,7 @@ class CommandOption {
     this.dmPermission = options.dmPermission ?? false;
 
     const choices = options.choices ?? [];
-    this.choices = (Array.isArray(choices) ? choices : [choices]).map(/** @param {import('./commands').CommandOption['choices'][number] | string | number}choice*/ choice => {
+    this.choices = (Array.isArray(choices) ? choices : [choices]).map(/** @param {import('./commands').CommandOption['choices'][number] | string | number}choice */ choice => {
       if (typeof choice == 'object') {
         choice.__NO_LOCALIZATION = true; // Removed in #setLocalization()
         return choice;
@@ -356,7 +356,7 @@ class CommandOption {
 
   /**
    * Sets the localization for `name`, `description` and `choices`.
-   * @param {I18nProvider}i18n*/
+   * @param {I18nProvider}i18n */
   #setLocalization(i18n) {
     for (const locale of i18n.availableLocales.keys()) {
       if (locale == i18n.config.defaultLocale) continue;
@@ -382,7 +382,7 @@ class CommandOption {
 
   /**
    * @param {I18nProvider}i18n
-   * @throws {TypeError} on invalid type, channelType or minLength/minValue missmatch.*/
+   * @throws {TypeError} on invalid type, channelType or minLength/minValue missmatch. */
   #validateData(i18n) {
     if (this.disabled) return;
 

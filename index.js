@@ -1,7 +1,7 @@
 const Command = require('./commands.js');
 module.exports = { ...Command, slashCommandsEqual, updateApplicationCommands };
 
-/** @type {import('.')['mapsEqual']}*/
+/** @type {import('.')['mapsEqual']} */
 function mapsEqual(a, b) {
   if ((a?.size ?? 0) !== (b?.size ?? 0)) return false;
   for (const [k, v] of a) if (!b.has(k) || b.get(k) != v) return false;
@@ -9,7 +9,7 @@ function mapsEqual(a, b) {
   return true;
 }
 
-/** @type {import('.')['slashCommandsEqual']}*/
+/** @type {import('.')['slashCommandsEqual']} */
 function slashCommandsEqual(a, b) {
   if (a === b) return true;
   if ((a instanceof Command.MixedCommand || b instanceof Command.MixedCommand) || a.constructor != b.constructor) return false;
@@ -38,12 +38,12 @@ function slashCommandsEqual(a, b) {
 
 /**
  * @type {import('.')['logWrapper']}
- * @this {ThisParameterType<import('.')['logWrapper']>}*/
+ * @this {ThisParameterType<import('.')['logWrapper']>} */
 function logWrapper(options, type, msg) {
   if (!options[`hide${type}CommandLog`]) this.log(msg);
 }
 
-/** @type {import('.')['updateApplicationCommands']}*/
+/** @type {import('.')['updateApplicationCommands']} */
 async function updateApplicationCommands(app, commands, loggerOptions, logger = console) {
   const
 
@@ -51,7 +51,7 @@ async function updateApplicationCommands(app, commands, loggerOptions, logger = 
     log = logWrapper.bind(logger, loggerOptions),
     applicationCommands = app.commands.fetch({ withLocalizations: true }),
 
-    /** @type {Parameters<import('.')['updateApplicationCommands']>['1']}*/
+    /** @type {Parameters<import('.')['updateApplicationCommands']>['1']} */
     handledCommands = new Map();
 
   for (const command of commands.values()) {

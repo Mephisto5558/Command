@@ -5,7 +5,7 @@ import type Commands from './commands';
 /* eslint-disable-next-line sonarjs/no-wildcard-import */
 export * from './commands.js';
 
-/** @returns `true` if both are undefined, otherwise compares their values.*/
+/** @returns `true` if both are undefined, otherwise compares their values. */
 export declare function mapsEqual(a: Map<string, string | number | null | undefined> | undefined, b: typeof a): boolean;
 
 export declare function slashCommandsEqual(
@@ -38,8 +38,8 @@ type bBoundFunction<OF, T extends CallableFunction> = T & {
   __boundArgs__: unknown[];
 };
 
-/** bBinded I18nProvider.__ function*/
-/* eslint-disable-next-line @typescript-eslint/no-unsafe-function-type */// @ts-expect-error Intentional little trick
+/** bBinded I18nProvider.__ function */
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-function-type *//* @ts-expect-error Intentional little trick */
 export type lang = Function['bBind'] extends never ? never : bBoundFunction<I18nProvider['__'], (this: I18nProvider, key: string, replacements?: string | object) => string>;
 export type logger = {
   log: typeof console.log;
