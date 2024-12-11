@@ -1,5 +1,5 @@
 import type Discord from 'discord.js';
-import type I18nProvider from '@mephisto5558/i18n';
+import type { I18nProvider } from '@mephisto5558/i18n';
 import type { lang, logger } from '.';
 
 /* eslint-disable @typescript-eslint/no-invalid-void-type */

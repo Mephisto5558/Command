@@ -1,5 +1,5 @@
 import type { ApplicationCommand, ClientApplication } from 'discord.js';
-import type I18nProvider from '@mephisto5558/i18n';
+import type { I18nProvider } from '@mephisto5558/i18n';
 import type Commands from './commands';
 
 /* eslint-disable-next-line sonarjs/no-wildcard-import */
