@@ -25,12 +25,12 @@
     "node": ">=20.11.0"
   },
   "dependencies": {
-    "@mephisto5558/i18n": "^1.2.2"
+    "@mephisto5558/i18n": "^1.3.0"
   },
   "devDependencies": {
     "@mephisto5558/eslint-config": "latest",
-    "discord.js": "^14.16.3",
-    "eslint": "^9.16.0"
+    "discord.js": "^14.17.2",
+    "eslint": "^9.17.0"
   },
   "repository": {
     "type": "git",

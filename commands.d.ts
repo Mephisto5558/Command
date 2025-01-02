@@ -143,7 +143,7 @@ declare class SlashCommand<canBeDM extends boolean = boolean> extends BaseComman
   noDefer: boolean;
 
   /**
-   * Do `interaction.deferReply({ ephemeral: true })`.
+   * Do `interaction.deferReply({ flags: MessageFlags.Ephemeral })`.
    *
    * Gets ignored if {@link SlashCommand.noDefer} is `true`. */
   ephemeralDefer: boolean;
