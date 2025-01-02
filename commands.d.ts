@@ -66,7 +66,7 @@ declare abstract class BaseCommand<canBeDM extends boolean = false, T_name exten
   name: T_name;
 
   /** Currently not in use */
-  nameLocalizations: Map<Discord.LocaleString, BaseCommand['name']>;
+  nameLocalizations: Map<Discord.Locale, BaseCommand['name']>;
 
   /** Gets set from the command's folder name. */
   category: T_category;
@@ -81,7 +81,7 @@ declare abstract class BaseCommand<canBeDM extends boolean = false, T_name exten
   /**
    * Gets set automatically from language files.
    * @see {@link BaseCommand.description} */
-  descriptionLocalizations: Map<Discord.LocaleString, BaseCommand['description']>;
+  descriptionLocalizations: Map<Discord.Locale, BaseCommand['description']>;
 
   aliases: { slash?: BaseCommand['name'][]; prefix?: BaseCommand['name'][] };
 
