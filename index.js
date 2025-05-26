@@ -21,6 +21,7 @@ function slashCommandsEqual(a, b) {
 
   /** The 2nd `instanceof` check is just a typeguard (see 2nd line is this function) */
   if (a instanceof Command.CommandOption && b instanceof Command.CommandOption) {
+    /* eslint-disable-next-line @typescript-eslint/no-unnecessary-type-conversion -- `required` can be undefined at this stage */
     if (!!a.required != !!b.required || a.choices.length != b.choices.length) return false;
     if (a.minValue != b.minValue || a.maxValue != b.maxValue || a.minLength != b.minLength || a.maxLength != b.maxLength) return false;
     if ((a.channelTypes?.length ?? 0) != (b.channelTypes?.length ?? 0)) return false;
