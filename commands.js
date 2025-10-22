@@ -1,11 +1,25 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
 /* eslint-disable max-lines -- TODO */
 
+/**
+ * @import { CommandOptionInitOptions } from './commands'
+ * @import { MixedCommandInitOptions } from './commands'
+ * @import { PrefixCommandInitOptions } from './commands'
+ * @import { SlashCommandInitOptions } from './commands'
+ * @import { BaseCommandInitOptions } from './commands'
+ * @import { logger } from '.'
+ * @import { CommandOption } from './commands'
+ * @import { BaseCommand } from './commands' */
+
+
 const
-  { ApplicationCommandType, ApplicationCommandOptionType, PermissionFlagsBits, PermissionsBitField, ChannelType, InteractionContextType } = require('discord.js'),
-  { join, resolve, dirname, basename } = require('node:path'),
+  { 
+    ApplicationCommandOptionType, ApplicationCommandType, ChannelType,
+    InteractionContextType, PermissionFlagsBits, PermissionsBitField
+  } = require('discord.js'),
+  { basename, dirname, join, resolve } = require('node:path'),
   { I18nProvider } = require('@mephisto5558/i18n'),
-  getCallerFilePath = require('./utils/getCallerFilePath.js');
+  getCallerFilePath = require('./utils/getCallerFilePath');
 
 const
 
@@ -19,8 +33,8 @@ const
   defaultI18nProvider = new I18nProvider({ undefinedNotFound: true, localesPath: join(process.cwd(), 'Locales') });
 
 /**
- * @typedef {import('./commands').BaseCommand}BaseCommand
- * @typedef {import('./commands').CommandOption}CommandOptionInitOptions */
+ * @typedef {BaseCommand} BaseCommand
+ * @typedef {CommandOption} CommandOptionInitOptions */
 
 // Source: https://stackoverflow.com/a/61860802/17580213
 function classes(...bases) {
@@ -39,7 +53,7 @@ function classes(...bases) {
   return Bases;
 }
 
-/** @param {import('.').logger}logger */
+/** @param {logger} logger */
 function flipDevMode(logger) {
   if (logger._warn) {
     logger.warn = logger._warn;
@@ -75,10 +89,11 @@ class BaseCommand {
   slashCommand; prefixCommand; context; disabled; disabledReason; options; beta;
 
   /**
-   * @param {import('.').logger | undefined}logger
-   * @param {import('./commands').BaseCommandInitOptions}options
-   * @param {I18nProvider | undefined}i18n
-   * @param {boolean}devMode @default devMode=false */
+   * @param {logger | undefined} logger
+   * @param {BaseCommandInitOptions} options
+   * @param {I18nProvider | undefined} i18n
+   * @param {boolean} devMode
+   * @default devMode=false */
   /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user */
   constructor(logger = console, options, i18n = defaultI18nProvider, devMode = DEV_MODE) {
     this.filePath = resolve(getCallerFilePath('Commands'));
@@ -93,8 +108,8 @@ class BaseCommand {
     this.usage = {}; // gets filled in #setLocalization()
     this.usageLocalizations = new Map(); // gets filled in #setLocalization()
     this.permissions = {
-      client: new Set(options.permissions?.client?.map(e => typeof e == 'string' ? PermissionFlagsBits[e] : e)),
-      user: new Set(options.permissions?.client?.map(e => typeof e == 'string' ? PermissionFlagsBits[e] : e))
+      client: new Set(options.permissions?.client?.map(e => (typeof e == 'string' ? PermissionFlagsBits[e] : e))),
+      user: new Set(options.permissions?.client?.map(e => (typeof e == 'string' ? PermissionFlagsBits[e] : e)))
     };
     this.cooldowns = {
       guild: Math.max(options.cooldowns?.guild ?? 0, 0),
@@ -103,7 +118,7 @@ class BaseCommand {
     };
     this.slashCommand = undefined;
     this.prefixCommand = undefined;
-    this.context = options.context ? this.context.map(e => typeof e == 'string' && e != '-Guild' ? InteractionContextType[e] : e) : [InteractionContextType.Guild];
+    this.context = options.context ? this.context.map(e => (typeof e == 'string' && e != '-Guild' ? InteractionContextType[e] : e)) : [InteractionContextType.Guild];
     this.disabled = options.disabled ?? false;
     this.disabledReason = options.disabledReason;
     this.options = options.options ?? [];
@@ -115,7 +130,7 @@ class BaseCommand {
     for (const option of this.options) option.__init(`${this.langId}.options`, i18n);
   }
 
-  /** @type {typeof import('./commands').BaseCommand['setLocalization']} */
+  /** @type {typeof BaseCommand['setLocalization']} */
   static setLocalization(command, i18n) {
     for (const locale of i18n.availableLocales.keys()) {
       const usageLocalization = {
@@ -139,7 +154,7 @@ class BaseCommand {
     }
   }
 
-  /** @type {typeof import('./commands').BaseCommand['validateData']} */
+  /** @type {typeof BaseCommand['validateData']} */
   static validateData(command, logger, i18n) {
     if (command.disabled) return;
 
@@ -192,10 +207,10 @@ class SlashCommand extends BaseCommand {
   noDefer; ephemeralDefer; id; type; run;
 
   /**
-   * @param {import('.').logger | undefined}logger
-   * @param {import('./commands').SlashCommandInitOptions}options
-   * @param {I18nProvider | undefined}i18n
-   * @param {boolean}devMode @default devMode=false */
+   * @param {logger | undefined} logger
+   * @param {SlashCommandInitOptions} options
+   * @param {I18nProvider | undefined} i18n
+   * @param {boolean} devMode `@default` devMode=false */
   /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user */
   constructor(logger = console, options, i18n = defaultI18nProvider, devMode = DEV_MODE) {
     super(logger, options, i18n, devMode);
@@ -227,10 +242,10 @@ class SlashCommand extends BaseCommand {
 
 class PrefixCommand extends BaseCommand {
   /**
-   * @param {import('.').logger | undefined}logger
-   * @param {import('./commands').PrefixCommandInitOptions}options
-   * @param {I18nProvider | undefined}i18n
-   * @param {boolean}devMode @default devMode=false */
+   * @param {logger | undefined} logger
+   * @param {PrefixCommandInitOptions} options
+   * @param {I18nProvider | undefined} i18n
+   * @param {boolean} devMode `@default` devMode=false */
   /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user */
   constructor(logger = console, options, i18n = defaultI18nProvider, devMode = DEV_MODE) {
     super(logger, options, i18n, devMode);
@@ -255,11 +270,11 @@ class PrefixCommand extends BaseCommand {
 
 class MixedCommand extends classes(SlashCommand, PrefixCommand) {
   /**
-   * @this {import('./commands').MixedCommand}
-   * @param {import('.').logger | undefined}logger
-   * @param {import('./commands').MixedCommandInitOptions}options
-   * @param {I18nProvider | undefined}i18n
-   * @param {boolean}devMode @default devMode=false */
+   * @this {MixedCommand}
+   * @param {logger | undefined} logger
+   * @param {MixedCommandInitOptions} options
+   * @param {I18nProvider | undefined} i18n
+   * @param {boolean} devMode `@default` devMode=false */
   /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user */
   constructor(logger = console, options, i18n = defaultI18nProvider, devMode = DEV_MODE) {
     super(logger, options, i18n, devMode);
@@ -286,10 +301,10 @@ class CommandOption {
   #logger;
 
   /**
-   * @param {import('.').logger | undefined}logger
-   * @param {import('./commands').CommandOptionInitOptions<boolean>}options
-   * @param {I18nProvider | undefined}i18n
-   * @param {boolean}devMode @default devMode=false */
+   * @param {logger | undefined} logger
+   * @param {CommandOptionInitOptions<boolean>} options
+   * @param {I18nProvider | undefined} i18n
+   * @param {boolean} devMode `@default` devMode=false */
   /* eslint-disable-next-line @typescript-eslint/default-param-last -- `logger` is intended to be bound by the lib user */
   constructor(logger = console, options, i18n = defaultI18nProvider, devMode = DEV_MODE) {
     this.name = options.name;
@@ -299,8 +314,8 @@ class CommandOption {
     this.descriptionLocalizations = new Map(); // gets filled in #setLocalization()
     this.type = typeof options.type == 'string' ? ApplicationCommandOptionType[options.type] : options.type;
     this.permissions = {
-      client: new Set(options.permissions?.client?.map(e => typeof e == 'string' ? PermissionFlagsBits[e] : e)),
-      user: new Set(options.permissions?.client?.map(e => typeof e == 'string' ? PermissionFlagsBits[e] : e))
+      client: new Set(options.permissions?.client?.map(e => (typeof e == 'string' ? PermissionFlagsBits[e] : e))),
+      user: new Set(options.permissions?.client?.map(e => (typeof e == 'string' ? PermissionFlagsBits[e] : e)))
     };
     this.cooldowns = options.cooldowns ?? {
       guild: Math.max(options.cooldowns?.guild ?? 0, 0),
@@ -311,7 +326,7 @@ class CommandOption {
     this.dmPermission = options.dmPermission ?? false;
 
     const choices = options.choices ?? [];
-    this.choices = (Array.isArray(choices) ? choices : [choices]).map(/** @param {import('./commands').CommandOption['choices'][number] | string | number}choice */ choice => {
+    this.choices = (Array.isArray(choices) ? choices : [choices]).map(/** @param {CommandOption['choices'][number] | string | number} choice */ choice => {
       if (typeof choice == 'object') {
         choice.__NO_LOCALIZATION = true; // Removed in #setLocalization()
         return choice;
@@ -344,7 +359,7 @@ class CommandOption {
     if (devMode) flipDevMode(this.#logger);
   }
 
-  /** @type {import('./commands').CommandOption['__init']} */
+  /** @type {CommandOption['__init']} */
   __init(langId, i18n = defaultI18nProvider) {
     this.langId = `${langId}.${this.name}`;
 
@@ -356,7 +371,7 @@ class CommandOption {
 
   /**
    * Sets the localization for `name`, `description` and `choices`.
-   * @param {I18nProvider}i18n */
+   * @param {I18nProvider} i18n */
   #setLocalization(i18n) {
     for (const locale of i18n.availableLocales.keys()) {
       if (locale == i18n.config.defaultLocale) continue;
@@ -381,7 +396,7 @@ class CommandOption {
   }
 
   /**
-   * @param {I18nProvider}i18n
+   * @param {I18nProvider} i18n
    * @throws {TypeError} on invalid type, channelType or minLength/minValue missmatch. */
   #validateData(i18n) {
     if (this.disabled) return;

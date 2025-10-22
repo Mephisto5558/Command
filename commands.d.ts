@@ -110,7 +110,7 @@ declare abstract class BaseCommand<canBeDM extends boolean = false, T_name exten
   /**
    * Same as {@link BaseCommand.context} having {@link Discord.InteractionContextType.BotDM}.
    * @deprecated Do not use. Just here for typing reasons. **Does not exist in code!** */
-  private dmPermission: canBeDM;
+  private readonly dmPermission: canBeDM;
 
   /** This command will not be loaded */
   disabled: boolean;
@@ -126,10 +126,13 @@ declare abstract class BaseCommand<canBeDM extends boolean = false, T_name exten
 
 type SlashCommandInitOptions<canBeDM extends boolean = false> = BaseCommandInitOptions<canBeDM> & {
   noDefer?: boolean; ephemeralDefer?: boolean;
-  run(this: Discord.ChatInputCommandInteraction<canBeDM extends true ? Discord.CacheType : 'cached'>, lang: lang, client: Discord.Client<true>): Promise<never>;
+  run(
+    this: Discord.ChatInputCommandInteraction<canBeDM extends true ? Discord.CacheType : 'cached'>,
+    lang: lang, client: Discord.Client<true>
+  ): Promise<never>;
 };
 declare class SlashCommand<canBeDM extends boolean = boolean> extends BaseCommand<canBeDM> {
-  /** @param {logger}logger is intended to be bound by the lib user */
+  /** @param {logger} logger is intended to be bound by the lib user */
   // @ts-expect-error `logger` is intended to be bound by the lib user.
   constructor(logger?: logger, options: SlashCommandInitOptions<canBeDM>, i18n?: I18nProvider);
   static [Symbol.hasInstance](value: unknown): this is SlashCommand | MixedCommand;
@@ -151,14 +154,17 @@ declare class SlashCommand<canBeDM extends boolean = boolean> extends BaseComman
   id: Discord.Snowflake;
   type: Discord.ApplicationCommandType.ChatInput;
 
-  run: (this: Discord.ChatInputCommandInteraction<canBeDM extends true ? Discord.CacheType : 'cached'>, lang: lang, client: Discord.Client<true>) => Promise<never>;
+  run: (
+    this: Discord.ChatInputCommandInteraction<canBeDM extends true ? Discord.CacheType : 'cached'>,
+    lang: lang, client: Discord.Client<true>
+  ) => Promise<never>;
 }
 
 type PrefixCommandInitOptions<canBeDM extends boolean = false> = BaseCommandInitOptions & {
   run(this: Discord.Message<canBeDM extends true ? boolean : true>, lang: lang, client: Discord.Client<true>): Promise<never>;
 };
 declare class PrefixCommand<canBeDM extends boolean = boolean> extends BaseCommand {
-  /** @param {logger}logger is intended to be bound by the lib user */
+  /** @param {logger} logger is intended to be bound by the lib user */
   // @ts-expect-error `logger` is intended to be bound by the lib user.
   constructor(logger?: logger, options: PrefixCommandInitOptions<canBeDM>, i18n?: I18nProvider);
   static [Symbol.hasInstance](value: unknown): this is PrefixCommand | MixedCommand;
@@ -176,7 +182,7 @@ type MixedCommandInitOptions<canBeDM extends boolean = false> = Omit<SlashComman
   ): ReturnType<SlashCommandInitOptions<canBeDM>['run'] | PrefixCommandInitOptions<canBeDM>['run']>;
 };
 declare class MixedCommand<canBeDM extends boolean = boolean> extends BaseCommand implements SlashCommand<canBeDM>, PrefixCommand<canBeDM> {
-  /** @param {logger}logger is intended to be bound by the lib user */
+  /** @param {logger} logger is intended to be bound by the lib user */
   // @ts-expect-error `logger` is intended to be bound by the lib user.
   constructor(logger?: logger, options: MixedCommandInitOptions<canBeDM>, i18n?: I18nProvider);
   static [Symbol.hasInstance](value: unknown): this is MixedCommand | SlashCommand | PrefixCommand;
@@ -254,7 +260,7 @@ declare class CommandOption<
   T_name extends Lowercase<string> = Lowercase<string>,
   T_langId extends Lowercase<`${BaseCommand['langId']}.options${string}`> = `${BaseCommand['langId']}.options`
 > {
-  /** @param {logger}logger is intended to be bound by the lib user */
+  /** @param {logger} logger is intended to be bound by the lib user */
   // @ts-expect-error `logger` is intended to be bound by the lib user.
   constructor(logger?: logger, options: CommandOptionInitOptions, devMode?: boolean);
 
