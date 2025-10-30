@@ -30,7 +30,7 @@ const
   MIN_CHOICE_NAME_LENGTH = 1,
   MAX_CHOICE_NAME_LENGTH = 32,
   DEV_MODE = false,
-  defaultI18nProvider = new I18nProvider({ undefinedNotFound: true, localesPath: join(process.cwd(), 'Locales') });
+  defaultI18nProvider = new I18nProvider({ undefinedNotFound: true, localesPath: join(process.cwd(), 'Locales') }).init();
 
 /**
  * @typedef {BaseCommand} BaseCommand
