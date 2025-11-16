@@ -30,7 +30,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@mephisto5558/i18n": "^1.5.x"
+    "@mephisto5558/i18n": "2.x"
   },
   "devDependencies": {
     "@mephisto5558/eslint-config": "github:Mephisto5558/ESLint-Config",

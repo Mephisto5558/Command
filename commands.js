@@ -13,7 +13,7 @@
 
 
 const
-  { 
+  {
     ApplicationCommandOptionType, ApplicationCommandType, ChannelType,
     InteractionContextType, PermissionFlagsBits, PermissionsBitField
   } = require('discord.js'),
