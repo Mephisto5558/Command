@@ -1,5 +1,5 @@
 /**
- * @import { Command, commandDoneFn } from '..'
+ * @import { Command, commandDoneFn, CooldownsManager } from '..'
  * @import { Client } from 'discord.js' */
 
 
@@ -15,8 +15,9 @@ let
 
 /**
  * @this {Client<false>}
- * @param {commandDoneFn} doneFn */
-module.exports = async function commandLoader(doneFn) {
+ * @param {commandDoneFn} doneFn
+ * @param {CooldownsManager} cooldownsManager */
+module.exports = async function commandLoader(doneFn, cooldownsManager) {
   for (const subFolder of await getDirectories('./Commands')) {
     for (const file of await readdir(`./Commands/${subFolder}`, { withFileTypes: true })) {
       if (!file.name.endsWith('.js') && !file.isDirectory()) continue;
@@ -32,7 +33,7 @@ module.exports = async function commandLoader(doneFn) {
 
       if (!commandFile?.types.includes(commandTypes.prefix)) continue;
 
-      const command = commandFile.init(this.i18n, filePath, log, doneFn);
+      const command = commandFile.init(this.i18n, filePath, { logger: log, doneFn, cooldownsManager });
 
       this.prefixCommands.set(command.name, command);
       if (command.disabled) {

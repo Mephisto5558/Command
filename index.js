@@ -2,7 +2,7 @@
 
 /**
  * @import { Locale, Translator } from '@mephisto5558/i18n'
- * @import { Command as CommandT, CommandOption as CommandOptionT, CommandType, CommandConfig, CommandOptionConfig, CommandExecutionError as CommandExecutionErrorT, customPermissionChecksFn, getMilliseconds as getMS, CooldownTypes } from '.' */ /* eslint-disable-line @stylistic/max-len */
+ * @import { Command as CommandT, CommandOption as CommandOptionT, CommandType, CommandConfig, CommandOptionConfig, CommandExecutionError as CommandExecutionErrorT, customPermissionChecksFn, getMilliseconds as getMS } from '.' */ /* eslint-disable-line @stylistic/max-len */
 
 
 const
@@ -15,7 +15,7 @@ const
   /** @type {getMS} *//* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
   getMilliseconds = require('better-ms').ms,
   {
-    filename, loadFile, capitalize,
+    filename, loadFile, capitalize, CooldownsManager,
     constants: { autocompleteOptionsMaxAmt, descriptionMaxLength, choicesMaxAmt, choiceValueMaxLength, choiceValueMinLength }
   } = require('./utils'),
 
@@ -100,8 +100,8 @@ class CommandOption {
   /** @type {CommandOptionT['options']} */ options = [];
 
   /** @type {Parameters<CommandOptionT['init']>['0']} */ #i18n;
-  /** @type {Parameters<CommandOptionT['init']>['2']} */ #logger;
-  /** @type {Partial<Record<CooldownTypes, Map<Snowflake, number>>>} */ #cooldownCache = new Map();
+  /** @type {Parameters<CommandOptionT['init']>['2']} */ #cooldownsManager;
+  /** @type {Parameters<CommandOptionT['init']>['3']} */ #logger;
 
   /** @param {CommandOptionConfig<CommandType[], boolean>} config */
   constructor(config = {}) {
@@ -132,9 +132,10 @@ class CommandOption {
   }
 
   /** @type {CommandOptionT['init']} */
-  init(i18n, parentId, logger = console, position = 0) {
+  init(i18n, parentId, cooldownsManager, logger = console, position = 0) {
     this.#i18n = i18n;
     this.#logger = logger;
+    this.#cooldownsManager = cooldownsManager;
 
     this.id = `${parentId}.options.${this.name}`;
     this.position = position;
@@ -142,7 +143,8 @@ class CommandOption {
     this.#validate();
     this.#localize();
 
-    for (const [i, option] of this.options.entries()) option.init(i18n, this.id, logger, i);
+    for (const [i, option] of this.options.entries())
+      option.init(i18n, this.id, cooldownsManager, logger, i);
 
     return this;
   }
@@ -319,23 +321,7 @@ class CommandOption {
 
   /** @type {CommandOptionT<CommandType[], boolean>['updateCooldowns']} */
   updateCooldowns(interaction) {
-    const
-      createdAt = interaction.createdAt.getTime(),
-      currentCooldowns = [];
-
-    for (const [cdName, cdVal] of Object.entries(this.cooldowns)) {
-      /* eslint-disable-next-line sonarjs/no-nested-conditional -- required for typing to work */
-      const areaId = (interaction instanceof Message ? interaction[cdName == 'user' ? 'author' : cdName] : interaction[cdName])?.id;
-      if (!cdVal || !areaId) continue;
-
-      this.#cooldownCache[cdName] ??= new Map();
-      const timestamp = this.#cooldownCache[cdName].get(areaId) ?? 0;
-
-      if (timestamp > createdAt) currentCooldowns.push(timestamp - createdAt);
-      else this.#cooldownCache[cdName].set(areaId, createdAt + cdVal);
-    }
-
-    return Math.max(0, ...currentCooldowns);
+    return this.#cooldownsManager.update(this.id, interaction, this.cooldowns);
   }
 
   /* eslint-disable sonarjs/expression-complexity, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/no-unnecessary-type-conversion,
@@ -430,7 +416,6 @@ class Command {
     replyOn: { disabled: true, nonBeta: true }
   };
 
-  /** @type {Partial<Record<CooldownTypes, Map<Snowflake, number>>>} */ #cooldownCache = new Map();
 
   /** @type {CommandOptionT[]} */ options = [];
 
@@ -439,6 +424,7 @@ class Command {
   /** @type {Parameters<CommandT<CommandType[], boolean>['init']>[0]} */ #i18n;
   /** @type {NonNullable<Parameters<CommandT<CommandType[], boolean>['init']>['2']>['logger']} */ #logger;
   /** @type {NonNullable<Parameters<CommandT<CommandType[], boolean>['init']>['2']>['doneFn']} */ #doneFn;
+  /** @type {NonNullable<Parameters<CommandT<CommandType[], boolean>['init']>['2']>['cooldownsManager']} */ #cooldownsManager;
   /** @type {customPermissionChecksFn | undefined} */ #customPermissionChecks;
 
 
@@ -480,13 +466,15 @@ class Command {
   /** @type {CommandT<CommandType[], boolean>['init']} */
   init(i18n, filePath, {
     logger = console, doneFn, devIds, devOnlyCategories, runBetaCommandsOnly, replyOn = {},
-    customPermissionChecks
+    customPermissionChecks, cooldownsManager = new CooldownsManager()
   } = {}) {
     this.#filePath = filePath;
 
     this.#i18n = i18n;
     this.#logger = logger;
     this.#doneFn = doneFn;
+    this.#cooldownsManager = cooldownsManager;
+
     this.#customPermissionChecks = customPermissionChecks?.bind(this);
 
     if (devIds) this.config.devIds = devIds;
@@ -503,8 +491,8 @@ class Command {
     this.#validate();
     this.#localize();
 
-    for (const option of this.options) option.init(this.#i18n, this.id, this.#logger, 0);
-    for (const [i, option] of this.options.entries()) option.init(this.#i18n, this.id, this.#logger, i);
+    for (const [i, option] of this.options.entries())
+      option.init(this.#i18n, this.id, this.#logger, this.#cooldownsManager, i);
 
     return this;
   }
@@ -579,25 +567,11 @@ class Command {
 
   /** @type {CommandT<CommandType[], boolean>['updateCooldowns']} */
   updateCooldowns(interaction) {
-    const
-      createdAt = interaction.createdAt.getTime(),
-      currentCooldowns = [];
+    const currentCooldowns = [this.#cooldownsManager.update(this.id, interaction, this.cooldowns)];
 
     let
       /** @type {string | undefined} */ group,
       /** @type {string | undefined} */ subCmd;
-
-    for (const [cdName, cdVal] of Object.entries(this.cooldowns)) {
-      /* eslint-disable-next-line sonarjs/no-nested-conditional -- required for typing to work */
-      const areaId = (interaction instanceof Message ? interaction[cdName == 'user' ? 'author' : cdName] : interaction[cdName])?.id;
-      if (!cdVal || !areaId) continue;
-
-      this.#cooldownCache[cdName] ??= new Map();
-      const timestamp = this.#cooldownCache[cdName].get(areaId) ?? 0;
-
-      if (timestamp > createdAt) currentCooldowns.push(timestamp - createdAt);
-      else this.#cooldownCache[cdName].set(areaId, createdAt + cdVal);
-    }
 
     if (interaction instanceof CommandInteraction) {
       group = interaction.options.getSubcommandGroup(false);
@@ -702,7 +676,10 @@ class Command {
     newCommand = 'default' in newCommand ? newCommand.default : newCommand;
 
     await i18n.loadAllLocales();
-    newCommand.init(i18n, this.#filePath, this.#logger);
+    newCommand.init(i18n, this.#filePath, {
+      logger: this.#logger, cooldownsManager: this.#cooldownsManager,
+      doneFn: this.#doneFn, customPermissionChecks: this.#customPermissionChecks
+    });
 
     if ([this, newCommand].some(e => e.types.includes(commandTypes.slash))) {
       const appCommand = await this.reloadApplicationCommand(application, newCommand);

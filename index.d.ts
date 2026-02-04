@@ -9,6 +9,7 @@ import type {
 } from 'discord.js';
 import type * as __ from '@mephisto5558/better-types'; /* eslint-disable-line import-x/no-namespace -- load in global definitions */
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
+import type { CooldownsManager } from './utils/index.js';
 
 export * from './utils/index.js';
 export * as loaders from './loaders';
@@ -346,6 +347,7 @@ export declare class Command<
     devIds?: Set<Snowflake>; devOnlyCategories?: Set<string>;
     runBetaCommandsOnly?: boolean;
     replyOn?: { disabled?: boolean; nonBeta?: boolean };
+    cooldownsManager?: CooldownsManager;
   }): this;
 
   /**
@@ -429,7 +431,7 @@ export declare class CommandOption<
   constructor(config: CommandOptionConfig<commandTypes, runsInDM, additionalRunOpts, Options>);
 
   /* eslint-disable-next-line @typescript-eslint/no-unused-private-class-members */
-  private init(i18n: I18nProvider, parentId: Command['id'] | CommandOption['id'], logger?: {
+  private init(i18n: I18nProvider, parentId: Command['id'] | CommandOption['id'], cooldownsManager: CooldownsManager, logger?: {
     log: typeof console.log;
     warn: typeof console.warn;
     error: typeof console.error;

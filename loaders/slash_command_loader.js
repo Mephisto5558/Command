@@ -1,5 +1,5 @@
 /**
- * @import { Command, commandDoneFn } from '..'
+ * @import { Command, commandDoneFn, CooldownsManager } from '..'
  * @import { Client } from 'discord.js' */
 
 const
@@ -11,8 +11,9 @@ const
 
 /**
  * @this {Client}
- * @param {commandDoneFn} doneFn */
-module.exports = async function slashCommandHandler(doneFn) {
+ * @param {commandDoneFn} doneFn 
+ * @param {CooldownsManager} cooldownsManager*/
+module.exports = async function slashCommandHandler(doneFn, cooldownsManager) {
   await this.awaitReady();
 
   const applicationCommands = this.application.commands.fetch({ withLocalizations: true });
@@ -35,7 +36,7 @@ module.exports = async function slashCommandHandler(doneFn) {
 
       /** @type {Command<['slash'], boolean>} */
       let command;
-      try { command = commandFile.init(this.i18n, filePath, log, doneFn); }
+      try { command = commandFile.init(this.i18n, filePath, { logger: log, doneFn, cooldownsManager }); }
       catch (err) {
         if (this.botType == 'dev') throw err;
         log.error(`Error on formatting command file ${filePath}:\n`, err);
