@@ -11,8 +11,8 @@ const
 
 /**
  * @this {Client}
- * @param {commandDoneFn} doneFn 
- * @param {CooldownsManager} cooldownsManager*/
+ * @param {commandDoneFn} doneFn
+ * @param {CooldownsManager} cooldownsManager */
 module.exports = async function slashCommandHandler(doneFn, cooldownsManager) {
   await this.awaitReady();
 

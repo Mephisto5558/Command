@@ -1,4 +1,4 @@
-/** @import {CooldownsManager as CooldownsManagerT} from '.' */
+/** @import { CooldownsManager as CooldownsManagerT } from '.' */
 
 const { Message } = require('discord.js');
 

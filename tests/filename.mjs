@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test as topLvlTest } from 'node:test';
 
-import filename from '#Utils/filename.js';
+import filename from '../utils/filename.js';
 
 await topLvlTest('filename', { concurrency: true }, async t => Promise.allSettled([
   t.test('should return the filename without extension from a full path', () => {

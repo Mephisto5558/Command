@@ -1,4 +1,4 @@
-import type { BaseInteraction } from 'discord.js';
+import type { BaseInteraction, Message } from 'discord.js';
 import type { I18nProvider, Locale } from '@mephisto5558/i18n';
 import type { Command, CommandType, CooldownTypes } from '..';
 
