@@ -8,7 +8,8 @@
 const
   {
     ApplicationCommandOptionType, ApplicationCommandType, ChannelType,
-    Colors, CommandInteraction, EmbedBuilder, Message, MessageFlags, PermissionsBitField, inlineCode
+    Colors, CommandInteraction, EmbedBuilder, Message, MessageFlags,
+    PermissionFlagsBits, PermissionsBitField, inlineCode
   } = require('discord.js'),
   { basename, dirname } = require('node:path'),
 
@@ -19,7 +20,9 @@ const
     constants: { autocompleteOptionsMaxAmt, descriptionMaxLength, choicesMaxAmt, choiceValueMaxLength, choiceValueMinLength }
   } = require('./utils'),
 
-  /** @type {number} */ msInSeconds = getMilliseconds('1s');
+  /** @type {number} */ msInSeconds = getMilliseconds('1s'),
+  /** @type {number} */ PERM_ERR_MSG_DELETETIME = getMilliseconds('10s'),
+  CANNOT_SEND_MESSAGE_API_ERR = 50_007;
 
 /**
  * @param {unknown} a
@@ -397,7 +400,8 @@ class Command {
   aliases = { slash: [], prefix: [] };
   cooldowns = { guild: 0, channel: 0, user: 0 };
 
-  permissions = { client: [], user: [] };
+  /** @type {CommandT['permissions']} */
+  permissions = { client: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages], user: [PermissionFlagsBits.SendMessages] };
   get defaultMemberPermissions() {
     return new PermissionsBitField(this.permissions.user);
   }
@@ -444,8 +448,8 @@ class Command {
       this.cooldowns = Object.fromEntries(Object.entries(this.cooldowns).map(cooldownConverter.bind(undefined, config.cooldowns)));
 
     if (config.permissions) {
-      if (config.permissions.client) this.permissions.client = config.permissions.client;
-      if (config.permissions.user) this.permissions.user = config.permissions.user;
+      if (config.permissions.client) this.permissions.client.push(...config.permissions.client);
+      if (config.permissions.user) this.permissions.user.push(...config.permissions.user);
     }
 
     if (config.dmPermission) this.dmPermission = config.dmPermission;
@@ -608,6 +612,45 @@ class Command {
   }
 
   /**
+   * @param {Parameters<customPermissionChecksFn<CommandT<CommandType[], false>>>[0]} interaction
+   * @param {Parameters<customPermissionChecksFn<CommandT<CommandType[], false>>>[1]} author
+   * @param {Parameters<customPermissionChecksFn>[2]} wrapperTranslator
+   * @returns {ReturnType<customPermissionChecksFn>} */
+  async #permissionChecks(interaction, author, wrapperTranslator) {
+    const
+      botChannelPerms = interaction.channel.permissionsFor(interaction.guild.members.me),
+      userPermsMissing = interaction.channel.permissionsFor(author).missing(this.permissions.user),
+      botPermsMissing = botChannelPerms.missing(this.permissions.client);
+
+    if (!botPermsMissing.length && !userPermsMissing.length) return false;
+
+    const embed = new EmbedBuilder({
+      title: wrapperTranslator('permissionDenied.embedTitle'),
+      description: wrapperTranslator(`permissionDenied.embedDescription${botPermsMissing.length ? 'Bot' : 'User'}`, {
+        permissions: (botPermsMissing.length ? botPermsMissing : userPermsMissing).map(perm => inlineCode(this.#i18n.__(
+          { locale: wrapperTranslator.config.locale, undefinedNotFound: true },
+          `others.Perms.${perm}`
+        ) ?? perm)).join(', ')
+      }),
+      color: Colors.Red
+    });
+
+    if (botChannelPerms.missing([PermissionFlagsBits.SendMessages, PermissionFlagsBits.ViewChannel]).length) {
+      if (interaction instanceof Message && botChannelPerms.has(PermissionFlagsBits.AddReactions))
+        void interaction.react('❌').then(() => void interaction.react('✍️'));
+
+      try { await author.send({ content: interaction instanceof Message ? interaction.url : undefined, embeds: [embed] }); }
+      catch (err) {
+        if (err.code != CANNOT_SEND_MESSAGE_API_ERR) throw err;
+      }
+    }
+    else if (interaction instanceof CommandInteraction) await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    else await interaction.reply({ embeds: [embed] }, PERM_ERR_MSG_DELETETIME);
+
+    return true;
+  }
+
+  /**
    * @param {Parameters<customPermissionChecksFn>[0]} interaction
    * @param {Translator} wrapperTranslator
    * @returns {ReturnType<customPermissionChecksFn>} */
@@ -628,6 +671,11 @@ class Command {
 
     if (!this.dmPermission && interaction.channel.type == ChannelType.DM) return ['guildOnly'];
     if (this.category == 'nsfw' && !interaction.channel?.nsfw) return ['nsfw'];
+
+    if (interaction.inGuild()) {
+      const err = await this.#permissionChecks(interaction, author, wrapperTranslator);
+      if (err) return err;
+    }
 
     if (this.#customPermissionChecks) {
       const customErr = await this.#customPermissionChecks(interaction, author, wrapperTranslator);
@@ -658,7 +706,7 @@ class Command {
       if (cooldown) return ['cooldown', inlineCode(Math.round(cooldown / msInSeconds))];
     }
 
-    return interaction.inGuild() && await checkPerms.call(interaction, this, wrapperTranslator);
+    return false;
   }
 
   /**

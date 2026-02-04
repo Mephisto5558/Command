@@ -326,7 +326,7 @@ export declare class Command<
 
   run: (
     this: ResolveContext<{
-      slash: ChatInputCommandInteraction<runsInDM extends false ? true : false>;
+      slash: ChatInputCommandInteraction<runsInDM extends false ? 'cached' : CacheType>;
       prefix: Message<runsInDM extends false ? true : false>;
     }, NoInfer<commandTypes>>,
     lang: Translator, client: Client
