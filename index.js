@@ -102,6 +102,8 @@ class CommandOption {
   channelTypes;
   /** @type {CommandOptionT['options']} */ options = [];
 
+  position = 0;
+
   /** @type {Parameters<CommandOptionT['init']>['0']} */ #i18n;
   /** @type {Parameters<CommandOptionT['init']>['2']} */ #cooldownsManager;
   /** @type {Parameters<CommandOptionT['init']>['3']} */ #logger;
