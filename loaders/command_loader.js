@@ -31,7 +31,7 @@ module.exports = async function commandLoader(doneFn, cooldownsManager) {
         if (err.code != 'MODULE_NOT_FOUND') throw err;
       }
 
-      if (!commandFile?.types.includes(commandTypes.prefix)) continue;
+      if (!commandFile.types.includes(commandTypes.prefix)) continue;
 
       const command = commandFile.init(this.i18n, filePath, { logger: log, doneFn, cooldownsManager });
 
@@ -45,8 +45,8 @@ module.exports = async function commandLoader(doneFn, cooldownsManager) {
       if (command.disabled || (this.botType == 'dev' && !command.beta)) disabledCommandCount++;
       else enabledCommandCount++;
 
-      for (const alias of command.aliases?.prefix ?? []) {
-        this.prefixCommands.set(alias, { ...command, name: alias, aliasOf: command.name });
+      for (const alias of command.aliases.prefix) {
+        this.prefixCommands.set(alias, command);
         if (!command.disabled) log(`Loaded Alias ${alias} of Prefix Command ${command.name}`);
         else if (!this.config.hideDisabledCommandLog) log(`Loaded Alias ${alias} of Prefix Command ${command.name} (disabled)`);
 

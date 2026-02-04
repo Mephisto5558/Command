@@ -7,11 +7,11 @@ const { capitalize, commandTypes } = require('..');
 /** @typedef {{ commandName: string, commandUsage: string, commandDescription: string, commandAlias: string }[]} commandList */
 
 /** @type {getCommandsT} */
-module.exports = function getCommands(lang) {
-  const commandList = [...this.slashCommands.values(), ...this.prefixCommands.values()].unique().reduce((
-    /** @type {{ category: string, subTitle: '', aliasesDisabled: boolean, list: commandList }[]} */ acc, /** @type {Command<CommandType[]>} */ cmd
+module.exports = function getCommands(lang, commands, excludeCategories) {
+  const commandList = commands.reduce((
+    /** @type {{ category: string, subTitle: '', aliasesDisabled: boolean, list: commandList }[]} */ acc, cmd
   ) => {
-    if (this.config.devOnlyFolders.includes(cmd.category) || cmd.disabled || cmd.aliasOf) return acc;
+    if (excludeCategories?.includes(cmd.category) || cmd.disabled) return acc;
 
     let category = acc.find(e => e.category == cmd.category);
     if (!category) {
@@ -26,8 +26,7 @@ module.exports = function getCommands(lang) {
     category.list.push({
       commandName: cmd.name,
       commandUsage: (
-        /* eslint-disable-next-line @typescript-eslint/restrict-plus-operands -- will be fixed when commands are moved to their own lib */
-        (cmd.types.includes(commandTypes.slash) ? lang('others.getCommands.lookAtOptionDesc') : '')
+        (cmd.types.includes(commandTypes.slash) ? lang('others.getCommands.lookAtOptionDesc') ?? '' : '')
         + (lang(`${cmd.id}.usage.usage`)?.replaceAll(/slash command:/gi, '') ?? '') || lang('others.getCommands.noInfo')
       ).trim().replaceAll('\n', '<br>&nbsp'),
       commandDescription: cmd.descriptionLocalizations[lang.config.locale ?? lang.defaultConfig.defaultLocale] ?? cmd.description,

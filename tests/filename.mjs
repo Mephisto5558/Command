@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test as topLvlTest } from 'node:test';
 
+/* eslint-disable-next-line import-x/extensions -- required for typing */
 import filename from '../utils/filename.js';
 
 await topLvlTest('filename', { concurrency: true }, async t => Promise.allSettled([

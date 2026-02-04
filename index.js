@@ -568,7 +568,9 @@ class Command {
       await this.run.call(interaction, commandTranslator, interaction.client);
       await this.#doneFn.call(interaction, this, commandTranslator);
     }
-    catch (err) { throw new CommandExecutionError(err.message, interaction, wrapperTranslator, { cause: err }); }
+    catch (err) {
+      throw new CommandExecutionError(err instanceof Error ? err.message : JSON.stringify(err), interaction, wrapperTranslator, { cause: err });
+    }
   }
 
   /** @type {CommandT<CommandType[], boolean>['updateCooldowns']} */

@@ -1,5 +1,5 @@
 import type { BaseInteraction, Message } from 'discord.js';
-import type { I18nProvider, Locale } from '@mephisto5558/i18n';
+import type { Locale, Translator } from '@mephisto5558/i18n';
 import type { Command, CommandType, CooldownTypes } from '..';
 
 export { default as constants } from './constants';
@@ -25,7 +25,9 @@ export declare function filename(path: string): string;
 
 export declare function getCommands(
   this: Client,
-  lang: lang<true>
+  lang: Translator<true, Locale>,
+  commands: Command<CommandType[], boolean>[],
+  excludeCategories?: Command['category'][]
 ): {
   category: string;
   subTitle: '';
