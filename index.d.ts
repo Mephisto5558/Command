@@ -14,6 +14,22 @@ export * from './utils/index.js';
 export * as loaders from './loaders';
 export { PermissionFlagsBits as Permissions } from 'discord.js';
 
+// for better-ms
+export declare function getMilliseconds<
+  T extends validTimeString | number
+>(val: T, options: { long: boolean }): (T extends string ? number : string) | undefined;
+
+type BuildOrderedCooldown<T extends readonly string[]> = T extends [infer Head extends string, ...infer Tail extends string[]]
+  ? `${number}${Head}` | `${number}${Head}${BuildOrderedCooldown<Tail>}` | BuildOrderedCooldown<Tail>
+  : never;
+
+/**
+ * This is more limited than what's actually allowed to enforce consitency.
+ *
+ * day, hour, minute, second, millisecond */
+type TimeUnits = ['d', 'h', 'min', 's', 'ms'];
+export type validTimeString = BuildOrderedCooldown<TimeUnits>;
+
 type ResolveContext<MAP, KEYS extends (keyof MAP)[]> = MAP[KEYS[number]];
 
 export type ChatInputCommandInteraction<Cached extends CacheType = CacheType> = StrictOmit<_ChatInputCommandInteraction<Cached>, 'options'>
@@ -44,6 +60,8 @@ export type customPermissionChecksFn<
 ) => Parameters<Translator> | boolean);
 
 export declare const commandTypes: { readonly [K in CommandType]: K };
+
+type Cooldowns = { [K in 'guild' | 'channel' | 'user']: validTimeString } & {};
 
 type DefaultOptionType<CT extends readonly CommandType[], DM extends boolean>
   = CommandOptionConfig<CT, DM, never, readonly unknown[]> | CommandOption<CT, DM, never, readonly unknown[]>;
@@ -183,24 +201,32 @@ type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options extend
 };
 
 /* eslint-disable-next-line @typescript-eslint/consistent-type-definitions */
-export interface CommandConfig<
+export interface SharedConfig<
   CT extends readonly CommandType[], DM extends boolean,
-  Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[] = readonly DefaultOptionType<CT, DM>[]
+  Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[]
 > {
-  types: CT;
-  usage?: { usage?: string; examples?: string } & {};
-  aliases?: { [K in NoInfer<CT>[number]]?: string[] } & {};
-  cooldowns?: { guild?: number; channel?: number; user?: number } & {};
-  permissions?: { client?: PermissionFlags[keyof PermissionFlags][]; user?: PermissionFlags[keyof PermissionFlags][] } & {};
+  cooldowns?: Partial<Cooldowns>;
+
   dmPermission?: DM;
 
   disabled?: boolean;
   disabledReason?: string;
 
+  options?: Options;
+}
+
+/* eslint-disable-next-line @typescript-eslint/consistent-type-definitions */
+export interface CommandConfig<
+  CT extends readonly CommandType[], DM extends boolean,
+  Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[] = readonly DefaultOptionType<CT, DM>[]
+> extends SharedConfig<CT, DM, Options> {
+  types: CT;
+  usage?: { usage?: string; examples?: string } & {};
+  aliases?: { [K in NoInfer<CT>[number]]?: string[] } & {};
+  permissions?: { client?: PermissionFlags[keyof PermissionFlags][]; user?: PermissionFlags[keyof PermissionFlags][] } & {};
+
   noDefer?: boolean;
   ephemeralDefer?: boolean;
-
-  options?: Options;
 
   beta?: true;
 
@@ -211,15 +237,10 @@ export interface CommandConfig<
 export interface CommandOptionConfig<
   CT extends readonly CommandType[], DM extends boolean, AO = never,
   Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[] = readonly DefaultOptionType<CT, DM>[]
-> {
+> extends SharedConfig<CT, DM, Options> {
   name: string;
   type: keyof typeof ApplicationCommandOptionType;
   required?: boolean;
-  cooldowns?: { guild?: number; channel?: number; user?: number } & {};
-  dmPermission?: DM;
-
-  disabled?: boolean;
-  disabledReason?: string;
 
   strictAutocomplete?: boolean;
   autocompleteOptions?: StrictCommandOption<CT, DM, AO>['autocompleteOptions'];
@@ -234,7 +255,8 @@ export interface CommandOptionConfig<
   minLength?: number;
   maxLength?: number;
 
-  options?: Options;
+  /* TODO: find a way to make this useful for run fn
+     default?: string | number | boolean | ChannelType; */
 
   run?: StrictCommandOption<CT, DM, AO, Options>['run'];
 }
@@ -277,7 +299,7 @@ export declare class Command<
   usageLocalizations: Partial<Record<Locale, StrictCommand<commandTypes, runsInDM>['usage']>>;
 
   aliases: { [K in NoInfer<commandTypes>[number]]: string[] } & {};
-  cooldowns: { [K in 'guild' | 'channel' | 'user']: number } & {};
+  cooldowns: { [K in keyof Cooldowns]: number } & {};
 
   permissions: { [K in 'client' | 'user']: PermissionFlags[keyof PermissionFlags][] } & {};
   get defaultMemberPermissions(): PermissionsBitField;
@@ -365,7 +387,7 @@ export declare class CommandOption<
   type: ApplicationCommandOptionType;
 
   required: boolean;
-  cooldowns: { [K in 'guild' | 'channel' | 'user']: number } & {};
+  cooldowns: { [K in keyof Cooldowns]: number } & {};
   dmPermission: runsInDM;
 
   disabled: boolean;

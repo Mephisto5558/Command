@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@mephisto5558/i18n": "2.x",
+    "better-ms": "1.x",
     "discord.js": "14.x",
     "import-without-cache": "^0.2.5"
   },

@@ -2,7 +2,7 @@
 
 /**
  * @import { Locale, Translator } from '@mephisto5558/i18n'
- * @import { Command as CommandT, CommandOption as CommandOptionT, CommandType, CommandConfig, CommandOptionConfig, CommandExecutionError as CommandExecutionErrorT, customPermissionChecksFn } from '.' */ /* eslint-disable-line @stylistic/max-len */
+ * @import { Command as CommandT, CommandOption as CommandOptionT, CommandType, CommandConfig, CommandOptionConfig, CommandExecutionError as CommandExecutionErrorT, customPermissionChecksFn, getMilliseconds as getMS } from '.' */ /* eslint-disable-line @stylistic/max-len */
 
 
 const
@@ -11,6 +11,9 @@ const
     Colors, CommandInteraction, EmbedBuilder, Message, MessageFlags, PermissionsBitField, inlineCode
   } = require('discord.js'),
   { basename, dirname } = require('node:path'),
+
+  /** @type {getMS} *//* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+  getMilliseconds = require('better-ms').ms,
   {
     filename, loadFile, capitalize,
     constants: { autocompleteOptionsMaxAmt, descriptionMaxLength, choicesMaxAmt, choiceValueMaxLength, choiceValueMinLength }, cooldowns
@@ -37,6 +40,21 @@ function equal(a, b) {
     if (!equal(a[key], b[key])) return false;
 
   return true;
+}
+
+/**
+ * @param {NonNullable<CommandConfig['cooldowns']>} cooldown
+ * @param {keyof CommandT['cooldowns']} k
+ * @param {CommandT['cooldowns'][keyof CommandT['cooldowns']]} v
+ * @returns {NonNullable<CommandT['cooldowns']>}
+ * @throws {TypeError} on invalid time string */
+function cooldownConverter(cooldown, k, v) {
+  if (!cooldown[k]) return [k, v];
+
+  const ms = getMilliseconds(cooldown[k]);
+  if (typeof ms != 'number') throw new TypeError(`Could not convert time string cooldowns.${k} "${cooldown[k]}" to milliseconds.`);
+
+  return [k, ms];
 }
 
 const commandTypes = Object.freeze({
@@ -85,11 +103,9 @@ class CommandOption {
   /** @param {CommandOptionConfig<CommandType[], boolean>} config */
   constructor(config = {}) {
     if (config.required != undefined) this.required = config.required;
-    if (config.cooldowns) {
-      if (config.cooldowns.guild) this.cooldowns.guild = config.cooldowns.guild;
-      if (config.cooldowns.channel) this.cooldowns.channel = config.cooldowns.channel;
-      if (config.cooldowns.user) this.cooldowns.user = config.cooldowns.user;
-    }
+    if (config.cooldowns)
+      this.cooldowns = Object.fromEntries(Object.entries(this.cooldowns).map(cooldownConverter.bind(undefined, config.cooldowns)));
+
     if (config.dmPermission) this.dmPermission = config.dmPermission;
     if (config.choices) this.choices = config.choices.map(e => ({ value: e }));
     if (config.strictAutocomplete) this.strictAutocomplete = config.strictAutocomplete;
@@ -107,6 +123,9 @@ class CommandOption {
 
     this.minLength = config.minLength;
     this.maxLength = config.maxLength;
+
+    // this.default = config.default;
+    this.run = config.run;
   }
 
   /** @type {CommandOptionT['init']} */
@@ -409,11 +428,8 @@ class Command {
         if (config.aliases[commandType]?.length) this.aliases[commandType] = config.aliases[commandType];
     }
 
-    if (config.cooldowns) {
-      if (config.cooldowns.guild) this.cooldowns.guild = config.cooldowns.guild;
-      if (config.cooldowns.channel) this.cooldowns.channel = config.cooldowns.channel;
-      if (config.cooldowns.user) this.cooldowns.user = config.cooldowns.user;
-    }
+    if (config.cooldowns)
+      this.cooldowns = Object.fromEntries(Object.entries(this.cooldowns).map(cooldownConverter.bind(undefined, config.cooldowns)));
 
     if (config.permissions) {
       if (config.permissions.client) this.permissions.client = config.permissions.client;
