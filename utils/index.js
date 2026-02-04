@@ -3,7 +3,6 @@ const utils = {
   checkForErrors: require('./checkForErrors'),
   commandMention: require('./commandMention'),
   constants: require('./constants'),
-  cooldowns: require('./cooldowns'),
   filename: require('./filename'),
   getCommands: require('./getCommands'),
   getDirectories: require('./getDirectories'),

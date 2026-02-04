@@ -61,7 +61,8 @@ export type customPermissionChecksFn<
 
 export declare const commandTypes: { readonly [K in CommandType]: K };
 
-type Cooldowns = { [K in 'guild' | 'channel' | 'user']: validTimeString } & {};
+export type CooldownTypes = 'guild' | 'channel' | 'user';
+type Cooldowns = { [K in CooldownTypes]: validTimeString } & {};
 
 type DefaultOptionType<CT extends readonly CommandType[], DM extends boolean>
   = CommandOptionConfig<CT, DM, never, readonly unknown[]> | CommandOption<CT, DM, never, readonly unknown[]>;
@@ -299,7 +300,7 @@ export declare class Command<
   usageLocalizations: Partial<Record<Locale, StrictCommand<commandTypes, runsInDM>['usage']>>;
 
   aliases: { [K in NoInfer<commandTypes>[number]]: string[] } & {};
-  cooldowns: { [K in keyof Cooldowns]: number } & {};
+  cooldowns: { [K in CooldownTypes]: number } & {};
 
   permissions: { [K in 'client' | 'user']: PermissionFlags[keyof PermissionFlags][] } & {};
   get defaultMemberPermissions(): PermissionsBitField;
@@ -347,6 +348,12 @@ export declare class Command<
     replyOn?: { disabled?: boolean; nonBeta?: boolean };
   }): this;
 
+  /**
+   * @returns the currect cooldown for this command or the subcommand(group) (whichever is higher) in ms.
+   * Resets it if it's `0`. */
+  /* eslint-disable-next-line @typescript-eslint/no-unused-private-class-members */
+  private updateCooldowns(interaction: ThisParameterType<StrictCommand<commandTypes, runsInDM>['run']>): number;
+
   async runWrapper(Interaction: ThisParameterType<StrictCommand<commandTypes, runsInDM>['run']>, i18n: I18nProvider, locale: Locale): Promise<never>;
 
   reload(
@@ -387,7 +394,7 @@ export declare class CommandOption<
   type: ApplicationCommandOptionType;
 
   required: boolean;
-  cooldowns: { [K in keyof Cooldowns]: number } & {};
+  cooldowns: { [K in CooldownTypes]: number } & {};
   dmPermission: runsInDM;
 
   disabled: boolean;
@@ -427,6 +434,12 @@ export declare class CommandOption<
     warn: typeof console.warn;
     error: typeof console.error;
   }, position?: number): this;
+
+  /**
+   * @returns the currect cooldown for this subcommand(group) in ms.
+   * Resets it if it's `0`. */
+  /* eslint-disable-next-line @typescript-eslint/no-unused-private-class-members */
+  private updateCooldowns(interaction: ThisParameterType<StrictCommandOption<commandTypes, runsInDM, additionalRunOpts, Options>['run']>): number;
 
   /* eslint-disable-next-line @typescript-eslint/no-unused-private-class-members */
   private isRunnable(

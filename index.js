@@ -2,7 +2,7 @@
 
 /**
  * @import { Locale, Translator } from '@mephisto5558/i18n'
- * @import { Command as CommandT, CommandOption as CommandOptionT, CommandType, CommandConfig, CommandOptionConfig, CommandExecutionError as CommandExecutionErrorT, customPermissionChecksFn, getMilliseconds as getMS } from '.' */ /* eslint-disable-line @stylistic/max-len */
+ * @import { Command as CommandT, CommandOption as CommandOptionT, CommandType, CommandConfig, CommandOptionConfig, CommandExecutionError as CommandExecutionErrorT, customPermissionChecksFn, getMilliseconds as getMS, CooldownTypes } from '.' */ /* eslint-disable-line @stylistic/max-len */
 
 
 const
@@ -16,8 +16,10 @@ const
   getMilliseconds = require('better-ms').ms,
   {
     filename, loadFile, capitalize,
-    constants: { autocompleteOptionsMaxAmt, descriptionMaxLength, choicesMaxAmt, choiceValueMaxLength, choiceValueMinLength }, cooldowns
-  } = require('./utils');
+    constants: { autocompleteOptionsMaxAmt, descriptionMaxLength, choicesMaxAmt, choiceValueMaxLength, choiceValueMinLength }
+  } = require('./utils'),
+
+  /** @type {number} */ msInSeconds = getMilliseconds('1s');
 
 /**
  * @param {unknown} a
@@ -99,6 +101,7 @@ class CommandOption {
 
   /** @type {Parameters<CommandOptionT['init']>['0']} */ #i18n;
   /** @type {Parameters<CommandOptionT['init']>['2']} */ #logger;
+  /** @type {Partial<Record<CooldownTypes, Map<Snowflake, number>>>} */ #cooldownCache = new Map();
 
   /** @param {CommandOptionConfig<CommandType[], boolean>} config */
   constructor(config = {}) {
@@ -314,6 +317,27 @@ class CommandOption {
     return [options];
   }
 
+  /** @type {CommandOptionT<CommandType[], boolean>['updateCooldowns']} */
+  updateCooldowns(interaction) {
+    const
+      createdAt = interaction.createdAt.getTime(),
+      currentCooldowns = [];
+
+    for (const [cdName, cdVal] of Object.entries(this.cooldowns)) {
+      /* eslint-disable-next-line sonarjs/no-nested-conditional -- required for typing to work */
+      const areaId = (interaction instanceof Message ? interaction[cdName == 'user' ? 'author' : cdName] : interaction[cdName])?.id;
+      if (!cdVal || !areaId) continue;
+
+      this.#cooldownCache[cdName] ??= new Map();
+      const timestamp = this.#cooldownCache[cdName].get(areaId) ?? 0;
+
+      if (timestamp > createdAt) currentCooldowns.push(timestamp - createdAt);
+      else this.#cooldownCache[cdName].set(areaId, createdAt + cdVal);
+    }
+
+    return Math.max(0, ...currentCooldowns);
+  }
+
   /* eslint-disable sonarjs/expression-complexity, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/no-unnecessary-type-conversion,
   @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment,
   @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, custom/cyclomatic-complexity -- TODO: refactor */
@@ -405,6 +429,8 @@ class Command {
     runBetaCommandsOnly: false,
     replyOn: { disabled: true, nonBeta: true }
   };
+
+  /** @type {Partial<Record<CooldownTypes, Map<Snowflake, number>>>} */ #cooldownCache = new Map();
 
   /** @type {CommandOptionT[]} */ options = [];
 
@@ -551,6 +577,62 @@ class Command {
     catch (err) { throw new CommandExecutionError(err.message, interaction, wrapperTranslator, { cause: err }); }
   }
 
+  /** @type {CommandT<CommandType[], boolean>['updateCooldowns']} */
+  updateCooldowns(interaction) {
+    const
+      createdAt = interaction.createdAt.getTime(),
+      currentCooldowns = [];
+
+    let
+      /** @type {string | undefined} */ group,
+      /** @type {string | undefined} */ subCmd;
+
+    for (const [cdName, cdVal] of Object.entries(this.cooldowns)) {
+      /* eslint-disable-next-line sonarjs/no-nested-conditional -- required for typing to work */
+      const areaId = (interaction instanceof Message ? interaction[cdName == 'user' ? 'author' : cdName] : interaction[cdName])?.id;
+      if (!cdVal || !areaId) continue;
+
+      this.#cooldownCache[cdName] ??= new Map();
+      const timestamp = this.#cooldownCache[cdName].get(areaId) ?? 0;
+
+      if (timestamp > createdAt) currentCooldowns.push(timestamp - createdAt);
+      else this.#cooldownCache[cdName].set(areaId, createdAt + cdVal);
+    }
+
+    if (interaction instanceof CommandInteraction) {
+      group = interaction.options.getSubcommandGroup(false);
+      subCmd = interaction.options.getSubcommand(false);
+    }
+    else {
+      const
+        [SubcommandGroup, subcommand] = interaction instanceof Message ? interaction.content.split(/\s+/).slice(1) : [],
+        option1 = this.options.find(e => e.name == SubcommandGroup);
+
+      if (option1?.type == ApplicationCommandOptionType.Subcommand) subCmd = SubcommandGroup;
+      else if (option1?.type == ApplicationCommandOptionType.SubcommandGroup) {
+        group = SubcommandGroup;
+
+        const option2 = option1.options.find(e => e.name == subcommand);
+        if (option2?.type == ApplicationCommandOptionType.Subcommand) subCmd = subcommand;
+      }
+    }
+
+    let subcommandGroup;
+    if (group) {
+      subcommandGroup = this.options.find(e => e.name == group && e.type == ApplicationCommandOptionType.SubcommandGroup);
+      if (subcommandGroup && Object.values(subcommandGroup.cooldowns).some(Boolean))
+        currentCooldowns.push(subcommandGroup.updateCooldowns(interaction));
+    }
+
+    if (subCmd) {
+      const subcommand = (subcommandGroup ?? this).options.find(e => e.name == subCmd && e.type == ApplicationCommandOptionType.Subcommand);
+      if (subcommand && Object.values(subcommand.cooldowns).some(Boolean))
+        currentCooldowns.push(subcommand.updateCooldowns(interaction));
+    }
+
+    return Math.max(0, ...currentCooldowns);
+  }
+
   /**
    * @param {Parameters<customPermissionChecksFn>[0]} interaction
    * @param {Translator} wrapperTranslator
@@ -598,8 +680,8 @@ class Command {
     }
 
     if (!this.config.runBetaCommandsOnly) {
-      const cooldown = cooldowns.call(interaction, this.name, this.cooldowns);
-      if (cooldown) return ['cooldown', inlineCode(cooldown)];
+      const cooldown = this.updateCooldowns(interaction);
+      if (cooldown) return ['cooldown', inlineCode(Math.round(cooldown / msInSeconds))];
     }
 
     return interaction.inGuild() && await checkPerms.call(interaction, this, wrapperTranslator);
