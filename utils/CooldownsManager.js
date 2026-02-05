@@ -16,8 +16,10 @@ module.exports = class CooldownsManager {
     for (const [cdName, value] of Object.entries(cooldowns)) {
       if (!value) continue;
 
-      /* eslint-disable-next-line sonarjs/no-nested-conditional -- required for typing */
-      const areaId = (context instanceof Message ? context[cdName === 'user' ? 'author' : cdName] : context[cdName])?.id;
+      let areaId;
+      if (context instanceof Message) areaId = context[cdName == 'user' ? 'author' : cdName]?.id;
+      else areaId = context[cdName].id;
+
       if (!areaId) continue;
 
       const
