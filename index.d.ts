@@ -36,8 +36,8 @@ export type validTimeString = BuildOrderedCooldown<TimeUnits>;
 
 type ResolveContext<MAP, KEYS extends (keyof MAP)[]> = MAP[KEYS[number]];
 
-export type ChatInputCommandInteraction<Cached extends CacheType = CacheType> = StrictOmit<_ChatInputCommandInteraction<Cached>, 'options'>
-  & { options: TypeSafeOptionResolver<Cached, Options> };
+export type ChatInputCommandInteraction<Cached extends CacheType = CacheType, Options extends readonly unknown[] = []>
+  = StrictOmit<_ChatInputCommandInteraction<Cached>, 'options'> & { options: TypeSafeOptionResolver<Cached, Options> };
 type autocompleteObject = StrictOmit<ApplicationCommandOptionChoiceData, 'nameLocalizations'>;
 type autocompleteOptions = autocompleteObject['value'] | autocompleteObject;
 export type CommandType = 'slash' | 'prefix';
