@@ -110,30 +110,45 @@ class CommandOption {
 
   /** @param {CommandOptionConfig<CommandType[], boolean>} config */
   constructor(config = {}) {
-    if (config.required != undefined) this.required = config.required;
-    if (config.cooldowns)
-      this.cooldowns = Object.fromEntries(Object.entries(this.cooldowns).map(cooldownConverter.bind(undefined, config.cooldowns)));
-
-    if (config.dmPermission) this.dmPermission = config.dmPermission;
-    if (config.choices) this.choices = config.choices.map(e => ({ value: e }));
-    if (config.strictAutocomplete) this.strictAutocomplete = config.strictAutocomplete;
-    if (config.options) this.options = config.options.map(e => (e instanceof CommandOption ? e : new CommandOption(e)));
-
     this.name = config.name;
     this.type = config.type;
 
-    this.autocompleteOptions = config.autocompleteOptions;
+    if ('required' in config) this.required = config.required;
 
-    this.channelTypes = config.channelTypes;
+    switch (config.type) {
+      case ApplicationCommandOptionType.SubcommandGroup:
+      case ApplicationCommandOptionType.Subcommand:
+        if (config.cooldowns)
+          this.cooldowns = Object.fromEntries(Object.entries(this.cooldowns).map(cooldownConverter.bind(undefined, config.cooldowns)));
+        if (config.dmPermission) this.dmPermission = config.dmPermission;
+        if (config.options) this.options = config.options.map(e => (e instanceof CommandOption ? e : new CommandOption(e)));
+        this.run = config.run;
+        break;
 
-    this.minValue = config.minValue;
-    this.maxValue = config.maxValue;
+      case ApplicationCommandOptionType.String:
+        this.minLength = config.minLength;
+        this.maxLength = config.maxLength;
 
-    this.minLength = config.minLength;
-    this.maxLength = config.maxLength;
+      // fallthrough
+      case ApplicationCommandOptionType.Integer:
+      case ApplicationCommandOptionType.Number:
+        if (config.type != ApplicationCommandOptionType.String) {
+          this.minValue = config.minValue;
+          this.maxValue = config.maxValue;
+        }
 
-    // this.default = config.default;
-    this.run = config.run;
+        if (config.choices) this.choices = config.choices.map(e => ({ value: e }));
+
+        this.autocompleteOptions = config.autocompleteOptions;
+        if (config.strictAutocomplete) this.strictAutocomplete = config.strictAutocomplete;
+        break;
+
+      case ApplicationCommandOptionType.Channel:
+        this.channelTypes = config.channelTypes;
+        break;
+
+      default: // no special handling
+    }
   }
 
   /** @type {CommandOptionT['init']} */
@@ -161,14 +176,6 @@ class CommandOption {
 
       this.name = this.name.toLowerCase();
     }
-
-    if (
-      [ApplicationCommandOptionType.Number, ApplicationCommandOptionType.Integer].includes(this.type)
-      && ('minLength' in this || 'maxLength' in this)
-    ) throw new Error(`Number and Integer options do not support "minLength" and "maxLength" (${this.id})`);
-
-    if (this.type == ApplicationCommandOptionType.String && ('minValue' in this || 'maxValue' in this))
-      throw new Error(`String options do not support "minValue" and "maxValue" (${this.id})`);
   }
 
   #localize() {

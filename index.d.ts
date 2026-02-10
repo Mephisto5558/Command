@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/consistent-type-definitions */
 /* eslint-disable max-lines */
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style -- using index signature to improve readability for lib user */
 
@@ -125,8 +126,9 @@ type ResolveValue<Option, BaseType>
 type ResolvedValue<Options extends readonly unknown[], Name extends string, Type extends ApplicationCommandOptionType, BaseType>
   = ResolveValue<GetOption<Options, Name, Type>, BaseType>;
 
+// Duplicate `${string}` prevents omitting `get`.
 type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options extends readonly unknown[]> = StrictOmit<
-  CommandInteractionOptionResolver<Cached>, `get${string}`
+  CommandInteractionOptionResolver<Cached>, `get${string}${string}`
 > & {
   /* eslint-disable @typescript-eslint/unified-signatures -- unifying them would result in lost accuracy */
   getString<N extends OptionName<Options, ApplicationCommandOptionType.String>>(
@@ -218,30 +220,48 @@ type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options extend
   /* eslint-enable @typescript-eslint/unified-signatures */
 };
 
-/* eslint-disable-next-line @typescript-eslint/consistent-type-definitions */
-export interface SharedConfig<
-  CT extends readonly CommandType[], DM extends boolean,
-  Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[]
-> {
+type OptionsG<CT, DM> = readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[];
+export interface SharedConfig<DM extends boolean> {
   cooldowns?: Partial<Cooldowns>;
 
   dmPermission?: DM;
 
   disabled?: boolean;
   disabledReason?: string;
-
-  options?: Options;
 }
 
-/* eslint-disable-next-line @typescript-eslint/consistent-type-definitions */
+type MapToConfig<
+  O, CT extends readonly CommandType[], DM extends boolean
+>
+  = O extends { type: ApplicationCommandOptionType.String } ? StringCommandOptionConfig<CT, DM, never>
+  : O extends { type: ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number } ? NumericCommandOptionConfig<CT, DM, never>
+  : O extends { type: ApplicationCommandOptionType.Boolean } ? BooleanCommandOptionConfig
+  : O extends { type: ApplicationCommandOptionType.User } ? UserCommandOptionConfig
+  : O extends { type: ApplicationCommandOptionType.Channel } ? ChannelCommandOptionConfig
+  : O extends { type: ApplicationCommandOptionType.Role } ? RoleCommandOptionConfig
+  : O extends { type: ApplicationCommandOptionType.Mentionable } ? MentionableCommandOptionConfig
+  : O extends { type: ApplicationCommandOptionType.Attachment } ? AttachmentCommandOptionConfig
+  : O extends { type: ApplicationCommandOptionType.Subcommand | ApplicationCommandOptionType.SubcommandGroup } ? (
+    SubcommandCommandOptionConfig<CT, DM, never, O extends { options: unknown } ? O['options'] : []>
+  ) : CommandOptionConfig<CT, DM>;
+
+type ValidateOption<O, CT extends readonly CommandType[], DM extends boolean> = MapToConfig<O, CT, DM> extends infer Config
+  ? Config & { [K in keyof O]: K extends keyof Config ? O[K] : never } : never;
+
+type ValidateOptionsArray<
+  Arr, CT extends readonly CommandType[], DM extends boolean
+> = Arr extends readonly unknown[] ? { [K in keyof Arr]: ValidateOption<Arr[K], CT, DM> } : Arr;
+
 export interface CommandConfig<
   CT extends readonly CommandType[], DM extends boolean,
-  Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[] = readonly DefaultOptionType<CT, DM>[]
-> extends SharedConfig<CT, DM, Options> {
+  Options extends OptionsG<CT, DM> = readonly DefaultOptionType<CT, DM>[]
+> extends SharedConfig<DM> {
   types: CT;
   usage?: { usage?: string; examples?: string } & {};
   aliases?: { [K in NoInfer<CT>[number]]?: string[] } & {};
   permissions?: { client?: PermissionFlags[keyof PermissionFlags][]; user?: PermissionFlags[keyof PermissionFlags][] } & {};
+
+  options?: ValidateOptionsArray<Options, CT, DM>;
 
   noDefer?: boolean;
   ephemeralDefer?: boolean;
@@ -251,33 +271,88 @@ export interface CommandConfig<
   run: StrictCommand<CT, DM, Options>['run'];
 }
 
-/* eslint-disable-next-line @typescript-eslint/consistent-type-definitions */
-export interface CommandOptionConfig<
-  CT extends readonly CommandType[], DM extends boolean, AO = never,
-  Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[] = readonly DefaultOptionType<CT, DM>[]
-> extends SharedConfig<CT, DM, Options> {
+
+interface BaseOptionConfig {
   name: string;
   type: ApplicationCommandOptionType;
   required?: boolean;
+
+}
+
+interface BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO> extends BaseOptionConfig {
+  type: ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number;
 
   strictAutocomplete?: boolean;
   autocompleteOptions?: StrictCommandOption<CT, DM, AO>['autocompleteOptions'];
 
   choices?: ApplicationCommandOptionChoiceData['value'][];
+}
 
-  channelTypes?: ChannelType[];
+interface SubcommandCommandOptionConfig<
+  CT extends readonly CommandType[], DM extends boolean, AO,
+  Options extends OptionsG<CT, DM> = readonly DefaultOptionType<CT, DM>[]
+> extends StrictOmit<BaseOptionConfig, 'required'>, SharedConfig<DM> {
+  type: ApplicationCommandOptionType.SubcommandGroup | ApplicationCommandOptionType.Subcommand;
 
-  minValue?: number;
-  maxValue?: number;
-
-  minLength?: number;
-  maxLength?: number;
-
-  /* TODO: find a way to make this useful for run fn
-     default?: string | number | boolean | ChannelType; */
+  options?: ValidateOptionsArray<Options, CT, DM>;
 
   run?: StrictCommandOption<CT, DM, AO, Options>['run'];
 }
+
+interface StringCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO> extends BasePrimitiveCommandOptionConfig<CT, DM, AO> {
+  type: ApplicationCommandOptionType.String;
+
+  minLength?: number;
+  maxLength?: number;
+}
+
+interface NumericCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO> extends BasePrimitiveCommandOptionConfig<CT, DM, AO> {
+  type: ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number;
+
+  minValue?: number;
+  maxValue?: number;
+}
+
+interface ChannelCommandOptionConfig extends BaseOptionConfig {
+  type: ApplicationCommandOptionType.Channel;
+
+  channelTypes?: ChannelType[];
+}
+
+interface BooleanCommandOptionConfig extends BaseOptionConfig {
+  type: ApplicationCommandOptionType.Boolean;
+}
+
+interface UserCommandOptionConfig extends BaseOptionConfig {
+  type: ApplicationCommandOptionType.User;
+}
+
+interface RoleCommandOptionConfig extends BaseOptionConfig {
+  type: ApplicationCommandOptionType.Role;
+}
+
+interface MentionableCommandOptionConfig extends BaseOptionConfig {
+  type: ApplicationCommandOptionType.Mentionable;
+}
+
+interface AttachmentCommandOptionConfig extends BaseOptionConfig {
+  type: ApplicationCommandOptionType.Attachment;
+}
+
+export type CommandOptionConfig<
+  CT extends readonly CommandType[], DM extends boolean, AO = never,
+  Options extends OptionsG<CT, DM> = readonly DefaultOptionType<CT, DM>[]
+>
+  = | StringCommandOptionConfig<CT, DM, AO>
+    | NumericCommandOptionConfig<CT, DM, AO>
+    | BooleanCommandOptionConfig
+    | UserCommandOptionConfig
+    | ChannelCommandOptionConfig
+    | RoleCommandOptionConfig
+    | MentionableCommandOptionConfig
+    | AttachmentCommandOptionConfig
+    | SubcommandCommandOptionConfig<CT, DM, AO, Options>;
+
 
 export declare class CommandExecutionError extends Error {
   name: 'CommandExecutionError';
