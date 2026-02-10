@@ -13,7 +13,10 @@ import type { CooldownsManager } from './utils/index.js';
 
 export * from './utils/index.js';
 export * as loaders from './loaders';
-export { PermissionFlagsBits as Permissions } from 'discord.js';
+export {
+  PermissionFlagsBits as Permissions,
+  ApplicationCommandOptionType as OptionType
+} from 'discord.js';
 
 // for better-ms
 export declare function getMilliseconds<
@@ -77,18 +80,18 @@ type StrictCommandOption<
   Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[] = readonly DefaultOptionType<CT, DM>[]
 > = CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<Options>>;
 
-type OptionName<Options extends readonly unknown[], Type extends keyof typeof ApplicationCommandOptionType>
+type OptionName<Options extends readonly unknown[], Type extends ApplicationCommandOptionType>
   = Options[number] extends infer O
     ? O extends { type: Type; name: infer N } ? (N extends string ? N : never)
-    : O extends { type: 'Subcommand' | 'SubcommandGroup'; options: infer SubOptions }
+    : O extends { type: ApplicationCommandOptionType.Subcommand | ApplicationCommandOptionType.SubcommandGroup; options: infer SubOptions }
       ? (SubOptions extends readonly unknown[] ? OptionName<SubOptions, Type> : never)
       : never
     : never;
 
-type GetOption<Options extends readonly unknown[], Name extends string, Type extends keyof typeof ApplicationCommandOptionType>
+type GetOption<Options extends readonly unknown[], Name extends string, Type extends ApplicationCommandOptionType>
   = Options[number] extends infer O
     ? O extends { name: Name; type: Type } ? O
-    : O extends { type: 'Subcommand' | 'SubcommandGroup'; options: infer SubOptions }
+    : O extends { type: ApplicationCommandOptionType.Subcommand | ApplicationCommandOptionType.SubcommandGroup; options: infer SubOptions }
       ? (SubOptions extends readonly unknown[] ? GetOption<SubOptions, Name, Type> : never)
       : never
     : never;
@@ -105,8 +108,8 @@ type ResolvedChannelType<T extends ChannelType>
 type MapChannelTypes<Types extends readonly ChannelType[]> = ResolvedChannelType<Types[number]>;
 
 type ResolvedChannel<Options extends readonly unknown[], Name extends string>
-  = GetOption<Options, Name, 'Channel'> extends { channelTypes: readonly ChannelType[] }
-    ? MapChannelTypes<GetOption<Options, Name, 'Channel'>['channelTypes']>
+  = GetOption<Options, Name, ApplicationCommandOptionType.Channel> extends { channelTypes: readonly ChannelType[] }
+    ? MapChannelTypes<GetOption<Options, Name, ApplicationCommandOptionType.Channel>['channelTypes']>
     : GuildBasedChannel | APIInteractionDataResolvedChannel;
 
 type ResolvedSubcommand<Options extends readonly unknown[]>
@@ -119,78 +122,91 @@ type ResolveValue<Option, BaseType>
   = Option extends { choices: readonly (infer C)[] } ? (C extends { value: infer V } ? V : C)
   : BaseType;
 
-type ResolvedValue<Options extends readonly unknown[], Name extends string, Type extends keyof typeof ApplicationCommandOptionType, BaseType>
+type ResolvedValue<Options extends readonly unknown[], Name extends string, Type extends ApplicationCommandOptionType, BaseType>
   = ResolveValue<GetOption<Options, Name, Type>, BaseType>;
 
 type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options extends readonly unknown[]> = StrictOmit<
-  /* eslint-disable-next-line sonarjs/max-union-size */
-  CommandInteractionOptionResolver<Cached>, 'getString' | 'getInteger' | 'getNumber' | 'getBoolean' | 'getUser'
-  | 'getMember' | 'getChannel' | 'getRole' | 'getAttachment' | 'getMentionable' | 'getSubcommand' | 'getSubcommandGroup'
+  CommandInteractionOptionResolver<Cached>, `get${string}`
 > & {
   /* eslint-disable @typescript-eslint/unified-signatures -- unifying them would result in lost accuracy */
-  getString<N extends OptionName<Options, 'String'>>(name: N, required: true): ResolvedValue<Options, N, 'String', string>;
-  getString<N extends OptionName<Options, 'String'>>(name: N, required?: boolean): ResolvedValue<Options, N, 'String', string>
-    | (GetOption<Options, N, 'String'> extends { required: true } ? never : null);
+  getString<N extends OptionName<Options, ApplicationCommandOptionType.String>>(
+    name: N, required: true
+  ): ResolvedValue<Options, N, ApplicationCommandOptionType.String, string>;
+  getString<N extends OptionName<Options, ApplicationCommandOptionType.String>>(
+    name: N, required?: boolean
+  ): ResolvedValue<Options, N, ApplicationCommandOptionType.String, string>
+    | (GetOption<Options, N, ApplicationCommandOptionType.String> extends { required: true } ? never : null);
   getString(name: string, required: true): string;
   getString(name: string, required?: boolean): string | null;
 
-  getInteger<N extends OptionName<Options, 'Integer'>>(name: N, required: true): ResolvedValue<Options, N, 'Integer', number>;
-  getInteger<N extends OptionName<Options, 'Integer'>>(name: N, required?: boolean): ResolvedValue<Options, N, 'Integer', number>
-    | (GetOption<Options, N, 'Integer'> extends { required: true } ? never : null);
+  getInteger<N extends OptionName<Options, ApplicationCommandOptionType.Integer>>(
+    name: N, required: true
+  ): ResolvedValue<Options, N, ApplicationCommandOptionType.Integer, number>;
+  getInteger<N extends OptionName<Options, ApplicationCommandOptionType.Integer>>(
+    name: N, required?: boolean
+  ): ResolvedValue<Options, N, ApplicationCommandOptionType.Integer, number>
+    | (GetOption<Options, N, ApplicationCommandOptionType.Integer> extends { required: true } ? never : null);
   getInteger(name: string, required: true): number;
   getInteger(name: string, required?: boolean): number | null;
 
-  getNumber<N extends OptionName<Options, 'Number'>>(name: N, required: true): ResolvedValue<Options, N, 'Number', number>;
-  getNumber<N extends OptionName<Options, 'Number'>>(name: N, required?: boolean): ResolvedValue<Options, N, 'Number', number>
-    | (GetOption<Options, N, 'Number'> extends { required: true } ? never : null);
+  getNumber<N extends OptionName<Options, ApplicationCommandOptionType.Number>>(
+    name: N, required: true
+  ): ResolvedValue<Options, N, ApplicationCommandOptionType.Number, number>;
+  getNumber<N extends OptionName<Options, ApplicationCommandOptionType.Number>>(
+    name: N, required?: boolean
+  ): ResolvedValue<Options, N, ApplicationCommandOptionType.Number, number>
+    | (GetOption<Options, N, ApplicationCommandOptionType.Number> extends { required: true } ? never : null);
   getNumber(name: string, required: true): number;
   getNumber(name: string, required?: boolean): number | null;
 
-  getBoolean(name: OptionName<Options, 'Boolean'>, required: true): boolean;
-  getBoolean<N extends OptionName<Options, 'Boolean'>>(name: N, required?: boolean): GetOption<Options, N, 'Boolean'> extends { required: true }
-    ? boolean : boolean | null;
+  getBoolean(name: OptionName<Options, ApplicationCommandOptionType.Boolean>, required: true): boolean;
+  getBoolean<N extends OptionName<Options, ApplicationCommandOptionType.Boolean>>(
+    name: N, required?: boolean
+  ): GetOption<Options, N, ApplicationCommandOptionType.Boolean> extends { required: true } ? boolean : boolean | null;
   getBoolean(name: string, required: true): boolean;
   getBoolean(name: string, required?: boolean): boolean | null;
 
-  getUser(name: OptionName<Options, 'User'>, required: true): User;
-  getUser<N extends OptionName<Options, 'User'>>(name: N, required?: boolean): GetOption<Options, N, 'User'> extends { required: true }
-    ? User : User | null;
+  getUser(name: OptionName<Options, ApplicationCommandOptionType.User>, required: true): User;
+  getUser<N extends OptionName<Options, ApplicationCommandOptionType.User>>(
+    name: N, required?: boolean
+  ): GetOption<Options, N, ApplicationCommandOptionType.User> extends { required: true } ? User : User | null;
   getUser(name: string, required: true): User;
   getUser(name: string, required?: boolean): User | null;
 
-  getMember(name: OptionName<Options, 'User'>): GuildMember | null;
+  getMember(name: OptionName<Options, ApplicationCommandOptionType.User>): GuildMember | null;
   getMember(name: string): GuildMember | null;
 
-  getChannel<N extends OptionName<Options, 'Channel'>>(name: N, required: true, channelTypes?: readonly ChannelType[]):
+  getChannel<N extends OptionName<Options, ApplicationCommandOptionType.Channel>>(name: N, required: true, channelTypes?: readonly ChannelType[]):
   ResolvedChannel<Options, N>;
-  getChannel<N extends OptionName<Options, 'Channel'>>(name: N, required: false, channelTypes?: readonly ChannelType[]):
+  getChannel<N extends OptionName<Options, ApplicationCommandOptionType.Channel>>(name: N, required: false, channelTypes?: readonly ChannelType[]):
     ResolvedChannel<Options, N>
-    | (GetOption<Options, N, 'Channel'> extends { required: true } ? never : null);
-  getChannel<N extends OptionName<Options, 'Channel'>>(name: N, required?: boolean, channelTypes?: readonly ChannelType[]):
+    | (GetOption<Options, N, ApplicationCommandOptionType.Channel> extends { required: true } ? never : null);
+  getChannel<N extends OptionName<Options, ApplicationCommandOptionType.Channel>>(name: N, required?: boolean, channelTypes?: readonly ChannelType[]):
     ResolvedChannel<Options, N>
-    | (GetOption<Options, N, 'Channel'> extends { required: true } ? never : null);
+    | (GetOption<Options, N, ApplicationCommandOptionType.Channel> extends { required: true } ? never : null);
   getChannel(name: string, required: true, channelTypes?: readonly ChannelType[]): GuildBasedChannel | APIInteractionDataResolvedChannel;
   getChannel(name: string, required: false, channelTypes?: readonly ChannelType[]): GuildBasedChannel | APIInteractionDataResolvedChannel | null;
   getChannel(name: string, required?: boolean, channelTypes?: readonly ChannelType[]): GuildBasedChannel | APIInteractionDataResolvedChannel | null;
 
-  getRole(name: OptionName<Options, 'Role'>, required: true): Role | APIRole;
-  getRole<N extends OptionName<Options, 'Role'>>(name: N, required?: boolean): GetOption<Options, N, 'Role'> extends { required: true }
-    ? Role | APIRole : Role | APIRole | null;
+  getRole(name: OptionName<Options, ApplicationCommandOptionType.Role>, required: true): Role | APIRole;
+  getRole<N extends OptionName<Options, ApplicationCommandOptionType.Role>>(
+    name: N, required?: boolean
+  ): GetOption<Options, N, ApplicationCommandOptionType.Role> extends { required: true } ? Role | APIRole : Role | APIRole | null;
   getRole(name: string, required: true): Role | APIRole;
   getRole(name: string, required?: boolean): Role | APIRole | null;
 
-  getAttachment(name: OptionName<Options, 'Attachment'>, required: true): Attachment;
-  getAttachment<N extends OptionName<Options, 'Attachment'>>(
+  getAttachment(name: OptionName<Options, ApplicationCommandOptionType.Attachment>, required: true): Attachment;
+  getAttachment<N extends OptionName<Options, ApplicationCommandOptionType.Attachment>>(
     name: N, required?: boolean
-  ): GetOption<Options, N, 'Attachment'> extends { required: true } ? Attachment : Attachment | null;
+  ): GetOption<Options, N, ApplicationCommandOptionType.Attachment> extends { required: true } ? Attachment : Attachment | null;
   getAttachment(name: string, required: true): Attachment;
   getAttachment(name: string, required?: boolean): Attachment | null;
 
-  getMentionable(name: OptionName<Options, 'Mentionable'>, required: true): User | GuildMember | Role | APIRole;
-  getMentionable<N extends OptionName<Options, 'Mentionable'>>(
+  getMentionable(name: OptionName<Options, ApplicationCommandOptionType.Mentionable>, required: true): User | GuildMember | Role | APIRole;
+  getMentionable<N extends OptionName<Options, ApplicationCommandOptionType.Mentionable>>(
     name: N, required?: boolean
-  ): GetOption<Options, N, 'Mentionable'> extends { required: true }
-    ? User | GuildMember | Role | APIRole : User | GuildMember | Role | APIRole | null;
+  ): User | GuildMember | Role | APIRole
+    | (GetOption<Options, N, ApplicationCommandOptionType.Mentionable> extends { required: true } ? never : null);
   getMentionable(name: string, required: true): User | GuildMember | Role | APIRole;
   getMentionable(name: string, required?: boolean): User | GuildMember | Role | APIRole | null;
 
@@ -241,7 +257,7 @@ export interface CommandOptionConfig<
   Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[] = readonly DefaultOptionType<CT, DM>[]
 > extends SharedConfig<CT, DM, Options> {
   name: string;
-  type: keyof typeof ApplicationCommandOptionType;
+  type: ApplicationCommandOptionType;
   required?: boolean;
 
   strictAutocomplete?: boolean;
@@ -326,7 +342,7 @@ export declare class Command<
 
   run: (
     this: ResolveContext<{
-      slash: ChatInputCommandInteraction<runsInDM extends false ? 'cached' : CacheType>;
+      slash: ChatInputCommandInteraction<runsInDM extends false ? 'cached' : CacheType, Options>;
       prefix: Message<runsInDM extends false ? true : false>;
     }, NoInfer<commandTypes>>,
     lang: Translator, client: Client

@@ -120,7 +120,7 @@ class CommandOption {
     if (config.options) this.options = config.options.map(e => (e instanceof CommandOption ? e : new CommandOption(e)));
 
     this.name = config.name;
-    this.type = ApplicationCommandOptionType[config.type]; // todo: make the user use that
+    this.type = config.type;
 
     this.autocompleteOptions = config.autocompleteOptions;
 
@@ -859,6 +859,7 @@ module.exports = {
   CommandOption,
   commandTypes,
   CommandExecutionError,
+  OptionType: ApplicationCommandOptionType,
   ...require('./utils'),
   loaders: require('./loaders')
 };
