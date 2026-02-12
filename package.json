@@ -1,6 +1,6 @@
 {
   "name": "@mephisto5558/command",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Discord.js command class and registering logic for slash- and prefix commands",
   "keywords": [
     "discord",
@@ -23,8 +23,9 @@
   "files": [
     "index.d.ts",
     "db.d.ts",
+    "utils",
     "loaders",
-    "utils"
+    "classes"
   ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
