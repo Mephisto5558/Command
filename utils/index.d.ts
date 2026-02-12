@@ -1,6 +1,7 @@
 import type { BaseInteraction, Message } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
-import type { Command, CommandType, CooldownTypes } from '..';
+import type { CommandType, CooldownTypes } from '..';
+import type { Command } from '../classes/command';
 
 export { default as constants } from './constants';
 
