@@ -1,5 +1,3 @@
-/* eslint-disable max-lines */
-
 /**
  * @import { Translator } from '@mephisto5558/i18n'
  * @import { getMilliseconds as getMS, CommandType, customPermissionChecksFn } from '../..'
@@ -13,11 +11,10 @@ const
     Colors, CommandInteraction, EmbedBuilder, Message, MessageFlags,
     PermissionFlagsBits, PermissionsBitField, inlineCode
   } = require('discord.js'),
-  { basename, dirname } = require('node:path'),
 
   /** @type {getMS} *//* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
   getMilliseconds = require('better-ms').ms,
-  { filename, loadFile, capitalize, CooldownsManager, constants: { descriptionMaxLength }, commandMention } = require('../../utils'),
+  { CooldownsManager, constants: { descriptionMaxLength }, commandMention } = require('../../utils'),
   { CommandOption } = require('../commandOption'),
   { CommandExecutionError, cooldownConverter, equal } = require('../utils'),
 
@@ -77,8 +74,6 @@ export class Command {
 
   /** @type {CommandOptionT[]} */ options = [];
 
-  /** @type {string} */ #filePath;
-
   /** @type {Parameters<CommandT<CommandType[], boolean>['init']>[0]} */ #i18n;
   /** @type {NonNullable<Parameters<CommandT<CommandType[], boolean>['init']>['2']>['logger']} */ #logger;
   /** @type {NonNullable<Parameters<CommandT<CommandType[], boolean>['init']>['2']>['doneFn']} */ #doneFn;
@@ -122,12 +117,10 @@ export class Command {
   }
 
   /** @type {CommandT<CommandType[], boolean>['init']} */
-  init(i18n, filePath, {
+  init(i18n, name, category, {
     logger = console, doneFn, devIds, devOnlyCategories, runBetaCommandsOnly, replyOn = {},
     customPermissionChecks, cooldownsManager = new CooldownsManager()
   } = {}) {
-    this.#filePath = filePath;
-
     this.#i18n = i18n;
     this.#logger = logger;
     this.#doneFn = doneFn;
@@ -142,8 +135,8 @@ export class Command {
     this.config.replyOn.disabled = !!replyOn.disabled;
     this.config.replyOn.nonBeta = !!replyOn.nonBeta;
 
-    this.name = filename(this.#filePath).toLowerCase();
-    this.category = basename(dirname(this.#filePath)).toLowerCase();
+    this.name = name.toLowerCase();
+    this.category = category.toLowerCase();
     this.id = `commands.${this.category}.${this.name}`;
 
     this.#validate();
@@ -381,115 +374,6 @@ export class Command {
     else {
       return this.options.find(e => (!args || e.name == args[0])
         && [ApplicationCommandOptionType.Subcommand, ApplicationCommandOptionType.SubcommandGroup].includes(e.type));
-    }
-  }
-
-  /**
-   * @param {string} action
-   * @param {string | undefined} name
-   * @param {string | undefined} alias */
-  #logLoadMsg(action, name = this.name, alias = this.name) {
-    return this.#logger.log(`${action} ${capitalize(commandTypes.slash)} Command ${name}${alias == name ? '' : ' (Alias of ' + alias + ')'}`);
-  }
-
-  /** @type {CommandT<CommandType[]>['reload']} */
-  async reload(application, i18n = this.#i18n) {
-    /** @type {CommandT | { default: CommandT }} */
-    let newCommand = await loadFile(this.#filePath);
-    newCommand = 'default' in newCommand ? newCommand.default : newCommand;
-
-    await i18n.loadAllLocales();
-    newCommand.init(i18n, this.#filePath, {
-      logger: this.#logger, cooldownsManager: this.#cooldownsManager,
-      doneFn: this.#doneFn, customPermissionChecks: this.#customPermissionChecks
-    });
-
-    if ([this, newCommand].some(e => e.types.includes(commandTypes.slash))) {
-      const appCommand = await this.reloadApplicationCommand(application, newCommand);
-      newCommand.commandId = appCommand?.id;
-    }
-
-    return newCommand;
-  }
-
-  /** @type {CommandT<CommandType[]>['reloadApplicationCommand']} */
-  async reloadApplicationCommand(application, newCommand) {
-    const
-      existingCommands = await application.commands.fetch(),
-      isEqual = this.isEqualTo(newCommand);
-
-    let appCommand;
-
-    if (this.types.includes(commandTypes.slash) && !newCommand.types.includes(commandTypes.slash)) {
-      if (this.commandId) await application.commands.delete(this.commandId);
-      this.#logLoadMsg('Deleted');
-    }
-    else if (newCommand.types.includes(commandTypes.slash)) {
-      if (newCommand.disabled) {
-        if (this.commandId) {
-          await application.commands.delete(this.commandId);
-          this.#logLoadMsg('Deleted Disabled');
-        }
-      }
-      else if (isEqual && this.commandId && existingCommands.has(this.commandId))
-        appCommand = existingCommands.get(this.commandId);
-      else {
-        const existing = existingCommands.find(e => e.name == newCommand.name);
-        if (existing) {
-          appCommand = await application.commands.edit(existing.id, newCommand);
-          this.#logLoadMsg('Reloaded');
-        }
-        else {
-          appCommand = await application.commands.create(newCommand);
-          this.#logLoadMsg('Created');
-        }
-      }
-    }
-
-    for (const alias of new Set([...this.aliases[commandTypes.slash], ...newCommand.aliases[commandTypes.slash]]))
-      await this.#reloadAlias(application, newCommand, alias, isEqual);
-
-    return appCommand;
-  }
-
-  /**
-   * @param {Parameters<CommandT<CommandType[]>['reloadApplicationCommand']>[0]} application
-   * @param {Parameters<CommandT<CommandType[]>['reloadApplicationCommand']>[1]} newCommand
-   * @param {CommandT<CommandType[]>['aliases'][CommandType][number]} alias
-   * @param {boolean} isEqual */
-  async #reloadAlias(application, newCommand, alias, isEqual) {
-    const
-      inOld = this.aliases[commandTypes.slash].includes(alias),
-      inNew = newCommand.aliases[commandTypes.slash].includes(alias),
-      existing = (await application.commands.fetch()).find(e => e.name == alias);
-
-    if (inOld && !inNew) {
-      if (existing) {
-        await application.commands.delete(existing.id);
-        this.#logLoadMsg('Deleted', alias);
-      }
-    }
-    else if (inNew) {
-      if (newCommand.disabled) {
-        if (!existing) return;
-        await application.commands.delete(existing.id);
-        return this.#logLoadMsg('Deleted Disabled', alias);
-      }
-
-      if (isEqual && inOld && existing) return;
-
-      // clone class instance to change it's name
-      const commandClone = Object.assign(Object.create(Object.getPrototypeOf(newCommand)), newCommand);
-      commandClone.name = alias;
-
-      if (existing) {
-        await application.commands.edit(existing.id, commandClone);
-        this.#logLoadMsg('Reloaded', alias);
-      }
-      else {
-        await application.commands.create(commandClone);
-        this.#logLoadMsg('Created', alias);
-      }
     }
   }
 

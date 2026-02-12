@@ -8,7 +8,7 @@ import type { Command } from './classes/command';
 import type { CommandOption, CommandOptionConfig, StrictCommandOption, TypeSafeOptionResolver } from './classes/commandOption';
 
 export * from './utils/index.js';
-export * as loaders from './loaders';
+export { CommandManager } from './CommandManager';
 export {
   PermissionFlagsBits as Permissions,
   ApplicationCommandOptionType as OptionType

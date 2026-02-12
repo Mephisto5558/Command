@@ -15,6 +15,7 @@ import type { CooldownsManager, commandMention } from '../../utils/index.js';
 import type {
   CommandOptionConfig, RunnableReturns as OptionRunnableReturns, StrictCommandOption, ValidateOptionsArray
 } from '../commandOption';
+import type { Logger } from '../../CommandManager';
 
 
 type StrictCommand<
@@ -121,13 +122,8 @@ export declare class Command<
 
   constructor(config: CommandConfig<CT, DM, Options>);
 
-  init(i18n: I18nProvider, filePath: string, config?: {
-    logger?: {
-      log: typeof console.log;
-      warn: typeof console.warn;
-      error: typeof console.error;
-      debug: typeof console.debug;
-    };
+  init(i18n: I18nProvider, name: string, category: string, config?: {
+    logger?: Logger;
     doneFn?: commandDoneFn<StrictCommand<CT, DM>>;
     customPermissionChecks?: customPermissionChecksFn<StrictCommand<CT, DM>>;
 
@@ -144,16 +140,6 @@ export declare class Command<
   private updateCooldowns(interaction: ThisParameterType<StrictCommand<CT, DM>['run']>): number;
 
   async runWrapper(Interaction: ThisParameterType<StrictCommand<CT, DM>['run']>, i18n: I18nProvider, locale: Locale): Promise<never>;
-
-  reload(
-    application: ResolveContext<{
-      slash: ClientApplication;
-      prefix: ClientApplication | undefined;
-    }, NoInfer<CT>>,
-    i18n?: I18nProvider
-  ): Promise<Command<CommandType[], boolean>>;
-
-  reloadApplicationCommand(application: ClientApplication, newCommand: Command<CommandType[], boolean>): Promise<ApplicationCommand | undefined>;
 
   findOption(
     option: { name: string; type?: ApplicationCommandOptionType },
