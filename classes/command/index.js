@@ -14,20 +14,19 @@ const
 
   /** @type {getMS} *//* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
   getMilliseconds = require('better-ms').ms,
-  { CooldownsManager, constants: { descriptionMaxLength }, commandMention } = require('../../utils'),
+  { CooldownsManager, constants: { descriptionMaxLength }, commandMention, CommandExecutionError, cooldownConverter, equal } = require('../../utils'),
   { CommandOption } = require('../commandOption'),
-  { CommandExecutionError, cooldownConverter, equal } = require('../utils'),
 
   /** @type {number} */ msInSeconds = getMilliseconds('1s'),
   /** @type {number} */ PERM_ERR_MSG_DELETETIME = getMilliseconds('10s'),
   CANNOT_SEND_MESSAGE_API_ERR = 50_007;
 
-export const commandTypes = Object.freeze({
+const commandTypes = Object.freeze({
   slash: 'slash',
   prefix: 'prefix'
 });
 
-export class Command {
+class Command {
   /** @type {string} */ name;
   nameLocalizations = {};
 
@@ -415,3 +414,5 @@ export class Command {
     return true;
   }
 }
+
+module.exports = { commandTypes, Command };

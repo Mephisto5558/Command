@@ -17,6 +17,7 @@ import type {
   CommandOptionConfig, RunnableReturns as OptionRunnableReturns, StrictCommandOption, ValidateOptionsArray
 } from '../commandOption';
 
+export { commandTypes };
 
 type StrictCommand<
   CT extends readonly CommandType[], DM extends boolean,
