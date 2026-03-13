@@ -8,6 +8,8 @@ import type { Command } from './classes/command';
 import type { CommandOption, CommandOptionConfig, StrictCommandOption, TypeSafeOptionResolver } from './classes/commandOption';
 
 export * from './utils/index.js';
+export * from './classes/command';
+export * from './classes/commandOption';
 export { CommandManager } from './CommandManager';
 export {
   PermissionFlagsBits as Permissions,

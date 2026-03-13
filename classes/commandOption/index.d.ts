@@ -4,11 +4,11 @@
 import type {
   APIInteractionDataResolvedChannel, APIRole, ApplicationCommandOption, ApplicationCommandOptionChoiceData,
   ApplicationCommandOptionType, Attachment, AutocompleteInteraction, CacheType, CategoryChannel, ChannelType,
-  ChatInputCommandInteraction as _ChatInputCommandInteraction, CommandInteractionOptionResolver, GuildBasedChannel, GuildMember,
-  Message, NewsChannel, Role, StageChannel, TextChannel, ThreadChannel, User, VoiceChannel, _NonNullableFields
+  Client, CommandInteractionOptionResolver, GuildBasedChannel,
+  GuildMember, Message, NewsChannel, Role, StageChannel, TextChannel, ThreadChannel, User, VoiceChannel, _NonNullableFields
 } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
-import type { CommandType, DefaultOptionType, OptionsG, ResolveContext, SharedConfig, customPermissionChecksFn } from '../..';
+import type { CommandType, DefaultOptionType, OptionsG, ResolveContext, SharedConfig, customPermissionChecksFn, ChatInputCommandInteraction } from '../..';
 import type { CooldownsManager } from '../../utils/index.js';
 import type { Command } from '../command';
 
@@ -212,7 +212,12 @@ interface SubcommandCommandOptionConfig<
 
   options?: ValidateOptionsArray<Options, CT, DM>;
 
-  run?: StrictCommandOption<CT, DM, AO, Options>['run'];
+  run?(
+    this: ResolveContext<{ slash: ChatInputCommandInteraction<'cached', Options>; prefix: Message }, CT>,
+    lang: Translator,
+    options: AO,
+    client: Client
+  ): unknown;
 }
 
 interface StringCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO> extends BasePrimitiveCommandOptionConfig<CT, DM, AO> {
@@ -312,8 +317,9 @@ export declare class CommandOption<
   options: StrictCommandOption<commandTypes, runsInDM>[];
 
   run: (
-    this: ThisParameterType<StrictCommand<commandTypes, runsInDM, Options>['run']>,
-    lang: Translator, options: additionalRunOpts, client: Client
+    this: ResolveContext<{ slash: ChatInputCommandInteraction<'cached', Options>; prefix: Message }, commandTypes>,
+    lang: Translator,
+    options: additionalRunOpts, client: Client
   ) => Promise<never>;
 
   constructor(config: CommandOptionConfig<commandTypes, runsInDM, additionalRunOpts, Options>);

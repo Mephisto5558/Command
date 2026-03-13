@@ -75,10 +75,10 @@ export class Command {
   /** @type {CommandOptionT[]} */ options = [];
 
   /** @type {Parameters<CommandT<CommandType[], boolean>['init']>[0]} */ #i18n;
-  /** @type {NonNullable<Parameters<CommandT<CommandType[], boolean>['init']>['2']>['logger']} */ #logger;
-  /** @type {NonNullable<Parameters<CommandT<CommandType[], boolean>['init']>['2']>['doneFn']} */ #doneFn;
-  /** @type {NonNullable<Parameters<CommandT<CommandType[], boolean>['init']>['2']>['cooldownsManager']} */ #cooldownsManager;
-  /** @type {customPermissionChecksFn | undefined} */ #customPermissionChecks;
+  /** @type {NonNullable<Parameters<CommandT<CommandType[], boolean>['init']>['3']>['logger']} */ #logger;
+  /** @type {NonNullable<Parameters<CommandT<CommandType[], boolean>['init']>['3']>['doneFn']} */ #doneFn;
+  /** @type {NonNullable<Parameters<CommandT<CommandType[], boolean>['init']>['3']>['cooldownsManager']} */ #cooldownsManager;
+  /** @type {NonNullable<Parameters<CommandT<CommandType[], boolean>['init']>['3']>['customPermissionChecks'] | undefined} */ #customPermissionChecks;
 
 
   /** @param {CommandConfig<CommandType[], boolean>} config */

@@ -3,7 +3,7 @@
 
 import type {
   ApplicationCommand, ApplicationCommandOptionType, ApplicationCommandType, CacheType,
-  ChatInputCommandInteraction as _ChatInputCommandInteraction, Client, ClientApplication, Message, PermissionFlags,
+  ChatInputCommandInteraction as _ChatInputCommandInteraction, Client, Message, PermissionFlags,
   PermissionsBitField, _NonNullableFields
 } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
@@ -11,11 +11,11 @@ import type {
   ChatInputCommandInteraction, CommandType, DefaultOptionType, OptionsG,
   ResolveContext, SharedConfig, commandDoneFn, commandTypes, customPermissionChecksFn
 } from '../..';
+import type { Logger } from '../../CommandManager';
 import type { CooldownsManager, commandMention } from '../../utils/index.js';
 import type {
   CommandOptionConfig, RunnableReturns as OptionRunnableReturns, StrictCommandOption, ValidateOptionsArray
 } from '../commandOption';
-import type { Logger } from '../../CommandManager';
 
 
 type StrictCommand<
