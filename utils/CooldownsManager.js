@@ -27,7 +27,14 @@ module.exports = class CooldownsManager {
         timestamp = typeCache.get(areaId) ?? 0;
 
       if (timestamp > createdAt) currentCooldowns.push(timestamp - createdAt);
-      else typeCache.set(areaId, createdAt + value);
+      else {
+        typeCache.set(areaId, createdAt + value);
+
+        setTimeout(() => {
+          typeCache.delete(areaId);
+          if (!typeCache.size) timeStamps.delete(cdName);
+        }, value);
+      }
     }
 
     return Math.max(0, ...currentCooldowns);

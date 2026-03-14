@@ -16,6 +16,7 @@ module.exports = async function loadFile(path) {
   catch (err) {
     if (err.code !== 'ERR_REQUIRE_ESM') throw err;
 
+    // This does not clear the old file from RAM as that can't be done programmatically.
     if (!importWithoutCache.isSupported) return import(pathToFileURL(`${path}?t=${Date.now()}`).href);
 
     const deregister = importWithoutCache.init();

@@ -100,6 +100,18 @@ module.exports = class CommandOption {
 
       this.name = this.name.toLowerCase();
     }
+
+    if (this.options.length) {
+      let foundOptional = false;
+      for (const option of this.options) {
+        if (!option.required) foundOptional = true;
+        else if (foundOptional) {
+          throw new TypeError(
+            `Invalid option order in subcommand(group) ${this.id}. Required options (${option.id}) cannot appear after optional options.`
+          );
+        }
+      }
+    }
   }
 
   #localize() {

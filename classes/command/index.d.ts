@@ -8,11 +8,11 @@ import type {
 } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  ChatInputCommandInteraction, CommandType, DefaultOptionType, OptionsG,
+  ChatInputCommandInteraction, CommandType, CooldownTypes, DefaultOptionType, OptionsG,
   ResolveContext, SharedConfig, commandDoneFn, commandTypes, customPermissionChecksFn
 } from '../..';
-import type { Logger } from '../../CommandManager';
 import type { CooldownsManager, commandMention } from '../../utils/index.js';
+import type { Logger } from '../commandManager';
 import type {
   CommandOptionConfig, RunnableReturns as OptionRunnableReturns, StrictCommandOption, ValidateOptionsArray
 } from '../commandOption';
@@ -23,17 +23,6 @@ type StrictCommand<
   CT extends readonly CommandType[], DM extends boolean,
   Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[] = readonly DefaultOptionType<CT, DM>[]
 > = Command<NoInfer<CT>, NoInfer<DM>, NoInfer<Options>>;
-
-/**
- * This is more limited than what's actually allowed to enforce consitency.
- *
- * day, hour, minute, second, millisecond */
-type TimeUnits = ['d', 'h', 'min', 's', 'ms'];
-export type validTimeString = BuildOrderedCooldown<TimeUnits>;
-
-
-export type CooldownTypes = 'guild' | 'channel' | 'user';
-type Cooldowns = { [K in CooldownTypes]: validTimeString } & {};
 
 export type RunnableReturns = ['nonBeta']
   | ['disabled', string]

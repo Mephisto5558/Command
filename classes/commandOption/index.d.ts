@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/consistent-type-definitions */
-/* eslint-disable @typescript-eslint/consistent-indexed-object-style -- using index signature to improve readability for lib user */
 
 import type {
   APIInteractionDataResolvedChannel, APIRole, ApplicationCommandOption, ApplicationCommandOptionChoiceData,
@@ -8,7 +7,9 @@ import type {
   GuildMember, Message, NewsChannel, Role, StageChannel, TextChannel, ThreadChannel, User, VoiceChannel, _NonNullableFields
 } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
-import type { ChatInputCommandInteraction, CommandType, DefaultOptionType, OptionsG, ResolveContext, SharedConfig, customPermissionChecksFn } from '../..';
+import type {
+  ChatInputCommandInteraction, CommandType, DefaultOptionType, OptionsG, ResolveContext, SharedConfig, customPermissionChecksFn
+} from '../..';
 import type { CooldownsManager } from '../../utils/index.js';
 import type { Command } from '../command';
 
@@ -289,6 +290,8 @@ export declare class CommandOption<
   type: ApplicationCommandOptionType;
 
   required: boolean;
+
+  /* eslint-disable @typescript-eslint/consistent-indexed-object-style -- using index signature to improve readability for lib user */
   cooldowns: { [K in CooldownTypes]: number } & {};
   dmPermission: runsInDM;
 

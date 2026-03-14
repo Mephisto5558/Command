@@ -10,7 +10,7 @@ import type { CommandOption, CommandOptionConfig, StrictCommandOption, TypeSafeO
 export * from './utils/index.js';
 export * from './classes/command';
 export * from './classes/commandOption';
-export { CommandManager } from './CommandManager';
+export * from './classes/commandManager';
 export {
   PermissionFlagsBits as Permissions,
   ApplicationCommandOptionType as OptionType

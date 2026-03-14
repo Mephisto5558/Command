@@ -1,7 +1,7 @@
 import type { ApplicationCommand, Client, Collection, Snowflake } from 'discord.js';
 import type { I18nProvider } from '@mephisto5558/i18n';
-import type { Command } from './classes/command';
-import type { CommandType, CooldownsManager, commandDoneFn, customPermissionChecksFn } from '.';
+import type { CommandType, CooldownsManager, commandDoneFn, customPermissionChecksFn } from '../..';
+import type { Command } from '../command';
 
 export type Logger = {
   log: typeof console.log;
@@ -26,7 +26,7 @@ export type ManagerConfig = [
   }
 ];
 
-type CollectionMember = Command<CommandType, boolean>;
+type CollectionMember = Command<CommandType[], boolean>;
 export declare class CommandManager {
   commands: Collection<string, CollectionMember>;
   client: Client;

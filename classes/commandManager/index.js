@@ -1,18 +1,15 @@
-/** @import { ApplicationCommand } from 'discord.js'; */
-/** @import { Collection } from 'discord.js'; */
 /**
- * @import { Collection as CollectionT } from 'discord.js'
- * @import { Command } from './classes/command'
- * @import { ManagerConfig, CommandManager as CommandManagerT } from './CommandManager'
- */
+ * @import { ApplicationCommand } from 'discord.js'
+ * @import { CommandType } from '../..'
+ * @import { ManagerConfig, CommandManager as CommandManagerT } from '.' */
 
 const
   { Collection } = require('discord.js'),
   { readdir } = require('node:fs/promises'),
   { basename, dirname, join, resolve } = require('node:path'),
-  { Command } = require('./classes/command'),
-  { capitalize, filename, getDirectories, loadFile } = require('./utils'),
-  { commandTypes } = require('.');
+  { commandTypes } = require('../..'),
+  { capitalize, filename, getDirectories, loadFile } = require('../../utils'),
+  { Command } = require('../command');
 
 module.exports = class CommandManager {
   /** @type {CommandManagerT['commands']} */ commands = new Collection();
@@ -104,9 +101,14 @@ module.exports = class CommandManager {
       return this.#logger.error(`Error on initializing command file ${filePath}:\n`, err);
     }
 
-    // Handle Reload Logic (API Sync)
-    const appCommand = await this.registerCommand(commandFile, oldCommand);
-    commandFile.commandId = appCommand?.id;
+    try {
+      // Handle Reload Logic (API Sync)
+      const appCommand = await this.registerCommand(commandFile, oldCommand);
+      commandFile.commandId = appCommand?.id;
+    }
+    catch (err) {
+      return this.#logger.error(`Error on registering command file ${filePath}:\n`, err);
+    }
 
     this.commands.set(commandFile.name, commandFile);
     this.#filePaths.set(commandFile.name, filePath);
@@ -157,12 +159,11 @@ module.exports = class CommandManager {
   }
 
   /**
-   * @param {Command} newCommand
-   * @param {Command} oldCommand
+   * @param {Command<CommandType[], boolean>} newCommand
+   * @param {Command<CommandType[], boolean> | undefined} oldCommand
    * @param {string} alias
    * @param {boolean} isEqual
-   * @param {Collection<string, ApplicationCommand>} existingCommands
-   */
+   * @param {Collection<string, ApplicationCommand>} existingCommands */
   async #registerAlias(newCommand, oldCommand, alias, isEqual, existingCommands) {
     const
       { application } = this.client,

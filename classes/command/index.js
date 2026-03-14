@@ -14,8 +14,9 @@ const
 
   /** @type {getMS} *//* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
   getMilliseconds = require('better-ms').ms,
-  { CooldownsManager, constants: { descriptionMaxLength }, commandMention, CommandExecutionError, cooldownConverter, equal } = require('../../utils'),
+  { CooldownsManager, constants: { descriptionMaxLength }, commandMention } = require('../../utils'),
   { CommandOption } = require('../commandOption'),
+  { CommandExecutionError, cooldownConverter, equal } = require('../utils'),
 
   /** @type {number} */ msInSeconds = getMilliseconds('1s'),
   /** @type {number} */ PERM_ERR_MSG_DELETETIME = getMilliseconds('10s'),
@@ -148,8 +149,22 @@ class Command {
   }
 
   #validate() {
-    if (!this.disabled && !['function', 'async function', 'async run(', 'run('].some(e => String(this.run).startsWith(e)))
+    if (this.disabled) return;
+
+    if (!['function', 'async function', 'async run(', 'run('].some(e => String(this.run).startsWith(e)))
       throw new TypeError(`The "run" method of command "${this.id}" is an arrow function! You cannot use arrow functions!`);
+
+    if (this.options.length) {
+      let foundOptional = false;
+      for (const option of this.options) {
+        if (!option.required) foundOptional = true;
+        else if (foundOptional) {
+          throw new TypeError(
+            `Invalid option order in command "${this.id}". Required options ("${option.id}") cannot appear after optional options.`
+          );
+        }
+      }
+    }
   }
 
   #localize() {
