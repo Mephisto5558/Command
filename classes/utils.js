@@ -58,3 +58,8 @@ module.exports.CommandExecutionError = class CommandExecutionError extends Error
     this.translator = translator;
   }
 };
+
+module.exports.commandTypes = Object.freeze({
+  slash: 'slash',
+  prefix: 'prefix'
+});

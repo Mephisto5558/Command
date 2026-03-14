@@ -33,7 +33,6 @@ type TimeUnits = ['d', 'h', 'min', 's', 'ms'];
 export type validTimeString = BuildOrderedCooldown<TimeUnits>;
 
 export type CommandType = 'slash' | 'prefix';
-export declare const commandTypes: { readonly [K in CommandType]: K };
 
 export type OptionsG<CT, DM> = readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[];
 export type DefaultOptionType<CT extends readonly CommandType[], DM extends boolean>

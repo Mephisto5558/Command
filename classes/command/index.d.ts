@@ -9,15 +9,14 @@ import type {
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
   ChatInputCommandInteraction, CommandType, CooldownTypes, DefaultOptionType, OptionsG,
-  ResolveContext, SharedConfig, commandDoneFn, commandTypes, customPermissionChecksFn
+  ResolveContext, SharedConfig, commandDoneFn, customPermissionChecksFn
 } from '../..';
 import type { CooldownsManager, commandMention } from '../../utils/index.js';
 import type { Logger } from '../commandManager';
 import type {
   CommandOptionConfig, RunnableReturns as OptionRunnableReturns, StrictCommandOption, ValidateOptionsArray
 } from '../commandOption';
-
-export { commandTypes };
+import type { commandTypes } from '../utils';
 
 type StrictCommand<
   CT extends readonly CommandType[], DM extends boolean,

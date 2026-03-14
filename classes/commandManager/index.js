@@ -7,9 +7,9 @@ const
   { Collection } = require('discord.js'),
   { readdir } = require('node:fs/promises'),
   { basename, dirname, join, resolve } = require('node:path'),
-  { commandTypes } = require('../..'),
   { capitalize, filename, getDirectories, loadFile } = require('../../utils'),
-  { Command } = require('../command');
+  { Command } = require('../command'),
+  { commandTypes } = require('../utils');
 
 module.exports = class CommandManager {
   /** @type {CommandManagerT['commands']} */ commands = new Collection();

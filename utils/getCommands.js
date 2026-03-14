@@ -1,8 +1,10 @@
-/**
- * @import { Command, CommandType } from '..'
- * @import { getCommands as getCommandsT } from '.' */
+/** @import { getCommands as getCommandsT } from '.' */
 
-const { capitalize, commandTypes } = require('..');
+
+const
+  { commandTypes } = require('../classes/utils'),
+  capitalize = require('./capitalize');
+
 
 /** @typedef {{ commandName: string, commandUsage: string, commandDescription: string, commandAlias: string }[]} commandList */
 

@@ -16,16 +16,11 @@ const
   getMilliseconds = require('better-ms').ms,
   { CooldownsManager, constants: { descriptionMaxLength }, commandMention } = require('../../utils'),
   { CommandOption } = require('../commandOption'),
-  { CommandExecutionError, cooldownConverter, equal } = require('../utils'),
+  { CommandExecutionError, commandTypes, cooldownConverter, equal } = require('../utils'),
 
   /** @type {number} */ msInSeconds = getMilliseconds('1s'),
   /** @type {number} */ PERM_ERR_MSG_DELETETIME = getMilliseconds('10s'),
   CANNOT_SEND_MESSAGE_API_ERR = 50_007;
-
-const commandTypes = Object.freeze({
-  slash: 'slash',
-  prefix: 'prefix'
-});
 
 class Command {
   /** @type {string} */ name;
@@ -430,4 +425,4 @@ class Command {
   }
 }
 
-module.exports = { commandTypes, Command };
+module.exports = { Command };
