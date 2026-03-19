@@ -1,12 +1,5 @@
 import config, { getModifiedRule, jsGlob, pluginNames, tsGlob } from '@mephisto5558/eslint-config';
 
-/* eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
-config.find(e => e.rules && 'no-underscore-dangle' in e.rules)?.rules['no-underscore-dangle'][1]?.allow
-  ?.push?.('__count__'); // Object#count
-
-/**
- * @type {typeof config}
- * This config lists all rules from every plugin it uses. */
 export default [
   ...config,
   {
@@ -22,6 +15,13 @@ export default [
     files: [`**/*${tsGlob}`, `**/*${jsGlob}`],
     languageOptions: {
       globals: {}
+    },
+    rules: {
+      ...getModifiedRule(config, 'no-underscore-dangle', [{
+        allow: [
+          '__count__' // Object#count
+        ]
+      }])
     }
   },
   {
@@ -35,4 +35,4 @@ export default [
       [`${pluginNames.unicorn}/no-null`]: 'off'
     }
   }
-];
+] as typeof config;

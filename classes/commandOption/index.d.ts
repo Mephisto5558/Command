@@ -8,7 +8,7 @@ import type {
   GuildMember, Message, NewsChannel, Role, StageChannel, TextChannel, ThreadChannel, User, VoiceChannel, _NonNullableFields
 } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
-import type { CommandType, DefaultOptionType, OptionsG, ResolveContext, SharedConfig, customPermissionChecksFn, ChatInputCommandInteraction } from '../..';
+import type { ChatInputCommandInteraction, CommandType, DefaultOptionType, OptionsG, ResolveContext, SharedConfig, customPermissionChecksFn } from '../..';
 import type { CooldownsManager } from '../../utils/index.js';
 import type { Command } from '../command';
 

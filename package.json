@@ -3,9 +3,9 @@
   "version": "0.5.0",
   "description": "Discord.js command class and registering logic for slash- and prefix commands",
   "keywords": [
+    "command",
     "discord",
-    "discord.js",
-    "command"
+    "discord.js"
   ],
   "homepage": "https://github.com/Mephisto5558/Command_v2#readme",
   "bugs": {
@@ -21,13 +21,14 @@
   "main": "index.js",
   "types": "index.d.ts",
   "files": [
-    "index.d.ts",
+    "classes",
     "db.d.ts",
-    "utils",
+    "index.d.ts",
     "loaders",
-    "classes"
+    "utils"
   ],
   "scripts": {
+    "lint": "eslint . --cache --cache-location ./node_modules/.cache/eslint/ >eslint.log",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
@@ -42,5 +43,12 @@
   },
   "engines": {
     "node": ">=22.15.0"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "onFail": "error",
+      "version": ">=22.15.0"
+    }
   }
 }
