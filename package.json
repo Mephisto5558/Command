@@ -38,7 +38,6 @@
     "import-without-cache": "^0.2.5"
   },
   "devDependencies": {
-    "@mephisto5558/better-types": "latest",
     "@mephisto5558/eslint-config": "latest"
   },
   "engines": {
