@@ -10,7 +10,7 @@ export type Logger = {
   debug: typeof console.debug;
 };
 
-export type ManagerConfig = [
+export type CommandManagerConfig = [
   commandsPath: string,
   client: Client,
   i18n: I18nProvider,
@@ -34,7 +34,7 @@ export declare class CommandManager {
   doneFn?: commandDoneFn;
   cooldownsManager: CooldownsManager;
 
-  constructor(...config: ManagerConfig);
+  init(...config: CommandManagerConfig): this;
 
   /** Get a command by name or alias. */
   get(query: string): CollectionMember | undefined;
@@ -42,7 +42,7 @@ export declare class CommandManager {
   loadAll(): Promise<CommandManager['commands']>;
   reloadAll(): Promise<CommandManager['commands']>;
 
-  reload(query: string): Promise<CollectionMember | undefined>;
+  reload<CMD extends CollectionMember | string>(command: CMD): Promise<CMD extends CollectionMember ? CMD : CollectionMember | undefined>;
 
   registerCommand(newCommand: CollectionMember, oldCommand?: CollectionMember): Promise<ApplicationCommand | undefined>;
 }

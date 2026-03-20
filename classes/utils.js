@@ -61,5 +61,6 @@ module.exports.CommandExecutionError = class CommandExecutionError extends Error
 
 module.exports.commandTypes = Object.freeze({
   slash: 'slash',
-  prefix: 'prefix'
+  prefix: 'prefix',
+  component: 'component'
 });

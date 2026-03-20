@@ -8,8 +8,7 @@ const utils = {
   getDirectories: require('./getDirectories'),
   loadFile: require('./loadFile')
 
-  /* componentHandler: require('./componentHandler'),
-     getCommandName: require('./getCommandName'), */
+  /* componentHandler: require('./componentHandler') */
 };
 
 module.exports = utils;

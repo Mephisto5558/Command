@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/consistent-type-definitions */
 
 import type {
-  APIInteractionDataResolvedChannel, APIRole, ApplicationCommandOption, ApplicationCommandOptionChoiceData,
+  APIInteractionDataResolvedChannel, APIRole, ApplicationCommandOption, ApplicationCommandOptionChoiceData, ApplicationCommandOptionData,
   ApplicationCommandOptionType, Attachment, AutocompleteInteraction, CacheType, CategoryChannel, ChannelType,
   Client, CommandInteractionOptionResolver, GuildBasedChannel,
   GuildMember, Message, NewsChannel, Role, StageChannel, TextChannel, ThreadChannel, User, VoiceChannel, _NonNullableFields
@@ -277,7 +277,7 @@ export declare class CommandOption<
   const Options extends readonly (
     CommandOptionConfig<commandTypes, runsInDM> | StrictCommandOption<commandTypes, runsInDM>
   )[] = readonly DefaultOptionType<commandTypes, runsInDM>[]
-> {
+> implements ApplicationCommandOptionData {
   name: Lowercase<string>;
   id: `${string}.options.${CommandOption['name']}`;
   position: number;

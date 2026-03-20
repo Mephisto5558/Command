@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style -- using index signature to improve readability for lib user */
 
 import type {
-  ApplicationCommand, ApplicationCommandOptionType, ApplicationCommandType, CacheType,
+  ApplicationCommand, ApplicationCommandData, ApplicationCommandOptionType, ApplicationCommandType, CacheType,
   ChatInputCommandInteraction as _ChatInputCommandInteraction, Client, Message, PermissionFlags,
   PermissionsBitField, _NonNullableFields
 } from 'discord.js';
@@ -56,7 +56,7 @@ export declare class Command<
   const Options extends readonly (
     CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>
   )[] = readonly DefaultOptionType<CT, DM>[]
-> {
+> implements ApplicationCommandData {
   name: Lowercase<string>;
   id: `commands.${Command['category']}.${Command['name']}`;
   commandId: ['slash'] extends NoInfer<CT> ? Snowflake : undefined;
@@ -79,7 +79,7 @@ export declare class Command<
   cooldowns: { [K in CooldownTypes]: number } & {};
 
   permissions: { [K in 'client' | 'user']: PermissionFlags[keyof PermissionFlags][] } & {};
-  get defaultMemberPermissions(): PermissionsBitField;
+  get defaultMemberPermissions(): PermissionsBitField['bitfield'];
 
   dmPermission: DM;
 

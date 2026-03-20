@@ -1,3 +1,5 @@
+/* eslint-disable max-lines */
+
 /**
  * @import { Translator } from '@mephisto5558/i18n'
  * @import { getMilliseconds as getMS, CommandType, customPermissionChecksFn } from '../..'
@@ -7,9 +9,8 @@
 
 const
   {
-    ApplicationCommandOptionType, ApplicationCommandType, ChannelType,
-    Colors, CommandInteraction, EmbedBuilder, Message, MessageFlags,
-    PermissionFlagsBits, PermissionsBitField, inlineCode
+    ApplicationCommandOptionType, ApplicationCommandType, ChannelType, Colors, CommandInteraction,
+    EmbedBuilder, Message, MessageComponentInteraction, MessageFlags, PermissionFlagsBits, PermissionsBitField, inlineCode
   } = require('discord.js'),
 
   /** @type {getMS} *//* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
@@ -45,7 +46,7 @@ class Command {
   /** @type {CommandT['permissions']} */
   permissions = { client: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages], user: [PermissionFlagsBits.SendMessages] };
   get defaultMemberPermissions() {
-    return new PermissionsBitField(this.permissions.user);
+    return new PermissionsBitField(this.permissions.user).bitfield;
   }
 
   dmPermission = false;
@@ -138,7 +139,7 @@ class Command {
     this.#localize();
 
     for (const [i, option] of this.options.entries())
-      option.init(this.#i18n, this.id, this.#logger, this.#cooldownsManager, i);
+      option.init(this.#i18n, this.id, this.#cooldownsManager, this.#logger, i);
 
     return this;
   }
@@ -199,8 +200,6 @@ class Command {
     const
       wrapperTranslator = i18n.getTranslator({ locale, backupPaths: ['events.command'] }),
       commandTranslator = i18n.getTranslator({ locale, backupPaths: [this.id] }),
-      commandType = interaction instanceof CommandInteraction ? commandTypes.slash : commandTypes.prefix,
-
       errorKey = await this.#isRunnable(interaction, wrapperTranslator);
 
     if (errorKey !== false) {
@@ -212,6 +211,11 @@ class Command {
     }
 
     interaction.commandName ??= this.name; // Is undefined on `MessageComponentInteraction`s
+
+    let commandType;
+    if (interaction instanceof CommandInteraction) commandType = commandTypes.slash;
+    else if (interaction instanceof MessageComponentInteraction) commandType = commandTypes.component;
+    else commandType = commandTypes.prefix;
 
     this.#logger.debug(`Executing ${commandType} command ${this.name}`);
 
@@ -408,7 +412,7 @@ class Command {
       this.name != cmd.name || this.description != cmd.description || this.type != cmd.type
       /* eslint-disable-next-line @typescript-eslint/no-deprecated */
       || this.dmPermission != cmd.dmPermission
-      || this.defaultMemberPermissions.bitfield != cmd.defaultMemberPermissions?.bitfield
+      || this.defaultMemberPermissions != (cmd.defaultMemberPermissions?.bitfield ?? cmd.defaultMemberPermissions)
       || !equal(this.nameLocalizations, cmd.nameLocalizations)
       || !equal(this.descriptionLocalizations, cmd.descriptionLocalizations)
     ) return false;

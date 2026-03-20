@@ -24,7 +24,6 @@
     "classes",
     "db.d.ts",
     "index.d.ts",
-    "loaders",
     "utils"
   ],
   "scripts": {

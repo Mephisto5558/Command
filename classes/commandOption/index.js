@@ -8,7 +8,7 @@ const
   { autocompleteOptionsMaxAmt, choiceValueMaxLength, choiceValueMinLength, choicesMaxAmt, descriptionMaxLength } = require('../../utils/constants'),
   { cooldownConverter, equal } = require('../utils');
 
-module.exports = class CommandOption {
+class CommandOption {
   name;
 
   /** @type {string} */ description;
@@ -46,6 +46,8 @@ module.exports = class CommandOption {
           this.cooldowns = Object.fromEntries(Object.entries(this.cooldowns).map(cooldownConverter.bind(undefined, config.cooldowns)));
         if (config.dmPermission) this.dmPermission = config.dmPermission;
         if (config.options) this.options = config.options.map(e => (e instanceof CommandOption ? e : new CommandOption(e)));
+
+        /* eslint-disable-next-line custom/unbound-method -- intentional here */
         this.run = config.run;
         break;
 
@@ -133,7 +135,7 @@ module.exports = class CommandOption {
 
 
       // choices
-      if ('choices' in this) this.#localizeChoices(locale);
+      if (this.choices) this.#localizeChoices(locale);
     }
   }
 
@@ -158,7 +160,7 @@ module.exports = class CommandOption {
 
       const localizedChoice = optionalTranslator(`choices.${choice.value}`) ?? choice.value.toString();
       if (localizedChoice) {
-        const errMsg = `"${locale}" choice name localization for "${choice.value}" of option "${this.name}"`
+        const errMsg = `"${locale}" choice name localization for "${choice.value}" of option "${this.name}" `
           + `(${this.id}.choices.${choice.value}) is too`;
 
         if (localizedChoice.length < choiceValueMinLength) {
@@ -324,4 +326,6 @@ module.exports = class CommandOption {
 
     return true;
   }
-};
+}
+
+module.exports = { CommandOption };

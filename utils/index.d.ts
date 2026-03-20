@@ -2,6 +2,7 @@ import type { BaseInteraction, Message } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type { CommandType, CooldownTypes } from '..';
 import type { Command } from '../classes/command';
+import type { CommandManager } from '../classes/commandManager';
 
 export { default as constants } from './constants';
 
@@ -27,7 +28,7 @@ export declare function filename(path: string): string;
 export declare function getCommands(
   this: Client,
   lang: Translator<true, Locale>,
-  commands: Command<CommandType[], boolean>[],
+  commands: CommandManager['commands'],
   excludeCategories?: Command['category'][]
 ): {
   category: string;

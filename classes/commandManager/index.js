@@ -1,7 +1,7 @@
 /**
  * @import { ApplicationCommand } from 'discord.js'
  * @import { CommandType } from '../..'
- * @import { ManagerConfig, CommandManager as CommandManagerT } from '.' */
+ * @import { CommandManagerConfig, CommandManager as CommandManagerT } from '.' */
 
 const
   { Collection } = require('discord.js'),
@@ -11,19 +11,19 @@ const
   { Command } = require('../command'),
   { commandTypes } = require('../utils');
 
-module.exports = class CommandManager {
+class CommandManager {
   /** @type {CommandManagerT['commands']} */ commands = new Collection();
 
   /** @type {Collection<string, string>} */ #filePaths = new Collection();
-  /** @type {NonNullable<NonNullable<ManagerConfig[3]>['logger']>} */ #logger = console;
-  /** @type {NonNullable<NonNullable<ManagerConfig[3]>['devIds']>} */ #devIds = new Set();
-  /** @type {NonNullable<NonNullable<ManagerConfig[3]>['devOnlyCategories']>} */ #devOnlyCategories = new Set();
-  /** @type {NonNullable<NonNullable<ManagerConfig[3]>['runBetaCommandsOnly']>} */ #runBetaCommandsOnly = false;
-  /** @type {NonNullable<NonNullable<ManagerConfig[3]>['replyOn']>} */ #replyOn = { disabled: false, nonBeta: false };
-  /** @type {NonNullable<ManagerConfig[3]>['customPermissionChecks']} */ #customPermissionChecks;
+  /** @type {NonNullable<NonNullable<CommandManagerConfig[3]>['logger']>} */ #logger = console;
+  /** @type {NonNullable<NonNullable<CommandManagerConfig[3]>['devIds']>} */ #devIds = new Set();
+  /** @type {NonNullable<NonNullable<CommandManagerConfig[3]>['devOnlyCategories']>} */ #devOnlyCategories = new Set();
+  /** @type {NonNullable<NonNullable<CommandManagerConfig[3]>['runBetaCommandsOnly']>} */ #runBetaCommandsOnly = false;
+  /** @type {NonNullable<NonNullable<CommandManagerConfig[3]>['replyOn']>} */ #replyOn = { disabled: false, nonBeta: false };
+  /** @type {NonNullable<CommandManagerConfig[3]>['customPermissionChecks']} */ #customPermissionChecks;
 
-  /** @type {(...config: ManagerConfig) => CommandManagerT} */
-  constructor(commandsPath, client, i18n, {
+  /** @type {CommandManagerT['init']} */
+  init(commandsPath, client, i18n, {
     logger, doneFn, cooldownsManager,
     devIds, devOnlyCategories, runBetaCommandsOnly, replyOn, customPermissionChecks
   } = {}) {
@@ -38,6 +38,8 @@ module.exports = class CommandManager {
     if (runBetaCommandsOnly) this.#runBetaCommandsOnly = runBetaCommandsOnly;
     if (replyOn) this.#replyOn = replyOn;
     this.#customPermissionChecks = customPermissionChecks;
+
+    return this;
   }
 
   /** @type {CommandManagerT['get']} */
@@ -65,8 +67,8 @@ module.exports = class CommandManager {
 
   /** @type {CommandManagerT['reload']} */
   async reload(query) {
-    const command = this.get(query);
-    if (!command) throw new Error(`Command "${query}" not found.`);
+    const command = query instanceof Command ? query : this.get(query);
+    if (!command) return;
 
     return this.#loadCommand(this.#filePaths.get(command.name), command);
   }
@@ -75,6 +77,8 @@ module.exports = class CommandManager {
    * @param {string} filePath
    * @param {Command} oldCommand */
   async #loadCommand(filePath, oldCommand) {
+    if (!this.client?.application) throw new Error('Client#application must exist (Client must be logged in!)');
+
     /** @type {Command | { default: Command }} */
     let commandFile = await loadFile(filePath);
     commandFile = typeof commandFile == 'object' && 'default' in commandFile ? commandFile.default : commandFile;
@@ -117,7 +121,7 @@ module.exports = class CommandManager {
 
   /** @type {CommandManagerT['registerCommand']} */
   async registerCommand(newCommand, oldCommand) {
-    if (!newCommand.types.includes(commandTypes.slash)) return;
+    if (!newCommand.types.includes(commandTypes.slash) || !this.client?.application) return;
 
     const
       { application } = this.client,
@@ -165,6 +169,8 @@ module.exports = class CommandManager {
    * @param {boolean} isEqual
    * @param {Collection<string, ApplicationCommand>} existingCommands */
   async #registerAlias(newCommand, oldCommand, alias, isEqual, existingCommands) {
+    if (!this.client?.application) throw new Error('Client#application must exist (Client must be logged in!)');
+
     const
       { application } = this.client,
       inOld = oldCommand?.aliases.slash.includes(alias),
@@ -206,6 +212,8 @@ module.exports = class CommandManager {
    * @param {string} name
    * @param {string | undefined} alias */
   #logLoadMsg(action, name, alias = name) {
-    this.#logger.log(`${action} ${capitalize(commandTypes.slash)} Command ${name}${alias == name ? '' : ' (Alias of ' + alias + ')'}`);
+    this.#logger.log(`${action} ${capitalize(commandTypes.slash)} Command ${alias}${alias == name ? '' : ' (Alias of ' + name + ')'}`);
   }
-};
+}
+
+module.exports = { CommandManager };

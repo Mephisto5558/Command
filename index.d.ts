@@ -32,7 +32,8 @@ type BuildOrderedCooldown<T extends readonly string[]> = T extends [infer Head e
 type TimeUnits = ['d', 'h', 'min', 's', 'ms'];
 export type validTimeString = BuildOrderedCooldown<TimeUnits>;
 
-export type CommandType = 'slash' | 'prefix';
+export type CommandType = 'slash' | 'component' | 'prefix';
+export declare const commandTypes: { readonly [K in CommandType]: K };
 
 export type OptionsG<CT, DM> = readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[];
 export type DefaultOptionType<CT extends readonly CommandType[], DM extends boolean>
