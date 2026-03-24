@@ -271,7 +271,7 @@ export type CommandOptionConfig<
 
 // #endregion option config
 
-export type RunnableReturns = [key: 'guildOnly']
+export type RunnableReturns = ['guildOnly']
   | ['paramRequired', { option: string; description: string }]
   | ['invalidChannelType', string]
   | ['strictAutocompleteNoMatch', string]

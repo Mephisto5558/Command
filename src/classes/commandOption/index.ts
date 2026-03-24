@@ -1,10 +1,13 @@
+/* eslint-disable max-lines */
 import {
-  ApplicationCommandOptionType, ChannelType, CommandInteraction, Message, _NonNullableFields, inlineCode
+  ApplicationCommandOptionType, ChannelType, CommandInteraction, Locale as DLocale, Message, _NonNullableFields, inlineCode
 } from 'discord.js';
 import { autocompleteOptionsMaxAmt, choiceValueMaxLength, choiceValueMinLength, choicesMaxAmt, descriptionMaxLength } from '../../utils/constants.ts';
 import { cooldownConverter, equal } from '../utils.ts';
 
-import type { ApplicationCommandOption, ApplicationCommandOptionChoiceData, AutocompleteInteraction, Client } from 'discord.js';
+import type {
+  ApplicationCommandOption, ApplicationCommandOptionChoiceData, AutocompleteInteraction, Client, MessageComponentInteraction
+} from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
   ChatInputCommandInteraction, Command, CooldownTypes, DefaultOptionType, Logger, ResolveContext, customPermissionChecksFn
@@ -64,7 +67,11 @@ export class CommandOption<
   options!: StrictCommandOption<CT, DM>[];
 
   run!: (
-    this: ResolveContext<{ slash: ChatInputCommandInteraction<'cached', Options>; prefix: Message }, CT>,
+    this: ResolveContext<{
+      slash: ChatInputCommandInteraction<'cached', Options>;
+      component: MessageComponentInteraction<'cached'>;
+      prefix: Message;
+    }, CT>,
     lang: Translator,
     options: additionalRunOpts, client: Client<true>
   ) => Promise<never>;
@@ -83,7 +90,7 @@ export class CommandOption<
       case ApplicationCommandOptionType.SubcommandGroup:
       case ApplicationCommandOptionType.Subcommand:
         if (config.cooldowns)
-          this.cooldowns = Object.fromEntries(Object.entries(this.cooldowns).map(cooldownConverter.bind(undefined, config.cooldowns)));
+          this.cooldowns = Object.fromEntries(Object.entries(this.cooldowns).map(e => cooldownConverter(config.cooldowns!, ...e)));
         if (config.dmPermission) this.dmPermission = config.dmPermission;
         if (config.options) this.options = config.options.map(e => (e instanceof CommandOption ? e : new CommandOption(e)));
 
@@ -168,13 +175,17 @@ export class CommandOption<
 
       // description
       const localizedDescription = locale == this.#i18n.config.defaultLocale ? optionalTranslator('description') : requiredTranslator('description');
-      if (localizedDescription?.length > descriptionMaxLength && !this.disabled)
+      if (!localizedDescription) {
+        if (!this.disabled)
+          this.#logger.warn(`Missing "${locale}" description for command "${this.name}" (${this.id}.description)`);
+      }
+      else if (localizedDescription.length > descriptionMaxLength && !this.disabled)
         this.#logger.warn(`"${locale}" description for command "${this.name}" (${this.id}.description) is too long (max length is 100)! Slicing.`);
 
-      if (locale == this.#i18n.config.defaultLocale) this.description = localizedDescription.slice(0, descriptionMaxLength);
-      else if (localizedDescription) this.descriptionLocalizations[locale] = localizedDescription.slice(0, descriptionMaxLength);
-      else if (!this.disabled) this.#logger.warn(`Missing "${locale}" description for command "${this.name}" (${this.id}.description)`);
-
+      if (localizedDescription) {
+        if (locale == this.#i18n.config.defaultLocale) this.description = localizedDescription.slice(0, descriptionMaxLength);
+        else this.descriptionLocalizations[locale] = localizedDescription.slice(0, descriptionMaxLength);
+      }
 
       // choices
       if (this.choices) this.#localizeChoices(locale);
@@ -183,6 +194,8 @@ export class CommandOption<
 
   /** @throws {Error} on too many choices */
   #localizeChoices(locale: Locale): void {
+    if (!this.choices) return;
+
     if (this.choices.length > choicesMaxAmt) {
       throw new Error(
         `Too many choices (${this.choices.length}) found for option "${this.name}"). Max is ${choicesMaxAmt}.`
@@ -208,6 +221,10 @@ export class CommandOption<
           this.#logger.warn(`${errMsg} long (max length is ${choiceValueMaxLength})! Slicing.`);
 
         if (locale == this.#i18n.config.defaultLocale) choice.name = localizedChoice;
+        else if (locale == 'en') {
+          choice.nameLocalizations[DLocale.EnglishGB] = localizedChoice;
+          choice.nameLocalizations[DLocale.EnglishUS] = localizedChoice;
+        }
         else choice.nameLocalizations[locale] = localizedChoice;
       }
       else if (choice.name != choice.value && !this.disabled) {
@@ -257,12 +274,14 @@ export class CommandOption<
       ) {
         if (typeof this.autocompleteOptions == 'function') return ['strictAutocompleteNoMatch', this.name];
 
-        return ['strictAutocompleteNoMatchWValues', {
-          option: this.name,
-          availableOptions: Array.isArray(this.autocompleteOptions)
-            ? this.autocompleteOptions.map(e => (typeof e == 'object' ? e.value : e).toString()).map(inlineCode).join(', ')
-            : this.autocompleteOptions
-        }];
+        let availableOptions: string;
+        if (!this.autocompleteOptions) availableOptions = '';
+        else if (Array.isArray(this.autocompleteOptions))
+          availableOptions = this.autocompleteOptions.map(e => (typeof e == 'object' ? e.value : e).toString()).map(inlineCode).join(', ');
+        else if (typeof this.autocompleteOptions == 'object') availableOptions = this.autocompleteOptions.value.toString();
+        else availableOptions = this.autocompleteOptions.toString();
+
+        return ['strictAutocompleteNoMatchWValues', { option: this.name, availableOptions }];
       }
 
       if (this.choices && !this.choices.some(e => e.value == arg)) {
@@ -336,7 +355,8 @@ export class CommandOption<
 
   isEqualTo(opt: CommandOption<CommandType[], boolean> | ApplicationCommandOption): boolean {
     for (const prop of ['name', 'description', 'type', 'autocomplete', 'required', 'minValue', 'maxValue', 'minLength', 'maxLength'] as const) {
-      const optProp = prop in opt ? opt[prop] : undefined;
+      /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
+      const optProp = prop in opt ? opt[prop as keyof typeof opt] : undefined;
       if (this[prop] != (typeof this[prop] == 'boolean' ? !!optProp : optProp)) return false;
     }
 
