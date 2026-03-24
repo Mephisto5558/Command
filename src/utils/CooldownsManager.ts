@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/filename-case -- class export */
 
 import { Message } from 'discord.js';
-import type { BaseInteraction } from 'discord.js';
+import type { ChatInputCommandInteraction, MessageComponentInteraction } from 'discord.js';
 import type { Command, CommandType, CooldownTypes } from '../index.ts';
 
 export default class CooldownsManager {
@@ -9,7 +9,7 @@ export default class CooldownsManager {
 
   /** @returns milliseconds until the cooldown ends */
   update(
-    name: string, context: BaseInteraction | Message,
+    name: string, context: ChatInputCommandInteraction | MessageComponentInteraction | Message,
     cooldowns: Partial<Command.Command<CommandType[], boolean>['cooldowns']>
   ): number {
     const

@@ -2,7 +2,7 @@ import {
   ApplicationCommandOptionType, ChannelType, CommandInteraction, Message, _NonNullableFields, inlineCode
 } from 'discord.js';
 import { autocompleteOptionsMaxAmt, choiceValueMaxLength, choiceValueMinLength, choicesMaxAmt, descriptionMaxLength } from '../../utils/constants.ts';
-import { cooldownConverter, equal } from '../../utils/index.ts';
+import { cooldownConverter, equal } from '../utils.ts';
 
 import type { ApplicationCommandOption, ApplicationCommandOptionChoiceData, AutocompleteInteraction, Client } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
@@ -11,9 +11,9 @@ import type {
 } from '../../index.ts';
 
 
-import type { CooldownsManager } from '../../utils/index.ts';
+import type CooldownsManager from '../../utils/CooldownsManager.ts';
 import type { RunnableReturns, StrictCommand } from '../command/utils.ts';
-import type { CommandOptionConfig, StrictCommandOption, autocompleteOptions } from './utils.ts';
+import type { CommandOptionConfig, StrictCommandOption, autocompleteObject, autocompleteOptions } from './utils.ts';
 
 /* eslint-disable-next-line import-x/prefer-default-export */
 export class CommandOption<
@@ -220,13 +220,13 @@ export class CommandOption<
     }
   }
 
-  private async isRunnable(
+  async isRunnable(
     interaction: Parameters<customPermissionChecksFn>[0], command: StrictCommand<commandTypes, runsInDM, Options>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
-  ): Exclude<ReturnType<customPermissionChecksFn<StrictCommand<commandTypes, DMInteraction, Options>, RunnableReturns>>, string> {
+  ): Promise<Awaited<Exclude<ReturnType<customPermissionChecksFn<StrictCommand<commandTypes, DMInteraction, Options>, RunnableReturns>>, string>>> {
     if (
       [ApplicationCommandOptionType.SubcommandGroup, ApplicationCommandOptionType.Subcommand].includes(this.type)
-      && !this.dmPermission && interaction.channel.type == ChannelType.DM
+      && !this.dmPermission && (!interaction.channel || interaction.channel.type == ChannelType.DM)
     ) return ['guildOnly'];
 
     if (this.type == ApplicationCommandOptionType.SubcommandGroup)
@@ -248,7 +248,7 @@ export class CommandOption<
 
     if (interaction instanceof Message && arg) { // if it's an interaction then these checks will be done by Discord
       if (this.type == ApplicationCommandOptionType.Channel && this.channelTypes) {
-        const channel = interaction.guild.channels.cache.get(arg);
+        const channel = interaction.guild?.channels.cache.get(arg);
         if (channel && !this.channelTypes.includes(channel.type)) return ['invalidChannelType', this.name];
       }
 
@@ -310,7 +310,8 @@ export class CommandOption<
     translator ??= this.#i18n.getTranslator({ locale, undefinedNotFound: true, backupPaths: [`${this.id}.choices`] });
 
     if (typeof options == 'function') options = await options.call(interaction, query);
-    if (typeof options == 'string' || typeof options == 'number') return [{ name: translator(options) ?? options, value: options }];
+    if (typeof options == 'string' || typeof options == 'number')
+      return [{ name: translator(options.toString()) ?? options.toString(), value: options }];
 
     if (Array.isArray(options)) {
       return (await Promise.all(
@@ -327,13 +328,15 @@ export class CommandOption<
   /**
    * @returns the currect cooldown for this subcommand(group) in ms.
    * Resets it if it's `0`. */
-  private updateCooldowns(interaction: ThisParameterType<StrictCommandOption<commandTypes, runsInDM, additionalRunOpts, Options>['run']>): number {
+  updateCooldowns(interaction: ThisParameterType<StrictCommandOption<commandTypes, runsInDM, additionalRunOpts, Options>['run']>): number {
     return this.#cooldownsManager.update(this.id, interaction, this.cooldowns);
   }
 
   isEqualTo(opt: CommandOption<CommandType[], boolean> | ApplicationCommandOption): boolean {
-    for (const prop of ['name', 'description', 'type', 'autocomplete', 'required', 'minValue', 'maxValue', 'minLength', 'maxLength'] as const)
-      if (this[prop] != (typeof this[prop] == 'boolean' ? !!opt.prop : opt.prop)) return false;
+    for (const prop of ['name', 'description', 'type', 'autocomplete', 'required', 'minValue', 'maxValue', 'minLength', 'maxLength'] as const) {
+      const optProp = prop in opt ? opt[prop] : undefined;
+      if (this[prop] != (typeof this[prop] == 'boolean' ? !!optProp : optProp)) return false;
+    }
 
     if (
       this.options.length != ('options' in opt ? opt.options.length : 0)
