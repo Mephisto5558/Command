@@ -67,7 +67,7 @@ export class CommandOption<
   run: (
     this: ResolveContext<{ slash: ChatInputCommandInteraction<'cached', Options>; prefix: Message }, commandTypes>,
     lang: Translator,
-    options: additionalRunOpts, client: Client
+    options: additionalRunOpts, client: Client<true>
   ) => Promise<never>;
 
   #i18n: I18nProvider;
@@ -89,7 +89,6 @@ export class CommandOption<
         if (config.options) this.options = config.options.map(e => (e instanceof CommandOption ? e : new CommandOption(e)));
 
 
-        /* eslint-disable-next-line custom/unbound-method */
         this.run = config.run;
         break;
 
@@ -223,7 +222,7 @@ export class CommandOption<
   async isRunnable(
     interaction: Parameters<customPermissionChecksFn>[0], command: StrictCommand<commandTypes, runsInDM, Options>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
-  ): Promise<Awaited<Exclude<ReturnType<customPermissionChecksFn<StrictCommand<commandTypes, DMInteraction, Options>, RunnableReturns>>, string>>> {
+  ): Promise<Awaited<Exclude<ReturnType<customPermissionChecksFn<StrictCommand<commandTypes, runsInDM, Options>, RunnableReturns>>, string>>> {
     if (
       [ApplicationCommandOptionType.SubcommandGroup, ApplicationCommandOptionType.Subcommand].includes(this.type)
       && !this.dmPermission && (!interaction.channel || interaction.channel.type == ChannelType.DM)
@@ -262,13 +261,17 @@ export class CommandOption<
         return ['strictAutocompleteNoMatchWValues', {
           option: this.name,
           availableOptions: Array.isArray(this.autocompleteOptions)
-            ? this.autocompleteOptions.map(e => (typeof e == 'object' ? e.value : e)).map(inlineCode).join(', ')
+            ? this.autocompleteOptions.map(e => (typeof e == 'object' ? e.value : e).toString()).map(inlineCode).join(', ')
             : this.autocompleteOptions
         }];
       }
 
-      if (this.choices && !this.choices.some(e => e.value == arg))
-        return ['strictAutocompleteNoMatchWValues', { option: this.name, availableOptions: this.choices.map(e => inlineCode(e.value)).join(', ') }];
+      if (this.choices && !this.choices.some(e => e.value == arg)) {
+        return ['strictAutocompleteNoMatchWValues', {
+          option: this.name,
+          availableOptions: this.choices.map(e => inlineCode(e.value.toString())).join(', ')
+        }];
+      }
     }
 
     return false;
@@ -277,21 +280,21 @@ export class CommandOption<
   async #isRunnableSubcommandGroup(
     interaction: Parameters<customPermissionChecksFn>[0], command: StrictCommand<commandTypes, runsInDM, Options>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
-  ): Exclude<ReturnType<customPermissionChecksFn<StrictCommand<commandTypes, DMInteraction, Options>, RunnableReturns>>, string> {
+  ): Promise<Exclude<ReturnType<customPermissionChecksFn<StrictCommand<commandTypes, runsInDM, Options>, RunnableReturns>>, string>> {
     const
-      subcommandName = interaction instanceof CommandInteraction ? interaction.options.getSubcommand(true) : args[0],
+      subcommandName = interaction instanceof CommandInteraction ? interaction.options.getSubcommand(true) : args?.[0],
       subcommand = this.options.find(e => e.name == subcommandName);
 
     return subcommand?.isRunnable(
       interaction, command, wrapperTranslator,
-      interaction instanceof Message ? args.slice(1) : args
+      interaction instanceof Message ? args?.slice(1) : args
     ) ?? false;
   }
 
   async #isRunnableSubcommand(
     interaction: Parameters<customPermissionChecksFn>[0], command: StrictCommand<commandTypes, runsInDM, Options>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
-  ): Exclude<ReturnType<customPermissionChecksFn<StrictCommand<commandTypes, DMInteraction, Options>, RunnableReturns>>, string> {
+  ): Promise<Exclude<ReturnType<customPermissionChecksFn<StrictCommand<commandTypes, runsInDM, Options>, RunnableReturns>>, string>> {
     for (const option of this.options) {
       const err = await option.isRunnable(interaction, command, wrapperTranslator, args);
       if (err) return err;
@@ -339,11 +342,12 @@ export class CommandOption<
     }
 
     if (
+      /* eslint-disable-next-line sonarjs/expression-complexity */
       this.options.length != ('options' in opt ? opt.options.length : 0)
       || !equal(this.nameLocalizations, opt.nameLocalizations)
       || !equal(this.descriptionLocalizations, opt.descriptionLocalizations)
-      || !this.#choicesEqualTo('choices' in opt ? opt.choices : undefined)
-      || !this.#channelTypesEqualTo('channelTypes' in opt ? opt.channelTypes : undefined)
+      || ('choices' in opt && opt.choices && !this.#choicesEqualTo(opt.choices))
+      || ('channelTypes' in opt && opt.channelTypes && !this.#channelTypesEqualTo(opt.channelTypes))
     ) return false;
 
     if (this.options.length && 'options' in opt) {
@@ -355,8 +359,8 @@ export class CommandOption<
     return true;
   }
 
-  #choicesEqualTo(choices: CommandOption['choices']): boolean {
-    if ((this.choices?.length ?? 0) != (choices?.length ?? 0)) return false;
+  #choicesEqualTo(choices: Readonly<NonNullable<CommandOption['choices']>>): boolean {
+    if ((this.choices?.length ?? 0) != choices.length) return false;
     if (this.choices?.length) {
       for (const choice of this.choices) {
         const other = choices.find(e => e.name == choice.name);
@@ -367,8 +371,8 @@ export class CommandOption<
     return true;
   }
 
-  #channelTypesEqualTo(channelTypes: CommandOption['channelTypes']): boolean {
-    if ((this.channelTypes?.length ?? 0) != (channelTypes?.length ?? 0)) return false;
+  #channelTypesEqualTo(channelTypes: Readonly<NonNullable<CommandOption['channelTypes']>>): boolean {
+    if ((this.channelTypes?.length ?? 0) != channelTypes.length) return false;
     if (this.channelTypes?.length) {
       for (const type of this.channelTypes)
         if (!channelTypes.includes(type)) return false;

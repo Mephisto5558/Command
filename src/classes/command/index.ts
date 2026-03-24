@@ -12,7 +12,7 @@ import { getMilliseconds as getMilliseconds_ } from 'better-ms';
 import { CommandExecutionError, CommandOption, commandTypes } from '../../index.ts';
 import { descriptionMaxLength } from '../../utils/constants.ts';
 import { commandMention } from '../../utils/index.ts';
-import { equal } from '../utils.ts';
+import { cooldownConverter, equal } from '../utils.ts';
 
 import type { ApplicationCommand, CacheType, ChatInputApplicationCommandData, Client, PermissionFlags } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
@@ -98,7 +98,7 @@ export class Command<
       component: MessageComponentInteraction<DM extends false ? 'cached' : CacheType>;
       prefix: Message<DM extends false ? true : false>;
     }, NoInfer<CT>>,
-    lang: Translator<false, Locale>, client: Client
+    lang: Translator<false, Locale>, client: Client<true>
   ) => Promise<never>;
 
   #i18n: I18nProvider;
@@ -318,10 +318,10 @@ export class Command<
   }
 
   async #permissionChecks(
-    interaction: Parameters<customPermissionChecksFn<Command<CommandType[]>>>[0],
-    author: Parameters<customPermissionChecksFn<Command<CommandType[]>>>[1],
-    wrapperTranslator: Parameters<customPermissionChecksFn>[2]
-  ): ReturnType<customPermissionChecksFn> {
+    interaction: Parameters<customPermissionChecksFn<this>>[0],
+    author: Parameters<customPermissionChecksFn<this>>[1],
+    wrapperTranslator: Parameters<customPermissionChecksFn<this>>[2]
+  ): ReturnType<customPermissionChecksFn<this>> {
     const
       botChannelPerms = interaction.channel.permissionsFor(interaction.guild.members.me),
       userPermsMissing = interaction.channel.permissionsFor(author).missing(this.permissions.user),

@@ -3,7 +3,7 @@ import type {
   Attachment, CacheType, CategoryChannel, ChannelType, Client, CommandInteractionOptionResolver, GuildBasedChannel,
   GuildMember, Message, MessageComponentInteraction, NewsChannel, Role, StageChannel, TextChannel, ThreadChannel, User, VoiceChannel
 } from 'discord.js';
-import type { Translator } from '@mephisto5558/i18n';
+import type { Locale, Translator } from '@mephisto5558/i18n';
 import type {
   ChatInputCommandInteraction, CommandOption, CommandType, DefaultOptionType, OptionsG, ResolveContext, SharedConfig
 } from '../../index.ts';
@@ -170,9 +170,13 @@ type MapToConfig<
   : O extends { type: ApplicationCommandOptionType.Role } ? RoleCommandOptionConfig
   : O extends { type: ApplicationCommandOptionType.Mentionable } ? MentionableCommandOptionConfig
   : O extends { type: ApplicationCommandOptionType.Attachment } ? AttachmentCommandOptionConfig
-  : O extends { type: ApplicationCommandOptionType.Subcommand | ApplicationCommandOptionType.SubcommandGroup } ? (
-    SubcommandCommandOptionConfig<CT, DM, never, O extends { options: OptionsG<CT, DM> } ? O['options'] : []>
-  ) : CommandOptionConfig<CT, DM>;
+  : O extends { type: ApplicationCommandOptionType.Subcommand } ? (
+    SubcommandConfig<CT, DM, never, O extends { options: OptionsG<CT, DM> } ? O['options'] : []>
+  )
+    : O extends { type: ApplicationCommandOptionType.SubcommandGroup } ? (
+      SubcommandGroupConfig<CT, DM, never, O extends { options: OptionsG<CT, DM> } ? O['options'] : []>
+    )
+      : PrimitiveCommandOptionConfig<CT, DM>;
 
 type ValidateOption<O, CT extends readonly CommandType[], DM extends boolean> = MapToConfig<O, CT, DM> extends infer Config
   ? Config & { [K in keyof O]: K extends keyof Config ? O[K] : never } : never;
@@ -197,22 +201,28 @@ type BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM exte
   choices?: ApplicationCommandOptionChoiceData['value'][];
 } & BaseOptionConfig;
 
-type SubcommandCommandOptionConfig<
+type SubcommandConfig<
   CT extends readonly CommandType[], DM extends boolean, AO,
   Options extends OptionsG<CT, DM> = readonly DefaultOptionType<CT, DM>[]
 > = {
-  type: ApplicationCommandOptionType.SubcommandGroup | ApplicationCommandOptionType.Subcommand;
-
-  options?: ValidateOptionsArray<Options, CT, DM>;
-
+  type: ApplicationCommandOptionType.Subcommand;
+  options?: ValidateOptionsArray<Options, CT, DM> & readonly PrimitiveCommandOptionConfig<CT, DM>[];
   run?(
     this: ResolveContext<{
       slash: ChatInputCommandInteraction<'cached', Options>;
       component: MessageComponentInteraction<'cached'>;
       prefix: Message;
     }, CT>,
-    lang: Translator, options: AO, client: Client
+    lang: Translator<false, Locale>, options: AO, client: Client<true>
   ): unknown;
+} & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
+
+type SubcommandGroupConfig<
+  CT extends readonly CommandType[], DM extends boolean, AO,
+  Options extends OptionsG<CT, DM> = readonly DefaultOptionType<CT, DM>[]
+> = {
+  type: ApplicationCommandOptionType.SubcommandGroup;
+  options?: ValidateOptionsArray<Options, CT, DM> & readonly SubcommandConfig<CT, DM, never>[];
 } & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
 
 type StringCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO> = {
@@ -241,18 +251,22 @@ type RoleCommandOptionConfig = { type: ApplicationCommandOptionType.Role } & Bas
 type MentionableCommandOptionConfig = { type: ApplicationCommandOptionType.Mentionable } & BaseOptionConfig;
 type AttachmentCommandOptionConfig = { type: ApplicationCommandOptionType.Attachment } & BaseOptionConfig;
 
+export type PrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO = never>
+  = | StringCommandOptionConfig<CT, DM, AO>
+    | NumericCommandOptionConfig<CT, DM, AO>
+    | BooleanCommandOptionConfig
+    | UserCommandOptionConfig
+    | ChannelCommandOptionConfig
+    | RoleCommandOptionConfig
+    | MentionableCommandOptionConfig
+    | AttachmentCommandOptionConfig;
+
 export type CommandOptionConfig<
   CT extends readonly CommandType[], DM extends boolean, AO = never,
   Options extends OptionsG<CT, DM> = readonly DefaultOptionType<CT, DM>[]
-> = StringCommandOptionConfig<CT, DM, AO>
-  | NumericCommandOptionConfig<CT, DM, AO>
-  | BooleanCommandOptionConfig
-  | UserCommandOptionConfig
-  | ChannelCommandOptionConfig
-  | RoleCommandOptionConfig
-  | MentionableCommandOptionConfig
-  | AttachmentCommandOptionConfig
-  | SubcommandCommandOptionConfig<CT, DM, AO, Options>;
+> = PrimitiveCommandOptionConfig<CT, DM, AO>
+  | SubcommandConfig<CT, DM, AO, Options>
+  | SubcommandGroupConfig<CT, DM, AO, Options>;
 
 // #endregion option config
 

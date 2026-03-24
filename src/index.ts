@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/consistent-type-definitions */
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style -- using index signature to improve readability for lib user */
 
-import type { CacheType, ChatInputCommandInteraction as _ChatInputCommandInteraction, User, _NonNullableFields } from 'discord.js';
+import type { CacheType, ChatInputCommandInteraction as _ChatInputCommandInteraction, DMChannel, User, _NonNullableFields } from 'discord.js';
 import type * as __ from '@mephisto5558/better-types'; /* eslint-disable-line import-x/no-namespace -- load in global definitions */
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type { Command } from './classes/command/index.ts';
@@ -52,6 +51,7 @@ export type DefaultOptionType<CT extends readonly CommandType[], DM extends bool
 export type CooldownTypes = 'guild' | 'channel' | 'user';
 type Cooldowns = { [K in CooldownTypes]: validTimeString } & {};
 
+/* eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- extending from it */
 export interface SharedConfig<DM extends boolean> {
   cooldowns?: Partial<Cooldowns>;
 
@@ -61,6 +61,7 @@ export interface SharedConfig<DM extends boolean> {
   disabledReason?: string;
 }
 
+/* eslint-disable-next-line @typescript-eslint/consistent-type-definitions */
 export interface ChatInputCommandInteraction<
   Cached extends CacheType = CacheType, Options extends readonly unknown[] = []
 > extends StrictOmit<_ChatInputCommandInteraction<Cached>, 'options'> {
