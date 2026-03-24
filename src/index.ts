@@ -1,17 +1,18 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style -- using index signature to improve readability for lib user */
 
-import type { CacheType, ChatInputCommandInteraction as _ChatInputCommandInteraction, DMChannel, User, _NonNullableFields } from 'discord.js';
+import type { CacheType, ChatInputCommandInteraction as _ChatInputCommandInteraction, User, _NonNullableFields } from 'discord.js';
 import type * as __ from '@mephisto5558/better-types'; /* eslint-disable-line import-x/no-namespace -- load in global definitions */
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type { Command } from './classes/command/index.ts';
 import type { CommandOption } from './classes/commandOption/index.ts';
 import type { CommandOptionConfig, StrictCommandOption, TypeSafeOptionResolver } from './classes/commandOption/utils.ts';
+import type { CommandType } from './classes/utils.ts';
 
 export * from './utils/index.ts';
 export * as Command from './classes/command/index.ts';
 export * as CommandOption from './classes/commandOption/index.ts';
 export * as CommandManager from './classes/commandManager/index.ts';
-export { CommandExecutionError } from './classes/utils.ts';
+export { CommandExecutionError, CommandType } from './classes/utils.ts';
 export {
   PermissionFlagsBits as Permissions,
   ApplicationCommandOptionType as OptionType
@@ -40,9 +41,6 @@ export type Logger = {
   warn: typeof console.warn;
   error: typeof console.error;
 };
-
-export type CommandType = 'slash' | 'component' | 'prefix';
-export declare const commandTypes: { readonly [K in CommandType]: K };
 
 export type OptionsG<CT extends readonly CommandType[], DM extends boolean> = readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[];
 export type DefaultOptionType<CT extends readonly CommandType[], DM extends boolean>

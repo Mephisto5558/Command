@@ -9,15 +9,15 @@ import {
 
 // @ts-expect-error Cannot augment that module
 import { getMilliseconds as getMilliseconds_ } from 'better-ms';
-import { CommandExecutionError, CommandOption, commandTypes } from '../../index.ts';
+import { CommandExecutionError, CommandOption } from '../../index.ts';
 import { descriptionMaxLength } from '../../utils/constants.ts';
 import { commandMention } from '../../utils/index.ts';
-import { cooldownConverter, equal } from '../utils.ts';
+import { CommandType, cooldownConverter, equal } from '../utils.ts';
 
 import type { ApplicationCommand, CacheType, ChatInputApplicationCommandData, Client, PermissionFlags } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  BetterMS, ChatInputCommandInteraction, CommandType, CooldownTypes,
+  BetterMS, ChatInputCommandInteraction, CooldownTypes,
   DefaultOptionType, Logger, ResolveContext, commandDoneFn, customPermissionChecksFn
 } from '../../index.ts';
 import type { CooldownsManager } from '../../utils/index.ts';
@@ -39,17 +39,17 @@ export class Command<
     CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>
   )[] = readonly DefaultOptionType<CT, DM>[]
 > implements ChatInputApplicationCommandData {
-  name: Lowercase<string>;
-  id: `commands.${Command['category']}.${Command['name']}`;
-  commandId: ['slash'] extends NoInfer<CT> ? Snowflake : undefined;
+  name!: Lowercase<string>;
+  id!: `commands.${Command['category']}.${Command['name']}`;
+  commandId!: [CommandType.slash] extends NoInfer<CT> ? Snowflake : undefined;
 
   /** Currently not used */
   nameLocalizations?: Partial<Record<Locale, Lowercase<string>>>;
 
-  description: string;
+  description!: string;
   descriptionLocalizations: Partial<Record<Locale, string>> = {};
 
-  category: Lowercase<string>;
+  category!: Lowercase<string>;
 
   readonly type = ApplicationCommandType.ChatInput;
 
@@ -59,7 +59,7 @@ export class Command<
   usage: Record<'usage' | 'examples', string | undefined> & {} = { usage: undefined, examples: undefined };
   usageLocalizations: Partial<Record<Locale, StrictCommand<CT, DM>['usage']>> = {};
 
-  aliases: Record<NoInfer<CT>[number], Lowercase<string>[]> & {} = { [commandTypes.slash]: [], [commandTypes.prefix]: [] };
+  aliases: Record<NoInfer<CT>[number], Lowercase<string>[]> & {} = { [CommandType.slash]: [], [CommandType.prefix]: [] };
   cooldowns: Record<CooldownTypes, number> & {} = { guild: 0, channel: 0, user: 0 };
 
   permissions: Record<'client' | 'user', PermissionFlags[keyof PermissionFlags][]> & {}
@@ -101,11 +101,11 @@ export class Command<
     lang: Translator<false, Locale>, client: Client<true>
   ) => Promise<never>;
 
-  #i18n: I18nProvider;
-  #logger: Logger;
-  #doneFn: commandDoneFn<StrictCommand<CT, DM, Options>>;
-  #cooldownsManager: CooldownsManager;
-  #customPermissionChecks: customPermissionChecksFn<StrictCommand<CT, DM, Options>> | undefined;
+  #i18n!: I18nProvider;
+  #logger!: Logger;
+  #doneFn!: commandDoneFn<this>;
+  #cooldownsManager!: CooldownsManager;
+  #customPermissionChecks: customPermissionChecksFn<this> | undefined;
 
   constructor(config: CommandConfig<CT, DM, Options>) {
     if (config.usage) {
@@ -114,7 +114,7 @@ export class Command<
     }
 
     if (config.aliases) {
-      for (const commandType of Object.values(commandTypes))
+      for (const commandType of Object.values(CommandType))
         if (config.aliases[commandType]?.length) this.aliases[commandType] = config.aliases[commandType];
     }
 
@@ -152,9 +152,9 @@ export class Command<
     cooldownsManager?: CooldownsManager;
   } = {}): this {
     this.#i18n = i18n;
-    this.#logger = config.logger;
-    this.#doneFn = config.doneFn;
-    this.#cooldownsManager = config.cooldownsManager;
+    if (config.logger) this.#logger = config.logger;
+    if (config.doneFn) this.#doneFn = config.doneFn;
+    if (config.cooldownsManager) this.#cooldownsManager = config.cooldownsManager;
     this.#customPermissionChecks = config.customPermissionChecks?.bind(this);
 
     if (config.devIds) this.config.devIds = config.devIds;
@@ -252,13 +252,13 @@ export class Command<
     interaction.commandName ??= this.name; // Is undefined on `MessageComponentInteraction`s
 
     let commandType;
-    if (interaction instanceof CommandInteraction) commandType = commandTypes.slash;
-    else if (interaction instanceof MessageComponentInteraction) commandType = commandTypes.component;
-    else commandType = commandTypes.prefix;
+    if (interaction instanceof CommandInteraction) commandType = CommandType.slash;
+    else if (interaction instanceof MessageComponentInteraction) commandType = CommandType.component;
+    else commandType = CommandType.prefix;
 
     this.#logger.debug(`Executing ${commandType} command ${this.name}`);
 
-    if (commandType == commandTypes.slash && interaction instanceof CommandInteraction && !this.noDefer && !interaction.replied)
+    if (commandType == CommandType.slash && interaction instanceof CommandInteraction && !this.noDefer && !interaction.replied)
       await interaction.deferReply({ flags: this.ephemeralDefer ? MessageFlags.Ephemeral : undefined });
 
     try {
@@ -301,10 +301,13 @@ export class Command<
   }
 
   #getSubcommandNames(
-    interaction: Parameters<Command<CommandType[], boolean>['updateCooldowns']>[0]
+    interaction: Parameters<Command<CT, DM>['updateCooldowns']>[0]
   ): { group: string | undefined; subcommand: string } | undefined {
-    if (interaction instanceof CommandInteraction)
-      return { group: interaction.options.getSubcommandGroup(false), subcommand: interaction.options.getSubcommand(false) };
+    if (interaction instanceof CommandInteraction) {
+      if (!interaction.options.getSubcommand(false)) return;
+      return { group: interaction.options.getSubcommandGroup(false) ?? undefined, subcommand: interaction.options.getSubcommand(true) };
+    }
+    if (interaction instanceof MessageComponentInteraction) return; // todo
 
     const
       args = interaction.content.split(/\s+/).slice(1),
@@ -321,7 +324,7 @@ export class Command<
     interaction: Parameters<customPermissionChecksFn<this>>[0],
     author: Parameters<customPermissionChecksFn<this>>[1],
     wrapperTranslator: Parameters<customPermissionChecksFn<this>>[2]
-  ): ReturnType<customPermissionChecksFn<this>> {
+  ): Promise<ReturnType<customPermissionChecksFn<this>>> {
     const
       botChannelPerms = interaction.channel.permissionsFor(interaction.guild.members.me),
       userPermsMissing = interaction.channel.permissionsFor(author).missing(this.permissions.user),
@@ -346,7 +349,7 @@ export class Command<
 
       try { await author.send({ content: interaction instanceof Message ? interaction.url : undefined, embeds: [embed] }); }
       catch (err) {
-        if (err.code != CANNOT_SEND_MESSAGE_API_ERR) throw err;
+        if (!(err instanceof Error && 'code' in err) || err.code != CANNOT_SEND_MESSAGE_API_ERR) throw err;
       }
     }
     else if (interaction instanceof CommandInteraction) await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
@@ -401,7 +404,7 @@ export class Command<
 
     // TODO: remove hardcoded "Not provided"
 
-    if (interaction instanceof Message && !this.types.includes(commandTypes.prefix)) return ['slashOnly', this.mention];
+    if (interaction instanceof Message && !this.types.includes(CommandType.prefix)) return ['slashOnly', this.mention];
 
     if (!this.dmPermission && interaction.channel?.type == ChannelType.DM) return ['guildOnly'];
     if (this.category == 'nsfw' && !interaction.channel?.nsfw) return ['nsfw'];
@@ -426,7 +429,7 @@ export class Command<
 
   findOption(
     option: { name: string; type?: ApplicationCommandOptionType },
-    interaction?: ThisParameterType<StrictCommand<[typeof commandTypes.slash], DM>['run']>
+    interaction?: ThisParameterType<StrictCommand<[CommandType.slash], DM>['run']>
   ): StrictCommandOption<CT, DM> | undefined {
     const
       group = interaction?.options.getSubcommandGroup(false),

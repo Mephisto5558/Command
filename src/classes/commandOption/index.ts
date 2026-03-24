@@ -7,47 +7,46 @@ import { cooldownConverter, equal } from '../utils.ts';
 import type { ApplicationCommandOption, ApplicationCommandOptionChoiceData, AutocompleteInteraction, Client } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  ChatInputCommandInteraction, Command, CommandType, CooldownTypes, DefaultOptionType, Logger, ResolveContext, customPermissionChecksFn
+  ChatInputCommandInteraction, Command, CooldownTypes, DefaultOptionType, Logger, ResolveContext, customPermissionChecksFn
 } from '../../index.ts';
-
-
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
 import type { RunnableReturns, StrictCommand } from '../command/utils.ts';
+import type { CommandType } from '../utils.ts';
 import type { CommandOptionConfig, StrictCommandOption, autocompleteObject, autocompleteOptions } from './utils.ts';
 
 /* eslint-disable-next-line import-x/prefer-default-export */
 export class CommandOption<
-  const commandTypes extends readonly CommandType[] = [],
-  const runsInDM extends boolean = false,
+  const CT extends readonly CommandType[] = [],
+  const DM extends boolean = false,
   const additionalRunOpts = never,
   const Options extends readonly (
-    CommandOptionConfig<commandTypes, runsInDM> | StrictCommandOption<commandTypes, runsInDM>
-  )[] = readonly DefaultOptionType<commandTypes, runsInDM>[]
+    CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>
+  )[] = readonly DefaultOptionType<CT, DM>[]
 > {
   name: Lowercase<string>;
-  id: `${string}.options.${CommandOption['name']}`;
+  id!: `${string}.options.${CommandOption['name']}`;
   position = 0;
 
   /** Currently not used */
   nameLocalizations?: Partial<Record<Locale, Lowercase<string>>>;
-  description: string;
-  descriptionLocalizations: Partial<Record<Locale, string>>;
+  description!: string;
+  descriptionLocalizations!: Partial<Record<Locale, string>>;
 
   type: ApplicationCommandOptionType;
 
   required = false;
 
   cooldowns: Record<CooldownTypes, number> & {} = { guild: 0, channel: 0, user: 0 };
-  dmPermission: runsInDM = false;
+  dmPermission: DM = false as DM;
 
-  disabled: boolean;
+  disabled!: boolean;
   disabledReason: string | undefined;
 
   get autocomplete(): boolean { return !!this.autocompleteOptions; }
   strictAutocomplete = false;
   autocompleteOptions: autocompleteOptions | autocompleteOptions[] | (
       (
-        this: ResolveContext<{ slash: AutocompleteInteraction<'cached'>; prefix: Message }, NoInfer<commandTypes>>,
+        this: ResolveContext<{ slash: AutocompleteInteraction<'cached'>; prefix: Message }, NoInfer<CT>>,
         query: string
       ) => autocompleteOptions[] | Promise<autocompleteOptions[]>
     ) | undefined;
@@ -62,19 +61,19 @@ export class CommandOption<
   minLength?: number;
   maxLength?: number;
 
-  options: StrictCommandOption<commandTypes, runsInDM>[];
+  options!: StrictCommandOption<CT, DM>[];
 
-  run: (
-    this: ResolveContext<{ slash: ChatInputCommandInteraction<'cached', Options>; prefix: Message }, commandTypes>,
+  run!: (
+    this: ResolveContext<{ slash: ChatInputCommandInteraction<'cached', Options>; prefix: Message }, CT>,
     lang: Translator,
     options: additionalRunOpts, client: Client<true>
   ) => Promise<never>;
 
-  #i18n: I18nProvider;
-  #cooldownsManager: CooldownsManager;
-  #logger: Logger;
+  #i18n!: I18nProvider;
+  #cooldownsManager!: CooldownsManager;
+  #logger!: Logger;
 
-  constructor(config: CommandOptionConfig<commandTypes, runsInDM, additionalRunOpts, Options>) {
+  constructor(config: CommandOptionConfig<CT, DM, additionalRunOpts, Options>) {
     this.name = config.name;
     this.type = config.type;
 
@@ -220,9 +219,9 @@ export class CommandOption<
   }
 
   async isRunnable(
-    interaction: Parameters<customPermissionChecksFn>[0], command: StrictCommand<commandTypes, runsInDM, Options>,
+    interaction: Parameters<customPermissionChecksFn>[0], command: StrictCommand<CT, DM, Options>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
-  ): Promise<Awaited<Exclude<ReturnType<customPermissionChecksFn<StrictCommand<commandTypes, runsInDM, Options>, RunnableReturns>>, string>>> {
+  ): Promise<Awaited<Exclude<ReturnType<customPermissionChecksFn<StrictCommand<CT, DM, Options>, RunnableReturns>>, string>>> {
     if (
       [ApplicationCommandOptionType.SubcommandGroup, ApplicationCommandOptionType.Subcommand].includes(this.type)
       && !this.dmPermission && (!interaction.channel || interaction.channel.type == ChannelType.DM)
@@ -278,9 +277,9 @@ export class CommandOption<
   }
 
   async #isRunnableSubcommandGroup(
-    interaction: Parameters<customPermissionChecksFn>[0], command: StrictCommand<commandTypes, runsInDM, Options>,
+    interaction: Parameters<customPermissionChecksFn>[0], command: StrictCommand<CT, DM, Options>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
-  ): Promise<Exclude<ReturnType<customPermissionChecksFn<StrictCommand<commandTypes, runsInDM, Options>, RunnableReturns>>, string>> {
+  ): Promise<Exclude<ReturnType<customPermissionChecksFn<StrictCommand<CT, DM, Options>, RunnableReturns>>, string>> {
     const
       subcommandName = interaction instanceof CommandInteraction ? interaction.options.getSubcommand(true) : args?.[0],
       subcommand = this.options.find(e => e.name == subcommandName);
@@ -292,9 +291,9 @@ export class CommandOption<
   }
 
   async #isRunnableSubcommand(
-    interaction: Parameters<customPermissionChecksFn>[0], command: StrictCommand<commandTypes, runsInDM, Options>,
+    interaction: Parameters<customPermissionChecksFn>[0], command: StrictCommand<CT, DM, Options>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
-  ): Promise<Exclude<ReturnType<customPermissionChecksFn<StrictCommand<commandTypes, runsInDM, Options>, RunnableReturns>>, string>> {
+  ): Promise<Exclude<ReturnType<customPermissionChecksFn<StrictCommand<CT, DM, Options>, RunnableReturns>>, string>> {
     for (const option of this.options) {
       const err = await option.isRunnable(interaction, command, wrapperTranslator, args);
       if (err) return err;
@@ -306,7 +305,7 @@ export class CommandOption<
   async generateAutocomplete(
     interaction: AutocompleteInteraction | Message,
     query: string, locale: Locale, translator?: Translator<true, Locale>,
-    options: StrictCommandOption<commandTypes, runsInDM>['autocompleteOptions'] = this.autocompleteOptions
+    options: StrictCommandOption<CT, DM>['autocompleteOptions'] = this.autocompleteOptions
   ): Promise<[] | autocompleteObject[]> {
     if (options == undefined) return [];
 
@@ -331,7 +330,7 @@ export class CommandOption<
   /**
    * @returns the currect cooldown for this subcommand(group) in ms.
    * Resets it if it's `0`. */
-  updateCooldowns(interaction: ThisParameterType<StrictCommandOption<commandTypes, runsInDM, additionalRunOpts, Options>['run']>): number {
+  updateCooldowns(interaction: ThisParameterType<StrictCommandOption<CT, DM, additionalRunOpts, Options>['run']>): number {
     return this.#cooldownsManager.update(this.id, interaction, this.cooldowns);
   }
 

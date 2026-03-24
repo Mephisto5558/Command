@@ -5,8 +5,9 @@ import type {
 } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  ChatInputCommandInteraction, CommandOption, CommandType, DefaultOptionType, OptionsG, ResolveContext, SharedConfig
+  ChatInputCommandInteraction, CommandOption, DefaultOptionType, OptionsG, ResolveContext, SharedConfig
 } from '../../index.ts';
+import type { CommandType } from '../utils.ts';
 
 export type autocompleteObject = StrictOmit<ApplicationCommandOptionChoiceData, 'nameLocalizations'>;
 export type autocompleteOptions = autocompleteObject['value'] | autocompleteObject;
@@ -174,7 +175,7 @@ type MapToConfig<
     SubcommandConfig<CT, DM, never, O extends { options: OptionsG<CT, DM> } ? O['options'] : []>
   )
     : O extends { type: ApplicationCommandOptionType.SubcommandGroup } ? (
-      SubcommandGroupConfig<CT, DM, never, O extends { options: OptionsG<CT, DM> } ? O['options'] : []>
+      SubcommandGroupConfig<CT, DM, O extends { options: OptionsG<CT, DM> } ? O['options'] : []>
     )
       : PrimitiveCommandOptionConfig<CT, DM>;
 
@@ -222,7 +223,7 @@ type SubcommandGroupConfig<
   Options extends OptionsG<CT, DM> = readonly DefaultOptionType<CT, DM>[]
 > = {
   type: ApplicationCommandOptionType.SubcommandGroup;
-  options?: ValidateOptionsArray<Options, CT, DM> & readonly SubcommandConfig<CT, DM, never>[];
+  options?: ValidateOptionsArray<Options, CT, DM> & readonly SubcommandConfig<CT, DM, AO>[];
 } & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
 
 type StringCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO> = {

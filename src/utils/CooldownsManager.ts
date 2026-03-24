@@ -2,7 +2,8 @@
 
 import { Message } from 'discord.js';
 import type { ChatInputCommandInteraction, MessageComponentInteraction } from 'discord.js';
-import type { Command, CommandType, CooldownTypes } from '../index.ts';
+import type { CommandType } from '../classes/utils.ts';
+import type { Command, CooldownTypes } from '../index.ts';
 
 export default class CooldownsManager {
   cache = new Map<string, Map<CooldownTypes, Map<Snowflake, number>>>();
