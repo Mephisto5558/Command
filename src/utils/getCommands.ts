@@ -1,4 +1,4 @@
-import { commandTypes } from '../index.ts';
+import { CommandType } from '../classes/utils.ts';
 import capitalize from './capitalize.ts';
 import type { Client } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
@@ -30,13 +30,13 @@ export default function getCommands(
     category.list.push({
       commandName: cmd.name,
       commandUsage: (
-        (cmd.types.includes(commandTypes.slash) ? lang('others.getCommands.lookAtOptionDesc') ?? '' : '')
+        (cmd.types.includes(CommandType.slash) ? lang('others.getCommands.lookAtOptionDesc') ?? '' : '')
         + (lang(`${cmd.id}.usage.usage`)?.replaceAll(/slash command:/gi, '') ?? '') || (lang('others.getCommands.noInfo') ?? '')
       ).trim().replaceAll('\n', '<br>&nbsp'),
       commandDescription: cmd.descriptionLocalizations[lang.config.locale ?? lang.defaultConfig.defaultLocale] ?? cmd.description,
       commandAlias: (
-        (cmd.aliases[commandTypes.prefix].length ? `${capitalize(commandTypes.prefix)}: ${cmd.aliases[commandTypes.prefix].join(', ')}\n` : '')
-        + (cmd.aliases[commandTypes.slash].length ? `${capitalize(commandTypes.slash)}: ${cmd.aliases[commandTypes.slash].join(', ')}` : '')
+        (cmd.aliases[CommandType.prefix].length ? `${capitalize(CommandType.prefix)}: ${cmd.aliases[CommandType.prefix].join(', ')}\n` : '')
+        + (cmd.aliases[CommandType.slash].length ? `${capitalize(CommandType.slash)}: ${cmd.aliases[CommandType.slash].join(', ')}` : '')
         || (lang('global.none') ?? '')
       ).trim().replaceAll('\n', '<br>&nbsp')
     });

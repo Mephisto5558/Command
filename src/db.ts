@@ -1,5 +1,6 @@
 import type { Channel, Guild, Role, User } from 'discord.js';
-import type { Command, CommandType } from './index.ts';
+import type { CommandType } from './classes/utils.ts';
+import type { Command } from './index.ts';
 
 export type Database = {
   botSettings: {

@@ -2,7 +2,7 @@
 import { getMilliseconds as getMilliseconds_ } from 'better-ms';
 
 import type { Locale, Translator } from '@mephisto5558/i18n';
-import type { BetterMS, Command, CommandType } from '../index.ts';
+import type { BetterMS, Command } from '../index.ts';
 import type { CommandConfig } from './command/utils.ts';
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
@@ -56,7 +56,7 @@ export class CommandExecutionError extends Error {
   }
 }
 
-export enum CommandTypes {
+export enum CommandType {
   slash = 'slash',
   prefix = 'prefix',
   component = 'component'

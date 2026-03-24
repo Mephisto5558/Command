@@ -2,10 +2,11 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style -- using index signature to improve readability for lib user */
 
 import type { ChatInputCommandInteraction as _ChatInputCommandInteraction, PermissionFlags, _NonNullableFields } from 'discord.js';
-import type { Command, CommandType, DefaultOptionType, OptionsG, SharedConfig } from '../../index.ts';
+import type { Command, DefaultOptionType, OptionsG, SharedConfig } from '../../index.ts';
 import type {
   CommandOptionConfig, RunnableReturns as OptionRunnableReturns, StrictCommandOption, ValidateOptionsArray
 } from '../commandOption/utils.ts';
+import type { CommandType } from '../utils.ts';
 
 
 export type StrictCommand<
