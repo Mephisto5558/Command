@@ -94,15 +94,18 @@ export class CommandManager {
     );
   }
 
-  async #loadCommand(filePath: string, oldCommand?: Command): Promise<CollectionMember | undefined> {
+  async #loadCommand(filePath: string, oldCommand?: Command): Promise<CollectionMember | void> {
     if (!this.client.application) throw new Error('Client#application must exist (Client must be logged in!)');
 
-    let commandFile = await loadFile(filePath)
-    commandFile = commandFile && typeof commandFile == 'object' && 'default' in commandFile ? commandFile.default : commandFile;
+    let commandFileImport = await loadFile(filePath);
+    commandFileImport = commandFileImport && typeof commandFileImport == 'object' && 'default' in commandFileImport
+      ? commandFileImport.default
+      : commandFileImport;
 
-    if (!(commandFile instanceof Command)) return;
-
+    if (!(commandFileImport instanceof Command)) return;
     const
+      /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
+      commandFile = commandFileImport as Command<CommandType[], boolean>,
       name = getFilename(filePath),
       category = basename(dirname(filePath));
 

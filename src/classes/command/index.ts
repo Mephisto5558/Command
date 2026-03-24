@@ -1,10 +1,9 @@
 /* eslint-disable max-lines */
 
 import {
-  ApplicationCommandOptionType, ApplicationCommandType, BaseInteraction,
-  ChannelType, ChatInputCommandInteraction as _ChatInputCommandInteraction, Colors,
-  CommandInteraction, EmbedBuilder, Message, MessageComponentInteraction,
-  MessageFlags, PermissionFlagsBits, PermissionsBitField, _NonNullableFields
+  ApplicationCommandOptionType, ApplicationCommandType, BaseInteraction, ChannelType, ChatInputCommandInteraction,
+  ChatInputCommandInteraction as _ChatInputCommandInteraction, Colors, CommandInteraction, EmbedBuilder, Message,
+  MessageComponentInteraction, MessageFlags, PermissionFlagsBits, PermissionsBitField, _NonNullableFields, inlineCode
 } from 'discord.js';
 
 // @ts-expect-error Cannot augment that module
@@ -17,8 +16,7 @@ import { CommandType, cooldownConverter, equal } from '../utils.ts';
 import type { ApplicationCommand, CacheType, ChatInputApplicationCommandData, Client, PermissionFlags } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  BetterMS, ChatInputCommandInteraction, CooldownTypes,
-  DefaultOptionType, Logger, ResolveContext, commandDoneFn, customPermissionChecksFn
+  BetterMS, CooldownTypes, DefaultOptionType, Logger, ResolveContext, commandDoneFn, customPermissionChecksFn
 } from '../../index.ts';
 import type { CooldownsManager } from '../../utils/index.ts';
 import type { CommandOptionConfig, StrictCommandOption } from '../commandOption/utils.ts';
@@ -27,8 +25,8 @@ import type { CommandConfig, RunnableReturns, StrictCommand } from './utils.ts';
 const
   /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
   getMilliseconds = getMilliseconds_ as typeof BetterMS.getMilliseconds,
-  msInSeconds = getMilliseconds('1s'),
-  PERM_ERR_MSG_DELETETIME = getMilliseconds('10s'),
+  msInSeconds = getMilliseconds('1s')!,
+  PERM_ERR_MSG_DELETETIME = getMilliseconds('10s')!,
   CANNOT_SEND_MESSAGE_API_ERR = 50_007;
 
 /* eslint-disable-next-line import-x/prefer-default-export */
@@ -59,7 +57,11 @@ export class Command<
   usage: Record<'usage' | 'examples', string | undefined> & {} = { usage: undefined, examples: undefined };
   usageLocalizations: Partial<Record<Locale, StrictCommand<CT, DM>['usage']>> = {};
 
-  aliases: Record<NoInfer<CT>[number], Lowercase<string>[]> & {} = { [CommandType.slash]: [], [CommandType.prefix]: [] };
+  /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
+  aliases: Record<NoInfer<CT>[number], Lowercase<string>[]> & {} = {
+    [CommandType.slash]: [], [CommandType.prefix]: []
+  } as Record<NoInfer<CT>[number], Lowercase<string>[]>;
+
   cooldowns: Record<CooldownTypes, number> & {} = { guild: 0, channel: 0, user: 0 };
 
   permissions: Record<'client' | 'user', PermissionFlags[keyof PermissionFlags][]> & {}
@@ -303,7 +305,7 @@ export class Command<
   #getSubcommandNames(
     interaction: Parameters<Command<CT, DM>['updateCooldowns']>[0]
   ): { group: string | undefined; subcommand: string } | undefined {
-    if (interaction instanceof CommandInteraction) {
+    if (interaction instanceof ChatInputCommandInteraction) {
       if (!interaction.options.getSubcommand(false)) return;
       return { group: interaction.options.getSubcommandGroup(false) ?? undefined, subcommand: interaction.options.getSubcommand(true) };
     }
@@ -325,29 +327,31 @@ export class Command<
     author: Parameters<customPermissionChecksFn<this>>[1],
     wrapperTranslator: Parameters<customPermissionChecksFn<this>>[2]
   ): Promise<ReturnType<customPermissionChecksFn<this>>> {
-    const
-      botChannelPerms = interaction.channel.permissionsFor(interaction.guild.members.me),
-      userPermsMissing = interaction.channel.permissionsFor(author).missing(this.permissions.user),
-      botPermsMissing = botChannelPerms.missing(this.permissions.client);
+    if (!(interaction.inGuild() && interaction.guild && interaction.channel)) return false;
 
-    if (!botPermsMissing.length && !userPermsMissing.length) return false;
+    const
+      botChannelPerms = interaction.guild.members.me ? interaction.channel.permissionsFor(interaction.guild.members.me) : undefined,
+      userPermsMissing = interaction.channel.permissionsFor(author)?.missing(this.permissions.user) ?? [],
+      botPermsMissing = botChannelPerms?.missing(this.permissions.client);
+
+    if (!botPermsMissing?.length && !userPermsMissing.length) return false;
 
     const embed = new EmbedBuilder({
       title: wrapperTranslator('permissionDenied.embedTitle'),
-      description: wrapperTranslator(`permissionDenied.embedDescription${botPermsMissing.length ? 'Bot' : 'User'}`, {
-        permissions: (botPermsMissing.length ? botPermsMissing : userPermsMissing).map(perm => inlineCode(this.#i18n.__(
-          { locale: wrapperTranslator.config.locale, undefinedNotFound: true },
+      description: wrapperTranslator(`permissionDenied.embedDescription${botPermsMissing?.length ? 'Bot' : 'User'}`, {
+        permissions: (botPermsMissing?.length ? botPermsMissing : userPermsMissing).map(perm => inlineCode(this.#i18n.__(
+          { locale: wrapperTranslator.config.locale ?? wrapperTranslator.defaultConfig.defaultLocale, undefinedNotFound: true },
           `others.Perms.${perm}`
         ) ?? perm)).join(', ')
       }),
       color: Colors.Red
     });
 
-    if (botChannelPerms.missing([PermissionFlagsBits.SendMessages, PermissionFlagsBits.ViewChannel]).length) {
+    if (botChannelPerms?.missing([PermissionFlagsBits.SendMessages, PermissionFlagsBits.ViewChannel]).length) {
       if (interaction instanceof Message && botChannelPerms.has(PermissionFlagsBits.AddReactions))
         void interaction.react('\u274C').then(() => void interaction.react('\u270D\uFE0F'));
 
-      try { await author.send({ content: interaction instanceof Message ? interaction.url : undefined, embeds: [embed] }); }
+      try { await author.send({ content: interaction instanceof Message ? interaction.url : '', embeds: [embed] }); }
       catch (err) {
         if (!(err instanceof Error && 'code' in err) || err.code != CANNOT_SEND_MESSAGE_API_ERR) throw err;
       }
@@ -386,7 +390,7 @@ export class Command<
 
     if (!this.config.runBetaCommandsOnly) {
       const cooldown = this.updateCooldowns(interaction);
-      if (cooldown) return ['cooldown', inlineCode(Math.round(cooldown / msInSeconds))];
+      if (cooldown) return ['cooldown', inlineCode(Math.round(cooldown / msInSeconds).toString())];
     }
 
     return false;
@@ -396,8 +400,8 @@ export class Command<
     interaction: Parameters<customPermissionChecksFn>[0], author: Parameters<customPermissionChecksFn>[1]
   ): Awaited<ReturnType<customPermissionChecksFn>> {
     if (
-      this.config.devOnlyCategories.has(this.category) && !this.config.devIds.has(author.id)
-      || (interaction instanceof Message && interaction.guild?.members.me.communicationDisabledUntil)
+      this.config.devOnlyCategories.has(this.category) && !this.config.devIds.has(author.id as Snowflake)
+      || (interaction instanceof Message && interaction.guild?.members.me?.communicationDisabledUntil)
     ) return true;
     if (this.config.runBetaCommandsOnly && !this.beta) return this.config.replyOn.nonBeta ? ['nonBeta'] : true;
     if (this.disabled) return this.config.replyOn.disabled ? ['disabled', this.disabledReason ?? 'Not provided'] : true;
@@ -407,7 +411,7 @@ export class Command<
     if (interaction instanceof Message && !this.types.includes(CommandType.prefix)) return ['slashOnly', this.mention];
 
     if (!this.dmPermission && interaction.channel?.type == ChannelType.DM) return ['guildOnly'];
-    if (this.category == 'nsfw' && !interaction.channel?.nsfw) return ['nsfw'];
+    if (this.category == 'nsfw' && interaction.channel && (!('nsfw' in interaction.channel) || !interaction.channel.nsfw)) return ['nsfw'];
     return false;
   }
 
@@ -450,7 +454,7 @@ export class Command<
       this.name != cmd.name || this.description != cmd.description || this.type != cmd.type
       /* eslint-disable-next-line @typescript-eslint/no-deprecated */
       || this.dmPermission != cmd.dmPermission
-      || this.defaultMemberPermissions != (cmd.defaultMemberPermissions?.bitfield ?? cmd.defaultMemberPermissions)
+      || this.defaultMemberPermissions != (cmd.defaultMemberPermissions instanceof PermissionsBitField ? cmd.defaultMemberPermissions.bitfield : cmd.defaultMemberPermissions)
       || !equal(this.nameLocalizations, cmd.nameLocalizations)
       || !equal(this.descriptionLocalizations, cmd.descriptionLocalizations)
     ) return false;
