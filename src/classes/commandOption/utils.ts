@@ -8,7 +8,7 @@ import type {
   ChatInputCommandInteraction, CommandOption, CommandType, DefaultOptionType, OptionsG, ResolveContext, SharedConfig
 } from '../../index.ts';
 
-type autocompleteObject = StrictOmit<ApplicationCommandOptionChoiceData, 'nameLocalizations'>;
+export type autocompleteObject = StrictOmit<ApplicationCommandOptionChoiceData, 'nameLocalizations'>;
 export type autocompleteOptions = autocompleteObject['value'] | autocompleteObject;
 
 export type StrictCommandOption<

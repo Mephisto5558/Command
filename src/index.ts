@@ -36,6 +36,7 @@ type TimeUnits = ['d', 'h', 'min', 's', 'ms'];
 export type validTimeString = BuildOrderedCooldown<TimeUnits>;
 
 export type Logger = {
+  debug: typeof console.debug;
   log: typeof console.log;
   warn: typeof console.warn;
   error: typeof console.error;
@@ -72,7 +73,7 @@ export type ResolveContext<MAP, KEYS extends readonly (keyof MAP)[]> = {
 
 export type commandDoneFn<cmd extends Command<CommandType[], boolean> = Command<CommandType[], boolean>> = (
   this: ThisParameterType<cmd['run']>,
-  command: cmd, lang: Translator
+  command: cmd, lang: Translator<false, Locale>
 ) => Promise<never>;
 
 /**

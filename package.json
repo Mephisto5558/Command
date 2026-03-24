@@ -1,6 +1,6 @@
 {
   "name": "@mephisto5558/command",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Discord.js command class and registering logic for slash- and prefix commands",
   "keywords": [
     "command",
@@ -17,18 +17,18 @@
   },
   "license": "MIT",
   "author": "Mephisto5558",
-  "type": "commonjs",
-  "main": "index.js",
-  "types": "index.d.ts",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
-    "classes",
-    "db.d.ts",
-    "index.d.ts",
-    "utils"
+    "dist"
   ],
   "scripts": {
+    "build": "npm run clean && tsc --build src",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\"",
     "lint": "eslint . --cache --cache-location ./node_modules/.cache/eslint/ >eslint.log",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\"",
+    "watch": "npm run build -- --watch"
   },
   "dependencies": {
     "better-ms": "1.x",

@@ -1,13 +1,14 @@
 import { Collection } from 'discord.js';
 import { readdir } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
+import { commandTypes } from '../../index.ts';
+import capitalize from '../../utils/capitalize.ts';
 import { Command } from '../command/index.ts';
 
 import type { ApplicationCommand, Client, Snowflake } from 'discord.js';
 import type { I18nProvider } from '@mephisto5558/i18n';
-import { type CommandType, type commandDoneFn, type customPermissionChecksFn, type Logger, commandTypes } from '../../index.ts';
+import type { CommandType, Logger, commandDoneFn, customPermissionChecksFn } from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
-import capitalize from '../../utils/capitalize.ts';
 
 type CollectionMember = Command<CommandType[], boolean>;
 
@@ -93,8 +94,7 @@ export class CommandManager {
   async #loadCommand(filePath: string, oldCommand: Command): Promise<CollectionMember | undefined> {
     if (!this.client?.application) throw new Error('Client#application must exist (Client must be logged in!)');
 
-    /** @type {Command | { default: Command }} */
-    let commandFile: Command | { default: Command; } = await loadFile(filePath);
+    let commandFile: Command | { default: Command } = await loadFile(filePath);
     commandFile = typeof commandFile == 'object' && 'default' in commandFile ? commandFile.default : commandFile;
 
     if (!(commandFile instanceof Command)) return;

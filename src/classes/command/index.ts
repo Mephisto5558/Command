@@ -1,14 +1,18 @@
 /* eslint-disable max-lines */
 
 import {
-  ApplicationCommandOptionType, ApplicationCommandType, ChatInputCommandInteraction as _ChatInputCommandInteraction,
-  CommandInteraction, EmbedBuilder, Message, MessageComponentInteraction, PermissionFlagsBits, PermissionsBitField, _NonNullableFields
+  ApplicationCommandOptionType, ApplicationCommandType, BaseInteraction,
+  ChannelType, ChatInputCommandInteraction as _ChatInputCommandInteraction, Colors,
+  CommandInteraction, EmbedBuilder, Message, MessageComponentInteraction,
+  MessageFlags, PermissionFlagsBits, PermissionsBitField, _NonNullableFields
 } from 'discord.js';
 
 // @ts-expect-error Cannot augment that module
 import { getMilliseconds as getMilliseconds_ } from 'better-ms';
-import { commandTypes } from '../../index.ts';
-import commandMention from '../../utils/commandMention.ts';
+import { CommandExecutionError, CommandOption, commandTypes } from '../../index.ts';
+import { descriptionMaxLength } from '../../utils/constants.ts';
+import { commandMention } from '../../utils/index.ts';
+import { equal } from '../utils.ts';
 
 import type { ApplicationCommand, CacheType, ChatInputApplicationCommandData, Client, PermissionFlags } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
@@ -16,7 +20,7 @@ import type {
   BetterMS, ChatInputCommandInteraction, CommandType, CooldownTypes,
   DefaultOptionType, Logger, ResolveContext, commandDoneFn, customPermissionChecksFn
 } from '../../index.ts';
-import type CooldownsManager from '../../utils/CooldownsManager.ts';
+import type { CooldownsManager } from '../../utils/index.ts';
 import type { CommandOptionConfig, StrictCommandOption } from '../commandOption/utils.ts';
 import type { CommandConfig, RunnableReturns, StrictCommand } from './utils.ts';
 
@@ -47,11 +51,13 @@ export class Command<
 
   category: Lowercase<string>;
 
-  type: ApplicationCommandType = ApplicationCommandType.ChatInput;
-  types: CT = [];
+  readonly type = ApplicationCommandType.ChatInput;
+
+  /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
+  types: CT = [] as unknown as CT;
 
   usage: Record<'usage' | 'examples', string | undefined> & {} = { usage: undefined, examples: undefined };
-  usageLocalizations: Partial<Record<Locale, StrictCommand<CT, DM>['usage']>>;
+  usageLocalizations: Partial<Record<Locale, StrictCommand<CT, DM>['usage']>> = {};
 
   aliases: Record<NoInfer<CT>[number], Lowercase<string>[]> & {} = { [commandTypes.slash]: [], [commandTypes.prefix]: [] };
   cooldowns: Record<CooldownTypes, number> & {} = { guild: 0, channel: 0, user: 0 };
@@ -63,6 +69,7 @@ export class Command<
     return new PermissionsBitField(this.permissions.user).bitfield;
   }
 
+  /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
   dmPermission: DM = false as DM;
 
   disabled = false;
@@ -70,6 +77,8 @@ export class Command<
 
   noDefer = false;
   ephemeralDefer = false;
+
+  beta = false;
 
   options: StrictCommandOption<CT, DM>[] = [];
 
@@ -89,14 +98,14 @@ export class Command<
       component: MessageComponentInteraction<DM extends false ? 'cached' : CacheType>;
       prefix: Message<DM extends false ? true : false>;
     }, NoInfer<CT>>,
-    lang: Translator, client: Client
+    lang: Translator<false, Locale>, client: Client
   ) => Promise<never>;
 
-  #i18n: Parameters<Command<CommandType[], boolean>['init']>[0];
-  #logger: NonNullable<Parameters<Command<CommandType[], boolean>['init']>['3']>['logger'];
-  #doneFn: NonNullable<Parameters<Command<CommandType[], boolean>['init']>['3']>['doneFn'];
-  #cooldownsManager: NonNullable<Parameters<Command<CommandType[], boolean>['init']>['3']>['cooldownsManager'];
-  #customPermissionChecks: NonNullable<Parameters<Command<CommandType[], boolean>['init']>['3']>['customPermissionChecks'] | undefined;
+  #i18n: I18nProvider;
+  #logger: Logger;
+  #doneFn: commandDoneFn<StrictCommand<CT, DM, Options>>;
+  #cooldownsManager: CooldownsManager;
+  #customPermissionChecks: customPermissionChecksFn<StrictCommand<CT, DM, Options>> | undefined;
 
   constructor(config: CommandConfig<CT, DM, Options>) {
     if (config.usage) {
@@ -123,7 +132,7 @@ export class Command<
     if (config.noDefer) this.noDefer = config.noDefer;
     if (config.ephemeralDefer) this.ephemeralDefer = config.ephemeralDefer;
 
-    if (config.options) this.options = config.options.map(e => (e instanceof CommandOption ? e : new CommandOption(e)));
+    if (config.options) this.options = config.options.map(e => (e instanceof CommandOption.CommandOption ? e : new CommandOption.CommandOption(e)));
     if (config.beta) this.beta = config.beta;
 
     this.types = config.types;
@@ -134,8 +143,8 @@ export class Command<
 
   init(i18n: I18nProvider, name: string, category: string, config: {
     logger?: Logger;
-    doneFn?: commandDoneFn<StrictCommand<CT, DM>>;
-    customPermissionChecks?: customPermissionChecksFn<StrictCommand<CT, DM>>;
+    doneFn?: commandDoneFn<StrictCommand<CT, DM, Options>>;
+    customPermissionChecks?: customPermissionChecksFn<StrictCommand<CT, DM, Options>>;
 
     devIds?: Set<Snowflake>; devOnlyCategories?: Set<string>;
     runBetaCommandsOnly?: boolean;
@@ -146,7 +155,6 @@ export class Command<
     this.#logger = config.logger;
     this.#doneFn = config.doneFn;
     this.#cooldownsManager = config.cooldownsManager;
-
     this.#customPermissionChecks = config.customPermissionChecks?.bind(this);
 
     if (config.devIds) this.config.devIds = config.devIds;
@@ -198,13 +206,17 @@ export class Command<
 
       // description
       const localizedDescription = locale == this.#i18n.config.defaultLocale ? optionalTranslator('description') : requiredTranslator('description');
-      if (localizedDescription?.length > descriptionMaxLength && !this.disabled)
+      if (!localizedDescription) {
+        if (!this.disabled)
+          this.#logger.warn(`Missing "${locale}" description for command "${this.name}" (${this.id}.description)`);
+      }
+      else if (localizedDescription.length > descriptionMaxLength && !this.disabled)
         this.#logger.warn(`"${locale}" description for command "${this.name}" (${this.id}.description) is too long (max length is 100)! Slicing.`);
 
-      if (locale == this.#i18n.config.defaultLocale) this.description = localizedDescription.slice(0, descriptionMaxLength);
-      else if (localizedDescription) this.descriptionLocalizations[locale] = localizedDescription.slice(0, descriptionMaxLength);
-      else if (!this.disabled) this.#logger.warn(`Missing "${locale}" description for command "${this.name}" (${this.id}.description)`);
-
+      if (localizedDescription) {
+        if (locale == this.#i18n.config.defaultLocale) this.description = localizedDescription.slice(0, descriptionMaxLength);
+        else this.descriptionLocalizations[locale] = localizedDescription.slice(0, descriptionMaxLength);
+      }
 
       // usage
       const localizedUsage = {
@@ -246,7 +258,7 @@ export class Command<
 
     this.#logger.debug(`Executing ${commandType} command ${this.name}`);
 
-    if (commandType == commandTypes.slash && interaction instanceof CommandInteraction && !this.noDefer && !this.replied)
+    if (commandType == commandTypes.slash && interaction instanceof CommandInteraction && !this.noDefer && !interaction.replied)
       await interaction.deferReply({ flags: this.ephemeralDefer ? MessageFlags.Ephemeral : undefined });
 
     try {
@@ -344,10 +356,10 @@ export class Command<
   }
 
   async #isRunnable(
-    interaction: Parameters<customPermissionChecksFn>[0], wrapperTranslator: Translator
+    interaction: Parameters<customPermissionChecksFn>[0], wrapperTranslator: Translator<false, Locale>
   ): Promise<Awaited<ReturnType<customPermissionChecksFn<Command<CommandType[], boolean>, RunnableReturns>>>> {
     const
-      author = interaction instanceof CommandInteraction ? interaction.user : interaction.author,
+      author = interaction instanceof BaseInteraction ? interaction.user : interaction.author,
       args = interaction instanceof Message ? interaction.content.split(/\s+/).slice(1) : undefined,
       staticErr = this.#staticRunnableChecks(interaction, author);
 
@@ -391,7 +403,7 @@ export class Command<
 
     if (interaction instanceof Message && !this.types.includes(commandTypes.prefix)) return ['slashOnly', this.mention];
 
-    if (!this.dmPermission && interaction.channel.type == ChannelType.DM) return ['guildOnly'];
+    if (!this.dmPermission && interaction.channel?.type == ChannelType.DM) return ['guildOnly'];
     if (this.category == 'nsfw' && !interaction.channel?.nsfw) return ['nsfw'];
     return false;
   }
@@ -425,7 +437,7 @@ export class Command<
     if (group) ({ options } = options.find(e => e.name == group));
     if (subcommand) ({ options } = options.find(e => e.name == subcommand));
 
-    return options.find(e => e.name == name && (!type || e.type == type));
+    return options.find(e => e.name == option.name && (!option.type || e.type == option.type));
   }
 
   isEqualTo(cmd?: Command<CommandType[], boolean> | ApplicationCommand): boolean {

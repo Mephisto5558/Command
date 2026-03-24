@@ -5,18 +5,19 @@
   "compilerOptions": {
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "target": "ESNext",
+    "target": "esnext",
     "lib": [
       "ESNext"
     ],
-    "allowJs": true,
+    "allowImportingTsExtensions": true,
+    "declaration": true,
     "exactOptionalPropertyTypes": true,
     "libReplacement": true,
     "noEmit": true,
     "noImplicitOverride": true,
     "noUncheckedIndexedAccess": true,
     "noUncheckedSideEffectImports": true,
-    "resolveJsonModule": true,
+    "rewriteRelativeImportExtensions": true,
     "skipLibCheck": true,
     "strict": true
   }
