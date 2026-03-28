@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style -- using index signature to improve readability for lib user */
 
 import type { CacheType, ChatInputCommandInteraction as _ChatInputCommandInteraction, User, _NonNullableFields } from 'discord.js';
-import type * as __ from '@mephisto5558/better-types'; /* eslint-disable-line import-x/no-namespace -- load in global definitions */
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type { Command } from './classes/command/index.ts';
 import type { CommandOption } from './classes/commandOption/index.ts';
