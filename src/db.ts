@@ -12,11 +12,9 @@ export type Database = {
     config: {
       commands?: Record<Command.Command['name'], {
         disabled?: {
-          /* eslint-disable @typescript-eslint/no-redundant-type-constituents */
           users: (User['id'] | '*')[];
           channels: (Channel['id'] | '*')[];
           roles: (Role['id'] | '*')[];
-          /* eslint-enable @typescript-eslint/no-redundant-type-constituents */
         };
       }>;
     };

@@ -6,12 +6,12 @@ import capitalize from '../../utils/capitalize.ts';
 import { Command } from '../command/index.ts';
 import { CommandType } from '../utils.ts';
 
-import type { ApplicationCommand, Client, Snowflake } from 'discord.js';
+import type { ApplicationCommand, Client } from 'discord.js';
 import type { I18nProvider } from '@mephisto5558/i18n';
 import type { Logger, commandDoneFn, customPermissionChecksFn } from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
 
-type CollectionMember = Command<CommandType[], boolean>;
+type CollectionMember = Command<readonly CommandType[], boolean>;
 
 /* eslint-disable-next-line import-x/prefer-default-export */
 export class CommandManager {
@@ -31,9 +31,9 @@ export class CommandManager {
   #customPermissionChecks: customPermissionChecksFn | undefined;
 
   init(
-    commandsPath: this['commandsPath'],
-    client: this['client'],
-    i18n: this['i18n'],
+    commandsPath: string,
+    client: Client,
+    i18n: I18nProvider,
     config: {
       logger?: Logger;
       doneFn?: commandDoneFn;
@@ -41,7 +41,7 @@ export class CommandManager {
       devIds?: Set<Snowflake>;
       devOnlyCategories?: Set<string>;
       runBetaCommandsOnly?: boolean;
-      replyOn?: { disabled: boolean; nonBeta: boolean };
+      replyOn?: { disabled?: boolean; nonBeta?: boolean };
       customPermissionChecks?: customPermissionChecksFn;
     } = {}
   ): this {
@@ -54,7 +54,7 @@ export class CommandManager {
     if (config.devIds) this.#devIds = config.devIds;
     if (config.devOnlyCategories) this.#devOnlyCategories = config.devOnlyCategories;
     if (config.runBetaCommandsOnly) this.#runBetaCommandsOnly = config.runBetaCommandsOnly;
-    if (config.replyOn) this.#replyOn = config.replyOn;
+    if (config.replyOn) this.#replyOn = { disabled: !!config.replyOn.disabled, nonBeta: !!config.replyOn.nonBeta };
     this.#customPermissionChecks = config.customPermissionChecks;
 
     return this;
@@ -88,13 +88,13 @@ export class CommandManager {
   >(query: CMD): Promise<CMD extends CollectionMember ? CMD : CollectionMember | undefined> {
     const command = query instanceof Command ? query : this.get(query.toLowerCase());
 
-    /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-non-null-assertion */
     return (command ? this.#loadCommand(this.#filePaths.get(command.name)!, command) : undefined) as (
       Promise<CMD extends CollectionMember ? CMD : CollectionMember | undefined>
     );
   }
 
-  async #loadCommand(filePath: string, oldCommand?: Command): Promise<CollectionMember | void> {
+  async #loadCommand(filePath: string, oldCommand?: Command): Promise<CollectionMember | undefined> {
     if (!this.client.application) throw new Error('Client#application must exist (Client must be logged in!)');
 
     let commandFileImport = await loadFile(filePath);
@@ -105,8 +105,8 @@ export class CommandManager {
     if (!(commandFileImport instanceof Command)) return;
     const
       /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
-      commandFile = commandFileImport as Command<CommandType[], boolean>,
-      name = getFilename(filePath),
+      commandFile = commandFileImport as CollectionMember,
+      name = getFilename(filePath) as Lowercase<string>,
       category = basename(dirname(filePath));
 
     try {
@@ -128,7 +128,7 @@ export class CommandManager {
     try {
       // Handle Reload Logic (API Sync)
       const appCommand = await this.registerCommand(commandFile, oldCommand);
-      commandFile.commandId = appCommand?.id;
+      if (appCommand) commandFile.commandId = appCommand.id;
     }
     catch (err) {
       return this.#logger.error(`Error on registering command file ${filePath}:\n`, err);
@@ -150,7 +150,7 @@ export class CommandManager {
     let appCommand;
 
     if (oldCommand?.types.includes(CommandType.slash) && !newCommand.types.includes(CommandType.slash)) {
-      await application.commands.delete(oldCommand.commandId);
+      if (oldCommand.commandId) await application.commands.delete(oldCommand.commandId);
       this.#logLoadMsg('Deleted', newCommand.name);
     }
     else if (newCommand.types.includes(CommandType.slash)) {

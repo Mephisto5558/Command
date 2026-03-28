@@ -1,9 +1,9 @@
 /* eslint-disable max-lines */
 
 import {
-  ApplicationCommandOptionType, ApplicationCommandType, BaseInteraction, ChannelType, ChatInputCommandInteraction,
-  ChatInputCommandInteraction as _ChatInputCommandInteraction, Colors, CommandInteraction, EmbedBuilder, Message,
-  MessageComponentInteraction, MessageFlags, PermissionFlagsBits, PermissionsBitField, _NonNullableFields, inlineCode
+  ApplicationCommandOptionType, ApplicationCommandType, BaseInteraction, ChannelType,
+  ChatInputCommandInteraction as _ChatInputCommandInteraction, Colors, EmbedBuilder,
+  Message, MessageFlags, PermissionFlagsBits, PermissionsBitField, _NonNullableFields, inlineCode
 } from 'discord.js';
 
 // @ts-expect-error Cannot augment that module
@@ -13,27 +13,33 @@ import { descriptionMaxLength } from '../../utils/constants.ts';
 import { commandMention } from '../../utils/index.ts';
 import { CommandType, cooldownConverter, equal } from '../utils.ts';
 
-import type { ApplicationCommand, CacheType, ChatInputApplicationCommandData, Client, PermissionFlags } from 'discord.js';
+import type {
+  ApplicationCommand, CacheType, ChatInputApplicationCommandData, Client, CommandInteraction,
+  MessageComponentInteraction, PermissionFlags, User
+} from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  BetterMS, CooldownTypes, DefaultOptionType, Logger, ResolveContext, commandDoneFn, customPermissionChecksFn
+  BetterMS, ChatInputCommandInteraction, CooldownTypes, DefaultOptionType, Logger,
+  ResolveContext, commandDoneFn, customPermissionChecksFn
 } from '../../index.ts';
 import type { CooldownsManager } from '../../utils/index.ts';
 import type { CommandOptionConfig, StrictCommandOption } from '../commandOption/utils.ts';
 import type { CommandConfig, RunnableReturns, StrictCommand } from './utils.ts';
 
 const
-  /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
+  /* eslint-disable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-non-null-assertion */
   getMilliseconds = getMilliseconds_ as typeof BetterMS.getMilliseconds,
   msInSeconds = getMilliseconds('1s')!,
   PERM_ERR_MSG_DELETETIME = getMilliseconds('10s')!,
+  /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
+
   CANNOT_SEND_MESSAGE_API_ERR = 50_007;
 
 /* eslint-disable-next-line import-x/prefer-default-export */
 export class Command<
   const CT extends readonly CommandType[] = [],
   const DM extends boolean = false,
-  const Options extends readonly (
+  Options extends readonly (
     CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>
   )[] = readonly DefaultOptionType<CT, DM>[]
 > implements ChatInputApplicationCommandData {
@@ -52,7 +58,7 @@ export class Command<
   readonly type = ApplicationCommandType.ChatInput;
 
   /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
-  types: CT = [] as unknown as CT;
+  readonly types: CT = [] as unknown as CT;
 
   usage: Record<'usage' | 'examples', string | undefined> & {} = { usage: undefined, examples: undefined };
   usageLocalizations: Partial<Record<Locale, StrictCommand<CT, DM>['usage']>> = {};
@@ -96,12 +102,12 @@ export class Command<
 
   run: (
     this: ResolveContext<{
-      slash: ChatInputCommandInteraction<DM extends false ? 'cached' : CacheType, Options>;
+      slash: ChatInputCommandInteraction<DM extends false ? 'cached' : CacheType, NoInfer<Options>>;
       component: MessageComponentInteraction<DM extends false ? 'cached' : CacheType>;
       prefix: Message<DM extends false ? true : false>;
     }, NoInfer<CT>>,
     lang: Translator<false, Locale>, client: Client<true>
-  ) => Promise<never>;
+  ) => unknown;
 
   #i18n!: I18nProvider;
   #logger!: Logger;
@@ -116,12 +122,17 @@ export class Command<
     }
 
     if (config.aliases) {
-      for (const commandType of Object.values(CommandType))
-        if (config.aliases[commandType]?.length) this.aliases[commandType] = config.aliases[commandType];
+      for (const commandType of Object.values(CommandType)) {
+        const aliasList = config.aliases[commandType as NoInfer<CT>[number]];
+        if (aliasList?.length) (this.aliases as Record<string, Lowercase<string>[]>)[commandType] = aliasList as Lowercase<string>[];
+      }
     }
 
-    if (config.cooldowns)
-      this.cooldowns = Object.fromEntries(Object.entries(this.cooldowns).map(cooldownConverter.bind(undefined, config.cooldowns)));
+    if (config.cooldowns) {
+      this.cooldowns = Object.fromEntries(
+        Object.entries(this.cooldowns).map(([k, v]) => cooldownConverter(config.cooldowns!, k, v))
+      );
+    }
 
     if (config.permissions) {
       if (config.permissions.client) this.permissions.client.push(...config.permissions.client);
@@ -134,24 +145,31 @@ export class Command<
     if (config.noDefer) this.noDefer = config.noDefer;
     if (config.ephemeralDefer) this.ephemeralDefer = config.ephemeralDefer;
 
-    if (config.options) this.options = config.options.map(e => (e instanceof CommandOption.CommandOption ? e : new CommandOption.CommandOption(e)));
+    if (config.options) {
+      this.options = config.options.map(e => (
+        e instanceof CommandOption.CommandOption ? e : new CommandOption.CommandOption(e)
+      )) as unknown as StrictCommandOption<CT, DM>[];
+    }
+
     if (config.beta) this.beta = config.beta;
 
     this.types = config.types;
     this.disabledReason = config.disabledReason;
 
-    this.run = config.run;
+    /* eslint-disable-next-line custom/unbound-method */
+    this.run = config.run as typeof this.run;
   }
 
   init(i18n: I18nProvider, name: string, category: string, config: {
-    logger?: Logger;
-    doneFn?: commandDoneFn<StrictCommand<CT, DM, Options>>;
-    customPermissionChecks?: customPermissionChecksFn<StrictCommand<CT, DM, Options>>;
+    logger?: Logger | undefined;
+    doneFn?: commandDoneFn | undefined;
+    customPermissionChecks?: customPermissionChecksFn | undefined;
 
-    devIds?: Set<Snowflake>; devOnlyCategories?: Set<string>;
-    runBetaCommandsOnly?: boolean;
-    replyOn?: { disabled?: boolean; nonBeta?: boolean };
-    cooldownsManager?: CooldownsManager;
+    devIds?: Set<Snowflake> | undefined;
+    devOnlyCategories?: Set<string> | undefined;
+    runBetaCommandsOnly?: boolean | undefined;
+    replyOn?: { disabled?: boolean; nonBeta?: boolean } | undefined;
+    cooldownsManager?: CooldownsManager | undefined;
   } = {}): this {
     this.#i18n = i18n;
     if (config.logger) this.#logger = config.logger;
@@ -260,8 +278,10 @@ export class Command<
 
     this.#logger.debug(`Executing ${commandType} command ${this.name}`);
 
-    if (commandType == CommandType.slash && interaction instanceof CommandInteraction && !this.noDefer && !interaction.replied)
-      await interaction.deferReply({ flags: this.ephemeralDefer ? MessageFlags.Ephemeral : undefined });
+    if (
+      commandType == CommandType.slash && !(interaction instanceof Message)
+      && interaction.isChatInputCommand() && !this.noDefer && !interaction.replied
+    ) await interaction.deferReply({ flags: this.ephemeralDefer ? MessageFlags.Ephemeral : undefined });
 
     try {
       await this.run.call(interaction, commandTranslator, interaction.client);
@@ -303,16 +323,16 @@ export class Command<
   }
 
   #getSubcommandNames(
-    interaction: Parameters<Command<CT, DM>['updateCooldowns']>[0]
+    interaction: CommandInteraction | Message | MessageComponentInteraction
   ): { group: string | undefined; subcommand: string } | undefined {
-    if (interaction instanceof ChatInputCommandInteraction) {
+    if (interaction instanceof BaseInteraction && interaction.isChatInputCommand()) {
       if (!interaction.options.getSubcommand(false)) return;
       return { group: interaction.options.getSubcommandGroup(false) ?? undefined, subcommand: interaction.options.getSubcommand(true) };
     }
-    if (interaction instanceof MessageComponentInteraction) return; // todo
+    if (interaction instanceof BaseInteraction && interaction.isMessageComponent()) return; // todo
 
     const
-      args = interaction.content.split(/\s+/).slice(1),
+      args = (interaction as Message).content.split(/\s+/).slice(1),
       option1 = this.options.find(e => e.name == args[0]);
 
     if (option1?.type == ApplicationCommandOptionType.Subcommand) return { group: undefined, subcommand: option1.name };
@@ -323,9 +343,9 @@ export class Command<
   }
 
   async #permissionChecks(
-    interaction: Parameters<customPermissionChecksFn<this>>[0],
-    author: Parameters<customPermissionChecksFn<this>>[1],
-    wrapperTranslator: Parameters<customPermissionChecksFn<this>>[2]
+    interaction: CommandInteraction | Message | MessageComponentInteraction,
+    author: User,
+    wrapperTranslator: Translator<false, Locale>
   ): Promise<ReturnType<customPermissionChecksFn<this>>> {
     if (!(interaction.inGuild() && interaction.guild && interaction.channel)) return false;
 
@@ -356,14 +376,15 @@ export class Command<
         if (!(err instanceof Error && 'code' in err) || err.code != CANNOT_SEND_MESSAGE_API_ERR) throw err;
       }
     }
-    else if (interaction instanceof CommandInteraction) await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
-    else await interaction.reply({ embeds: [embed] }, PERM_ERR_MSG_DELETETIME);
+    else if (interaction instanceof BaseInteraction && interaction.isRepliable())
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+    else await (interaction as Message).reply({ embeds: [embed] });
 
     return true;
   }
 
   async #isRunnable(
-    interaction: Parameters<customPermissionChecksFn>[0], wrapperTranslator: Translator<false, Locale>
+    interaction: CommandInteraction | Message | MessageComponentInteraction, wrapperTranslator: Translator<false, Locale>
   ): Promise<Awaited<ReturnType<customPermissionChecksFn<Command<CommandType[], boolean>, RunnableReturns>>>> {
     const
       author = interaction instanceof BaseInteraction ? interaction.user : interaction.author,
@@ -397,10 +418,10 @@ export class Command<
   }
 
   #staticRunnableChecks(
-    interaction: Parameters<customPermissionChecksFn>[0], author: Parameters<customPermissionChecksFn>[1]
+    interaction: CommandInteraction | Message | MessageComponentInteraction, author: User
   ): Awaited<ReturnType<customPermissionChecksFn>> {
     if (
-      this.config.devOnlyCategories.has(this.category) && !this.config.devIds.has(author.id as Snowflake)
+      this.config.devOnlyCategories.has(this.category) && !this.config.devIds.has(author.id)
       || (interaction instanceof Message && interaction.guild?.members.me?.communicationDisabledUntil)
     ) return true;
     if (this.config.runBetaCommandsOnly && !this.beta) return this.config.replyOn.nonBeta ? ['nonBeta'] : true;
@@ -416,9 +437,9 @@ export class Command<
   }
 
   #resolveActiveOption(
-    interaction: Parameters<Command<CommandType[], boolean>['updateCooldowns']>[0], args: string[] | undefined
+    interaction: CommandInteraction | Message | MessageComponentInteraction, args: string[] | undefined
   ): StrictCommandOption<CT, DM> | undefined {
-    if (interaction instanceof CommandInteraction) {
+    if (interaction instanceof BaseInteraction && interaction.isChatInputCommand()) {
       const group = interaction.options.getSubcommandGroup(false);
       if (group) return this.options.find(e => e.name == group);
 
@@ -439,10 +460,9 @@ export class Command<
       group = interaction?.options.getSubcommandGroup(false),
       subcommand = interaction?.options.getSubcommand(false);
 
-    /* eslint-disable-next-line @typescript-eslint/no-this-alias -- this is required and fine in this context. */
-    let { options } = this;
-    if (group) ({ options } = options.find(e => e.name == group));
-    if (subcommand) ({ options } = options.find(e => e.name == subcommand));
+    let options: StrictCommandOption<CT, DM>[] = this.options;
+    if (group) options = this.options.find(e => e.name == group)?.options ?? [];
+    if (subcommand) options = options.find(e => e.name == subcommand)?.options ?? [];
 
     return options.find(e => e.name == option.name && (!option.type || e.type == option.type));
   }
@@ -454,7 +474,9 @@ export class Command<
       this.name != cmd.name || this.description != cmd.description || this.type != cmd.type
       /* eslint-disable-next-line @typescript-eslint/no-deprecated */
       || this.dmPermission != cmd.dmPermission
-      || this.defaultMemberPermissions != (cmd.defaultMemberPermissions instanceof PermissionsBitField ? cmd.defaultMemberPermissions.bitfield : cmd.defaultMemberPermissions)
+      || this.defaultMemberPermissions != (
+        cmd.defaultMemberPermissions instanceof PermissionsBitField ? cmd.defaultMemberPermissions.bitfield : cmd.defaultMemberPermissions
+      )
       || !equal(this.nameLocalizations, cmd.nameLocalizations)
       || !equal(this.descriptionLocalizations, cmd.descriptionLocalizations)
     ) return false;

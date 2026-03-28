@@ -1,9 +1,9 @@
 // @ts-expect-error Cannot augment that module
 import { getMilliseconds as getMilliseconds_ } from 'better-ms';
 
+import type { CommandInteraction, Message, MessageComponentInteraction } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
-import type { BetterMS, Command } from '../index.ts';
-import type { CommandConfig } from './command/utils.ts';
+import type { BetterMS, Command, validTimeString } from '../index.ts';
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
 const getMilliseconds = getMilliseconds_ as typeof BetterMS.getMilliseconds;
@@ -29,7 +29,7 @@ export function equal(a: unknown, b: unknown): boolean {
 }
 
 export function cooldownConverter(
-  cooldown: NonNullable<CommandConfig<CommandType[], boolean>['cooldowns']>,
+  cooldown: Partial<Record<string, validTimeString>>,
   k: keyof Command.Command['cooldowns'], v: Command.Command['cooldowns'][keyof Command.Command['cooldowns']]
 ): [keyof Command.Command['cooldowns'], number] {
   if (!cooldown[k]) return [k, v];
@@ -42,7 +42,7 @@ export function cooldownConverter(
 
 export class CommandExecutionError extends Error {
   override readonly name = 'CommandExecutionError';
-  interaction: ThisParameterType<Command.Command<CommandType[], boolean>['run']>;
+  interaction: CommandInteraction | Message | MessageComponentInteraction;
   translator: Translator<boolean, Locale>;
 
   constructor(

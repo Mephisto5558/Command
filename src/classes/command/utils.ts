@@ -1,8 +1,12 @@
 /* eslint-disable @typescript-eslint/consistent-type-definitions */
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style -- using index signature to improve readability for lib user */
 
-import type { ChatInputCommandInteraction as _ChatInputCommandInteraction, PermissionFlags, _NonNullableFields } from 'discord.js';
-import type { Command, DefaultOptionType, OptionsG, SharedConfig } from '../../index.ts';
+import type {
+  CacheType, ChatInputCommandInteraction as _ChatInputCommandInteraction, Client, Message,
+  MessageComponentInteraction, PermissionFlags, _NonNullableFields
+} from 'discord.js';
+import type { Locale, Translator } from '@mephisto5558/i18n';
+import type { ChatInputCommandInteraction, Command, DefaultOptionType, OptionsG, ResolveContext, SharedConfig } from '../../index.ts';
 import type {
   CommandOptionConfig, RunnableReturns as OptionRunnableReturns, StrictCommandOption, ValidateOptionsArray
 } from '../commandOption/utils.ts';
@@ -38,5 +42,12 @@ export interface CommandConfig<
 
   beta?: true;
 
-  run: StrictCommand<CT, DM, Options>['run'];
+  run(
+    this: ResolveContext<{
+      slash: ChatInputCommandInteraction<DM extends false ? 'cached' : CacheType, NoInfer<Options>>;
+      component: MessageComponentInteraction<DM extends false ? 'cached' : CacheType>;
+      prefix: Message<DM extends false ? true : false>;
+    }, NoInfer<CT>>,
+    lang: Translator<false, Locale>, client: Client<true>
+  ): unknown;
 }
