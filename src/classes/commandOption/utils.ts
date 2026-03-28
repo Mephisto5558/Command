@@ -4,9 +4,7 @@ import type {
   GuildMember, Message, MessageComponentInteraction, NewsChannel, Role, StageChannel, TextChannel, ThreadChannel, User, VoiceChannel
 } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
-import type {
-  ChatInputCommandInteraction, CommandOption, DefaultOptionType, OptionsG, ResolveContext, SharedConfig
-} from '../../index.ts';
+import type { ChatInputCommandInteraction, CommandOption, DefaultOptionType, OptionsG, ResolveContext, SharedConfig } from '../../index.ts';
 import type { CommandType } from '../utils.ts';
 
 export type autocompleteObject = StrictOmit<ApplicationCommandOptionChoiceData, 'nameLocalizations'>;
@@ -18,20 +16,29 @@ export type StrictCommandOption<
 > = CommandOption.CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<Options>>;
 
 // #region option resolver
+type GetNamesAtLevel<Opts extends readonly unknown[], TargetType extends ApplicationCommandOptionType>
+  = Opts[number] extends infer O
+    ? O extends { type: TargetType; name: infer N } ? (N extends string ? N : never) : never
+    : never;
+
 type OptionName<Options extends readonly unknown[], Type extends ApplicationCommandOptionType>
   = Options[number] extends infer O
     ? O extends { type: Type; name: infer N } ? (N extends string ? N : never)
-    : O extends { type: ApplicationCommandOptionType.Subcommand | ApplicationCommandOptionType.SubcommandGroup; options: infer SubOptions }
-      ? (SubOptions extends readonly unknown[] ? OptionName<SubOptions, Type> : never)
-      : never
+    : O extends { type: ApplicationCommandOptionType.SubcommandGroup; options: infer SubGroupOptions } // Recurse into subcommand group
+      ? (SubGroupOptions extends readonly unknown[] ? GetNamesAtLevel<SubGroupOptions, Type> : never)
+      : O extends { type: ApplicationCommandOptionType.Subcommand; options: infer SubOptions } // Recurse into subcommand
+        ? (SubOptions extends readonly unknown[] ? GetNamesAtLevel<SubOptions, Type> : never)
+        : never
     : never;
 
 type GetOption<Options extends readonly unknown[], Name extends string, Type extends ApplicationCommandOptionType>
   = Options[number] extends infer O
     ? O extends { name: Name; type: Type } ? O
-    : O extends { type: ApplicationCommandOptionType.Subcommand | ApplicationCommandOptionType.SubcommandGroup; options: infer SubOptions }
-      ? (SubOptions extends readonly unknown[] ? GetOption<SubOptions, Name, Type> : never)
-      : never
+    : O extends { type: ApplicationCommandOptionType.SubcommandGroup; options: infer SubGroupOptions } // Recurse into subcommand group
+      ? (SubGroupOptions extends readonly unknown[] ? GetOption<SubGroupOptions, Name, Type> : never)
+      : O extends { type: ApplicationCommandOptionType.Subcommand; options: infer SubOptions } // Recurse into subcommand
+        ? (SubOptions extends readonly unknown[] ? GetOption<SubOptions, Name, Type> : never)
+        : never
     : never;
 
 type ResolvedChannelType<T extends ChannelType>
@@ -41,14 +48,14 @@ type ResolvedChannelType<T extends ChannelType>
   : T extends ChannelType.GuildAnnouncement ? NewsChannel
   : T extends ChannelType.GuildStageVoice ? StageChannel
   : T extends ChannelType.PublicThread | ChannelType.PrivateThread | ChannelType.AnnouncementThread ? ThreadChannel
-  : GuildBasedChannel;
+  : GuildBasedChannel | APIInteractionDataResolvedChannel;
 
 type MapChannelTypes<Types extends readonly ChannelType[]> = ResolvedChannelType<Types[number]>;
 
 type ResolvedChannel<Options extends readonly unknown[], Name extends string>
   = GetOption<Options, Name, ApplicationCommandOptionType.Channel> extends { channelTypes: readonly ChannelType[] }
     ? MapChannelTypes<GetOption<Options, Name, ApplicationCommandOptionType.Channel>['channelTypes']>
-    : GuildBasedChannel | APIInteractionDataResolvedChannel;
+    : GuildBasedChannel | APIInteractionDataResolvedChannel; // Added APIInteractionDataResolvedChannel
 
 type ResolvedSubcommand<Options extends readonly unknown[]> = OptionName<Options, ApplicationCommandOptionType.Subcommand> extends never
   ? string : OptionName<Options, ApplicationCommandOptionType.Subcommand>;
@@ -161,8 +168,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
 
 // #region option config
 type MapToConfig<
-  O, CT extends readonly CommandType[], DM extends boolean
->
+  O, CT extends readonly CommandType[], DM extends boolean>
   = O extends { type: ApplicationCommandOptionType.String } ? StringCommandOptionConfig<CT, DM, never>
   : O extends { type: ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number } ? NumericCommandOptionConfig<CT, DM, never>
   : O extends { type: ApplicationCommandOptionType.Boolean } ? BooleanCommandOptionConfig
@@ -171,13 +177,9 @@ type MapToConfig<
   : O extends { type: ApplicationCommandOptionType.Role } ? RoleCommandOptionConfig
   : O extends { type: ApplicationCommandOptionType.Mentionable } ? MentionableCommandOptionConfig
   : O extends { type: ApplicationCommandOptionType.Attachment } ? AttachmentCommandOptionConfig
-  : O extends { type: ApplicationCommandOptionType.Subcommand } ? (
-    SubcommandConfig<CT, DM, never, O extends { options: OptionsG<CT, DM> } ? O['options'] : []>
-  )
-    : O extends { type: ApplicationCommandOptionType.SubcommandGroup } ? (
-      SubcommandGroupConfig<CT, DM, O extends { options: OptionsG<CT, DM> } ? O['options'] : []>
-    )
-      : PrimitiveCommandOptionConfig<CT, DM>;
+  : O extends { type: ApplicationCommandOptionType.SubcommandGroup } ? SubcommandGroupConfig<CT, DM>
+  : O extends { type: ApplicationCommandOptionType.Subcommand } ? SubcommandConfig<CT, DM>
+  : PrimitiveCommandOptionConfig<CT, DM>;
 
 type ValidateOption<O, CT extends readonly CommandType[], DM extends boolean> = MapToConfig<O, CT, DM> extends infer Config
   ? Config & { [K in keyof O]: K extends keyof Config ? O[K] : never } : never;
@@ -198,33 +200,30 @@ type BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM exte
 
   strictAutocomplete?: boolean;
   autocompleteOptions?: StrictCommandOption<CT, DM, AO>['autocompleteOptions'];
-
   choices?: ApplicationCommandOptionChoiceData['value'][];
 } & BaseOptionConfig;
 
 type SubcommandConfig<
-  CT extends readonly CommandType[], DM extends boolean, AO,
-  Options extends OptionsG<CT, DM> = readonly DefaultOptionType<CT, DM>[]
-> = {
-  type: ApplicationCommandOptionType.Subcommand;
-  options?: ValidateOptionsArray<Options, CT, DM> & readonly PrimitiveCommandOptionConfig<CT, DM>[];
-  run?(
-    this: ResolveContext<{
-      slash: ChatInputCommandInteraction<'cached', Options>;
-      component: MessageComponentInteraction<'cached'>;
-      prefix: Message;
-    }, CT>,
-    lang: Translator<false, Locale>, options: AO, client: Client<true>
-  ): unknown;
-} & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
+  CT extends readonly CommandType[], DM extends boolean, AO = never,
+  Options extends readonly PrimitiveCommandOptionConfig<CT, DM, AO>[] = readonly PrimitiveCommandOptionConfig<CT, DM, AO>[]> = {
+    type: ApplicationCommandOptionType.Subcommand;
+    options?: ValidateOptionsArray<Options, CT, DM>;
+    run?(
+      this: ResolveContext<{
+        slash: ChatInputCommandInteraction<'cached', Options>;
+        component: MessageComponentInteraction<'cached'>;
+        prefix: Message;
+      }, CT>,
+      lang: Translator<false, Locale>, options: AO, client: Client<true>
+    ): unknown;
+  } & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
 
 type SubcommandGroupConfig<
-  CT extends readonly CommandType[], DM extends boolean, AO,
-  Options extends OptionsG<CT, DM> = readonly DefaultOptionType<CT, DM>[]
-> = {
-  type: ApplicationCommandOptionType.SubcommandGroup;
-  options?: ValidateOptionsArray<Options, CT, DM> & readonly SubcommandConfig<CT, DM, AO>[];
-} & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
+  CT extends readonly CommandType[], DM extends boolean, AO = never,
+  Options extends readonly SubcommandConfig<CT, DM, AO>[] = readonly SubcommandConfig<CT, DM, AO>[]> = {
+    type: ApplicationCommandOptionType.SubcommandGroup;
+    options?: ValidateOptionsArray<Options, CT, DM>;
+  } & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
 
 type StringCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO> = {
   type: ApplicationCommandOptionType.String;

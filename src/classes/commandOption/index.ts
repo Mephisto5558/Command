@@ -22,9 +22,7 @@ export class CommandOption<
   const CT extends readonly CommandType[] = [],
   const DM extends boolean = false,
   const additionalRunOpts = never,
-  const Options extends readonly (
-    CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>
-  )[] = readonly DefaultOptionType<CT, DM>[]
+  const Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[] = readonly DefaultOptionType<CT, DM>[]
 > {
   name: Lowercase<string>;
   id!: `${string}.options.${CommandOption['name']}`;
@@ -74,7 +72,7 @@ export class CommandOption<
     }, CT>,
     lang: Translator,
     options: additionalRunOpts, client: Client<true>
-  ) => Promise<never>;
+  ) => unknown;
 
   #i18n!: I18nProvider;
   #cooldownsManager!: CooldownsManager;
@@ -91,11 +89,14 @@ export class CommandOption<
       case ApplicationCommandOptionType.Subcommand:
         if (config.cooldowns)
           this.cooldowns = Object.fromEntries(Object.entries(this.cooldowns).map(e => cooldownConverter(config.cooldowns!, ...e)));
-        if (config.dmPermission) this.dmPermission = config.dmPermission;
-        if (config.options) this.options = config.options.map(e => (e instanceof CommandOption ? e : new CommandOption(e)));
+
+        if ('dmPermission' in config) this.dmPermission = config.dmPermission;
+        if (config.options)
+          this.options = config.options.map(e => (e instanceof CommandOption ? e : new CommandOption(e)));
 
 
-        this.run = config.run;
+        /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, custom/unbound-method */
+        if ('run' in config) this.run = config.run as unknown as typeof this.run;
         break;
 
       case ApplicationCommandOptionType.String:
@@ -238,7 +239,7 @@ export class CommandOption<
   async isRunnable(
     interaction: Parameters<customPermissionChecksFn>[0], command: StrictCommand<CT, DM, Options>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
-  ): Promise<Awaited<Exclude<ReturnType<customPermissionChecksFn<StrictCommand<CT, DM, Options>, RunnableReturns>>, string>>> {
+  ): Promise<RunnableReturns | boolean> {
     if (
       [ApplicationCommandOptionType.SubcommandGroup, ApplicationCommandOptionType.Subcommand].includes(this.type)
       && !this.dmPermission && (!interaction.channel || interaction.channel.type == ChannelType.DM)
@@ -250,7 +251,9 @@ export class CommandOption<
       return this.#isRunnableSubcommand(interaction, command, wrapperTranslator, args);
 
     const
-      option = interaction instanceof CommandInteraction ? interaction.options.get(this.name)?.value : undefined,
+      option = !(interaction instanceof Message) && interaction.isChatInputCommand()
+        ? interaction.options.get(this.name)?.value
+        : undefined,
       arg = args?.[this.position];
 
     if (this.required && option === undefined && !arg) {
@@ -269,7 +272,7 @@ export class CommandOption<
 
       if (
         this.autocomplete && this.strictAutocomplete
-        && (await this.generateAutocomplete(interaction, arg, wrapperTranslator.config.locale ?? wrapperTranslator.defaultConfig.defaultLocale))
+        && !(await this.generateAutocomplete(interaction, arg, wrapperTranslator.config.locale ?? wrapperTranslator.defaultConfig.defaultLocale))
           .some(e => e.value.toString().toLowerCase() === arg.toLowerCase())
       ) {
         if (typeof this.autocompleteOptions == 'function') return ['strictAutocompleteNoMatch', this.name];
@@ -298,7 +301,7 @@ export class CommandOption<
   async #isRunnableSubcommandGroup(
     interaction: Parameters<customPermissionChecksFn>[0], command: StrictCommand<CT, DM, Options>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
-  ): Promise<Exclude<ReturnType<customPermissionChecksFn<StrictCommand<CT, DM, Options>, RunnableReturns>>, string>> {
+  ): Promise<RunnableReturns | boolean> {
     const
       subcommandName = interaction instanceof CommandInteraction ? interaction.options.getSubcommand(true) : args?.[0],
       subcommand = this.options.find(e => e.name == subcommandName);
@@ -312,7 +315,7 @@ export class CommandOption<
   async #isRunnableSubcommand(
     interaction: Parameters<customPermissionChecksFn>[0], command: StrictCommand<CT, DM, Options>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
-  ): Promise<Exclude<ReturnType<customPermissionChecksFn<StrictCommand<CT, DM, Options>, RunnableReturns>>, string>> {
+  ): Promise<RunnableReturns | boolean> {
     for (const option of this.options) {
       const err = await option.isRunnable(interaction, command, wrapperTranslator, args);
       if (err) return err;

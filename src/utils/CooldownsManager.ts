@@ -1,6 +1,7 @@
 /* eslint-disable unicorn/filename-case -- class export */
 
 import { Message } from 'discord.js';
+
 import type { ChatInputCommandInteraction, MessageComponentInteraction } from 'discord.js';
 import type { CommandType } from '../classes/utils.ts';
 import type { Command, CooldownTypes } from '../index.ts';
@@ -22,11 +23,18 @@ export default class CooldownsManager {
     for (const [cdName, value] of Object.entries(cooldowns)) {
       if (!value) continue;
 
-      let areaId;
-      /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
-      if (context instanceof Message) areaId = context[cdName == 'user' ? 'author' : cdName]?.id as Snowflake | undefined;
-      else areaId = context[cdName]?.id as Snowflake | undefined;
-      /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
+      let areaId: Snowflake | undefined;
+      switch (cdName) {
+        case 'user':
+          areaId = context instanceof Message ? context.author.id : context.user.id;
+          break;
+        case 'guild':
+          areaId = context.guildId ?? undefined;
+          break;
+        case 'channel':
+          areaId = context.channelId;
+          break;
+      }
 
       if (!areaId) continue;
 

@@ -4,7 +4,7 @@ import type { CacheType, ChatInputCommandInteraction as _ChatInputCommandInterac
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type { Command } from './classes/command/index.ts';
 import type { CommandOption } from './classes/commandOption/index.ts';
-import type { CommandOptionConfig, StrictCommandOption, TypeSafeOptionResolver } from './classes/commandOption/utils.ts';
+import type { CommandOptionConfig, TypeSafeOptionResolver } from './classes/commandOption/utils.ts';
 import type { CommandType } from './classes/utils.ts';
 
 export * from './utils/index.ts';
@@ -41,7 +41,7 @@ export type Logger = {
   error: typeof console.error;
 };
 
-export type OptionsG<CT extends readonly CommandType[], DM extends boolean> = readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[];
+export type OptionsG<CT extends readonly CommandType[], DM extends boolean> = readonly (CommandOptionConfig<CT, DM> | CommandOption<CT, DM>)[];
 export type DefaultOptionType<CT extends readonly CommandType[], DM extends boolean>
   = CommandOptionConfig<CT, DM, never, OptionsG<CT, DM>> | CommandOption<CT, DM, never, OptionsG<CT, DM>>;
 
@@ -65,11 +65,11 @@ export interface ChatInputCommandInteraction<
   options: TypeSafeOptionResolver<Cached, Options>;
 }
 
-export type ResolveContext<MAP, KEYS extends readonly (keyof MAP)[]> = {
-  [K in KEYS[number]]: MAP[K]
-}[KEYS[number]];
+export type ResolveContext<MAP, KEYS extends readonly string[]> = Prettify<{
+  [K in KEYS[number]]: K extends keyof MAP ? MAP[K] : undefined
+}>[KEYS[number]];
 
-export type commandDoneFn<cmd extends Command<CommandType[], boolean> = Command<CommandType[], boolean>> = (
+export type commandDoneFn<cmd extends Command<readonly CommandType[], boolean> = Command<readonly CommandType[], boolean>> = (
   this: ThisParameterType<cmd['run']>,
   command: cmd, lang: Translator<false, Locale>
 ) => Promise<never>;
@@ -79,7 +79,7 @@ export type commandDoneFn<cmd extends Command<CommandType[], boolean> = Command<
  * @returns If a permission error was handled by the function: `true`
  * @returns If no permission error was found: `false` */
 export type customPermissionChecksFn<
-  cmd extends Command<CommandType[], boolean> = Command<CommandType[], boolean>,
+  cmd extends Command<readonly CommandType[], boolean> = Command<readonly CommandType[], boolean>,
   RetMsgs extends Parameters<Translator> = Parameters<Translator>
 > = ((
   this: cmd, interaction: ThisParameterType<cmd['run']>,
