@@ -13,7 +13,7 @@ import { descriptionMaxLength } from '../../utils/constants.ts';
 import { commandMention } from '../../utils/index.ts';
 import { CommandType, cooldownConverter, equal } from '../utils.ts';
 
-import type { ApplicationCommand, CacheType, ChatInputApplicationCommandData, Client, PermissionFlags, User } from 'discord.js';
+import type { ApplicationCommand, CacheType, Client, PermissionFlags, User } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
   BetterMS, ChatInputCommandInteraction, DefaultOptionType, Logger,
@@ -38,7 +38,7 @@ export class Command<
   Options extends readonly (
     CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>
   )[] = readonly DefaultOptionType<CT, DM>[]
-> implements ChatInputApplicationCommandData {
+> /* implements ChatInputApplicationCommandData */ {
   name!: Lowercase<string>;
   id!: `commands.${Command['category']}.${Command['name']}`;
   commandId!: [CommandType.Slash] extends NoInfer<CT> ? Snowflake : undefined;
@@ -102,9 +102,9 @@ export class Command<
 
   run: (
     this: ResolveContext<{
-      slash: ChatInputCommandInteraction<DM extends false ? 'cached' : CacheType, NoInfer<Options>>;
-      component: MessageComponentInteraction<DM extends false ? 'cached' : CacheType>;
-      prefix: Message<DM extends false ? true : false>;
+      [CommandType.Slash]: ChatInputCommandInteraction<DM extends false ? 'cached' : CacheType, NoInfer<Options>>;
+      [CommandType.Component]: MessageComponentInteraction<DM extends false ? 'cached' : CacheType>;
+      [CommandType.Prefix]: Message<DM extends false ? true : false>;
     }, NoInfer<CT>>,
     lang: Translator<false, Locale>, client: Client<true>
   ) => unknown;
@@ -172,7 +172,7 @@ export class Command<
     if (config.logger) this.#logger = config.logger;
     if (config.doneFn) this.#doneFn = config.doneFn;
     if (config.cooldownsManager) this.#cooldownsManager = config.cooldownsManager;
-    this.#customPermissionChecks = config.customPermissionChecks?.bind(this);
+    this.#customPermissionChecks = config.customPermissionChecks?.bind(this as unknown as Command<unknown, unknown, unknown>);
 
     if (config.devIds) this.config.devIds = config.devIds;
     if (config.devOnlyCategories) this.config.devOnlyCategories = config.devOnlyCategories;
@@ -258,8 +258,8 @@ export class Command<
       commandTranslator = i18n.getTranslator({ locale, backupPaths: [this.id] }),
       errorKey = await this.#isRunnable(interaction, wrapperTranslator);
 
+    if (errorKey === true) return; // already handled by the function
     if (errorKey !== false) {
-      if (errorKey === true) return; // already handled by the function
       return interaction.reply({
         embeds: [new EmbedBuilder({ description: wrapperTranslator(...errorKey), color: Colors.Red })],
         flags: MessageFlags.Ephemeral
@@ -269,14 +269,14 @@ export class Command<
     interaction.commandName ??= this.name; // Is undefined on `MessageComponentInteraction`s
 
     let commandType;
-    if (interaction instanceof CommandInteraction) commandType = CommandType.slash;
-    else if (interaction instanceof MessageComponentInteraction) commandType = CommandType.component;
-    else commandType = CommandType.prefix;
+    if (interaction instanceof CommandInteraction) commandType = CommandType.Slash;
+    else if (interaction instanceof MessageComponentInteraction) commandType = CommandType.Component;
+    else commandType = CommandType.Prefix;
 
     this.#logger.debug(`Executing ${commandType} command ${this.name}`);
 
     if (
-      commandType == CommandType.slash && !(interaction instanceof Message)
+      commandType == CommandType.Slash && !(interaction instanceof Message)
       && interaction.isChatInputCommand() && !this.noDefer && !interaction.replied
     ) await interaction.deferReply({ flags: this.ephemeralDefer ? MessageFlags.Ephemeral : undefined });
 
@@ -294,7 +294,7 @@ export class Command<
    * Resets it if it's `0`. */
   private updateCooldowns(interaction: ThisParameterType<StrictCommand<CT, DM>['run']>): number {
     const
-      currentCooldowns = [this.#cooldownsManager.update(this.id, interaction, this.cooldowns)],
+      currentCooldowns = [this.#cooldownsManager.update(this.id, interaction as unknown as Parameters<CooldownsManager['update']>[1], this.cooldowns)],
       { group, subcommand } = this.#getSubcommandNames(interaction) ?? {};
 
     if (group) {
@@ -304,7 +304,7 @@ export class Command<
           currentCooldowns.push(groupOption.updateCooldowns(interaction));
 
         if (subcommand) {
-          const subOption = groupOption.options.find(e => e.name == subcommand && e.type == ApplicationCommandOptionType.Subcommand);
+          const subOption = groupOption.options?.find(e => e.name == subcommand && e.type == ApplicationCommandOptionType.Subcommand);
           if (subOption && Object.values(subOption.cooldowns).some(Boolean))
             currentCooldowns.push(subOption.updateCooldowns(interaction));
         }
@@ -320,13 +320,15 @@ export class Command<
   }
 
   #getSubcommandNames(
-    interaction: CommandInteraction | Message | MessageComponentInteraction
+    interaction: ChatInputCommandInteraction | Message | MessageComponentInteraction
   ): { group: string | undefined; subcommand: string } | undefined {
     if (interaction instanceof BaseInteraction && interaction.isChatInputCommand()) {
-      if (!interaction.options.getSubcommand(false)) return;
-      return { group: interaction.options.getSubcommandGroup(false) ?? undefined, subcommand: interaction.options.getSubcommand(true) };
+      const commandInteraction = interaction as ChatInputCommandInteraction;
+      if (!commandInteraction.options.getSubcommand(false)) return;
+      return { group: commandInteraction.options.getSubcommandGroup(false) ?? undefined, subcommand: commandInteraction.options.getSubcommand(true) };
     }
-    if (interaction instanceof BaseInteraction && interaction.isMessageComponent()) return; // todo
+
+    if (interaction instanceof MessageComponentInteraction) return; // todo
 
     const
       args = (interaction as Message).content.split(/\s+/).slice(1),
@@ -334,7 +336,7 @@ export class Command<
 
     if (option1?.type == ApplicationCommandOptionType.Subcommand) return { group: undefined, subcommand: option1.name };
     if (option1?.type == ApplicationCommandOptionType.SubcommandGroup) {
-      const subcommand = option1.options.find(e => e.name == args[1] && e.type == ApplicationCommandOptionType.Subcommand);
+      const subcommand = option1.options?.find(e => e.name == args[1] && e.type == ApplicationCommandOptionType.Subcommand);
       if (subcommand) return { group: option1.name, subcommand: subcommand.name };
     }
   }
@@ -343,7 +345,7 @@ export class Command<
     interaction: CommandInteraction | Message | MessageComponentInteraction,
     author: User,
     wrapperTranslator: Translator<false, Locale>
-  ): Promise<ReturnType<customPermissionChecksFn>> {
+  ): Promise<boolean | RunnableReturns> {
     if (!(interaction.inGuild() && interaction.guild && interaction.channel)) return false;
 
     const
@@ -373,16 +375,16 @@ export class Command<
         if (!(err instanceof Error && 'code' in err) || err.code != CANNOT_SEND_MESSAGE_API_ERR) throw err;
       }
     }
-    else if (interaction instanceof BaseInteraction && interaction.isRepliable())
-      await interaction.reply({ embeds: [embed], ephemeral: true });
-    else await (interaction as Message).reply({ embeds: [embed] });
+    else if (interaction instanceof BaseInteraction)
+      await (interaction.isRepliable() ? interaction.reply({ embeds: [embed], ephemeral: true }) : interaction.channel.send({ embeds: [embed] }));
+    else await interaction.reply({ embeds: [embed] });
 
     return true;
   }
 
   async #isRunnable(
     interaction: CommandInteraction | Message | MessageComponentInteraction, wrapperTranslator: Translator<false, Locale>
-  ): Promise<Awaited<ReturnType<customPermissionChecksFn<Command<CommandType[], boolean>, RunnableReturns>>>> {
+  ): Promise<RunnableReturns | boolean> {
     const
       author = interaction instanceof BaseInteraction ? interaction.user : interaction.author,
       args = interaction instanceof Message ? interaction.content.split(/\s+/).slice(1) : undefined,
@@ -416,7 +418,7 @@ export class Command<
 
   #staticRunnableChecks(
     interaction: CommandInteraction | Message | MessageComponentInteraction, author: User
-  ): Awaited<ReturnType<customPermissionChecksFn>> {
+  ): RunnableReturns | boolean {
     if (
       this.config.devOnlyCategories.has(this.category) && !this.config.devIds.has(author.id)
       || (interaction instanceof Message && interaction.guild?.members.me?.communicationDisabledUntil)
@@ -464,7 +466,7 @@ export class Command<
     return options.find(e => e.name == option.name && (!option.type || e.type == option.type));
   }
 
-  isEqualTo(cmd?: Command<CommandType[], boolean> | ApplicationCommand): boolean {
+  isEqualTo(cmd?: Command<readonly CommandType[], boolean> | ApplicationCommand): boolean {
     if (!cmd) return false;
     if (
       /* eslint-disable-next-line sonarjs/expression-complexity */

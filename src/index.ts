@@ -47,8 +47,8 @@ export type Logger = {
 };
 
 export type OptionsG<CT extends readonly CommandType[], DM extends boolean> = readonly (CommandOptionConfig<CT, DM> | CommandOption<CT, DM>)[];
-export type DefaultOptionType<CT extends readonly CommandType[], DM extends boolean>
-  = CommandOptionConfig<CT, DM, never, OptionsG<CT, DM>> | CommandOption<CT, DM, never, OptionsG<CT, DM>>;
+export type DefaultOptionType<CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = never>
+  = CommandOptionConfig<CT, DM, AO, OptionsG<CT, DM>> | CommandOption<CT, DM, never, OptionsG<CT, DM>>;
 
 export enum CooldownType {
   Guild = 'guild',
@@ -78,7 +78,7 @@ export type ResolveContext<MAP, KEYS extends readonly string[]> = Prettify<{
   [K in KEYS[number]]: K extends keyof MAP ? MAP[K] : undefined
 }>[KEYS[number]];
 
-export type commandDoneFn<cmd extends Command<CommandType[], boolean> = Command<CommandType[], boolean>> = (
+export type commandDoneFn<cmd extends Command<readonly CommandType[], boolean> = Command<readonly CommandType[], boolean>> = (
   this: ThisParameterType<cmd['run']>,
   command: cmd, lang: Translator<false, Locale>
 ) => Promise<never>;
@@ -88,7 +88,7 @@ export type commandDoneFn<cmd extends Command<CommandType[], boolean> = Command<
  * @returns If a permission error was handled by the function: `true`
  * @returns If no permission error was found: `false` */
 export type customPermissionChecksFn<
-  cmd extends Command<CommandType[], boolean> = Command<CommandType[], boolean>,
+  cmd extends Command<readonly CommandType[], boolean> = Command<readonly CommandType[], boolean>,
   RetMsgs extends Parameters<Translator> = Parameters<Translator>
 > = ((
   this: cmd, interaction: ThisParameterType<cmd['run']>,
