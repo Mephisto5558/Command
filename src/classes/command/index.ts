@@ -2,25 +2,22 @@
 
 import {
   ApplicationCommandOptionType, ApplicationCommandType, BaseInteraction, ChannelType,
-  ChatInputCommandInteraction as _ChatInputCommandInteraction, Colors, EmbedBuilder,
-  Message, MessageFlags, PermissionFlagsBits, PermissionsBitField, _NonNullableFields, inlineCode
+  ChatInputCommandInteraction as _ChatInputCommandInteraction, Colors, CommandInteraction, EmbedBuilder,
+  Message, MessageComponentInteraction, MessageFlags, PermissionFlagsBits, PermissionsBitField, _NonNullableFields, inlineCode
 } from 'discord.js';
 
 // @ts-expect-error Cannot augment that module
 import { getMilliseconds as getMilliseconds_ } from 'better-ms';
-import { CommandExecutionError, CommandOption } from '../../index.ts';
+import { CommandExecutionError, CommandOption, CooldownType } from '../../index.ts';
 import { descriptionMaxLength } from '../../utils/constants.ts';
 import { commandMention } from '../../utils/index.ts';
 import { CommandType, cooldownConverter, equal } from '../utils.ts';
 
-import type {
-  ApplicationCommand, CacheType, ChatInputApplicationCommandData, Client, CommandInteraction,
-  MessageComponentInteraction, PermissionFlags, User
-} from 'discord.js';
+import type { ApplicationCommand, CacheType, ChatInputApplicationCommandData, Client, PermissionFlags, User } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  BetterMS, ChatInputCommandInteraction, CooldownTypes, DefaultOptionType, Logger,
-  ResolveContext, commandDoneFn, customPermissionChecksFn
+  BetterMS, ChatInputCommandInteraction, DefaultOptionType, Logger,
+  OptionsG, ResolveContext, commandDoneFn, customPermissionChecksFn
 } from '../../index.ts';
 import type { CooldownsManager } from '../../utils/index.ts';
 import type { CommandOptionConfig, StrictCommandOption } from '../commandOption/utils.ts';
@@ -30,7 +27,6 @@ const
   /* eslint-disable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-non-null-assertion */
   getMilliseconds = getMilliseconds_ as typeof BetterMS.getMilliseconds,
   msInSeconds = getMilliseconds('1s')!,
-  PERM_ERR_MSG_DELETETIME = getMilliseconds('10s')!,
   /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
 
   CANNOT_SEND_MESSAGE_API_ERR = 50_007;
@@ -68,7 +64,7 @@ export class Command<
     [CommandType.slash]: [], [CommandType.prefix]: []
   } as Record<NoInfer<CT>[number], Lowercase<string>[]>;
 
-  cooldowns: Record<CooldownTypes, number> & {} = { guild: 0, channel: 0, user: 0 };
+  cooldowns: Record<CooldownType, number> & {} = { [CooldownType.guild]: 0, [CooldownType.channel]: 0, [CooldownType.user]: 0 };
 
   permissions: Record<'client' | 'user', PermissionFlags[keyof PermissionFlags][]> & {}
     = { client: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages], user: [PermissionFlagsBits.SendMessages] };
@@ -111,9 +107,9 @@ export class Command<
 
   #i18n!: I18nProvider;
   #logger!: Logger;
-  #doneFn!: commandDoneFn<this>;
+  #doneFn!: commandDoneFn;
   #cooldownsManager!: CooldownsManager;
-  #customPermissionChecks: customPermissionChecksFn<this> | undefined;
+  #customPermissionChecks: customPermissionChecksFn | undefined;
 
   constructor(config: CommandConfig<CT, DM, Options>) {
     if (config.usage) {
@@ -124,7 +120,7 @@ export class Command<
     if (config.aliases) {
       for (const commandType of Object.values(CommandType)) {
         const aliasList = config.aliases[commandType as NoInfer<CT>[number]];
-        if (aliasList?.length) (this.aliases as Record<string, Lowercase<string>[]>)[commandType] = aliasList as Lowercase<string>[];
+        if (aliasList?.length) this.aliases[commandType as NoInfer<CT>[number]] = aliasList;
       }
     }
 
@@ -145,11 +141,8 @@ export class Command<
     if (config.noDefer) this.noDefer = config.noDefer;
     if (config.ephemeralDefer) this.ephemeralDefer = config.ephemeralDefer;
 
-    if (config.options) {
-      this.options = config.options.map(e => (
-        e instanceof CommandOption.CommandOption ? e : new CommandOption.CommandOption(e)
-      )) as unknown as StrictCommandOption<CT, DM>[];
-    }
+    if (config.options)
+      this.options = config.options.map(e => CommandOption.from(e));
 
     if (config.beta) this.beta = config.beta;
 
@@ -346,7 +339,7 @@ export class Command<
     interaction: CommandInteraction | Message | MessageComponentInteraction,
     author: User,
     wrapperTranslator: Translator<false, Locale>
-  ): Promise<ReturnType<customPermissionChecksFn<this>>> {
+  ): Promise<ReturnType<customPermissionChecksFn>> {
     if (!(interaction.inGuild() && interaction.guild && interaction.channel)) return false;
 
     const
@@ -490,5 +483,11 @@ export class Command<
     }
 
     return true;
+  }
+
+  static from<
+    CT extends readonly CommandType[], DM extends boolean, Options extends OptionsG<CT, DM>
+  >(command: CommandConfig<CT, DM, Options> | Command<CT, DM, Options>): Command<CT, DM, Options> {
+    return command instanceof this ? command : new this(command);
   }
 }

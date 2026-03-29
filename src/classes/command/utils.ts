@@ -16,11 +16,11 @@ import type { CommandType } from '../utils.ts';
 export type StrictCommand<
   CT extends readonly CommandType[], DM extends boolean,
   Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[] = readonly DefaultOptionType<CT, DM>[]
-> = Command.Command<NoInfer<CT>, NoInfer<DM>, NoInfer<Options>>;
+> = Command<NoInfer<CT>, NoInfer<DM>, NoInfer<Options>>;
 
 export type RunnableReturns = ['nonBeta']
   | ['disabled', string]
-  | ['slashOnly', Command.Command['mention']]
+  | ['slashOnly', Command['mention']]
   | ['guildOnly']
   | ['nsfw']
   | ['cooldown', string]
@@ -32,7 +32,7 @@ export interface CommandConfig<
 > extends SharedConfig<DM> {
   types: CT;
   usage?: { usage?: string; examples?: string } & {};
-  aliases?: { [K in NoInfer<CT>[number]]?: string[] } & {};
+  aliases?: { [K in NoInfer<CT>[number]]?: Lowercase<string>[] };
   permissions?: { client?: PermissionFlags[keyof PermissionFlags][]; user?: PermissionFlags[keyof PermissionFlags][] } & {};
 
   options?: ValidateOptionsArray<Options, CT, DM>;

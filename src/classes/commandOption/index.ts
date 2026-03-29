@@ -1,7 +1,9 @@
 /* eslint-disable max-lines */
+
 import {
   ApplicationCommandOptionType, ChannelType, CommandInteraction, Locale as DLocale, Message, _NonNullableFields, inlineCode
 } from 'discord.js';
+import { CooldownType } from '../../index.ts';
 import { autocompleteOptionsMaxAmt, choiceValueMaxLength, choiceValueMinLength, choicesMaxAmt, descriptionMaxLength } from '../../utils/constants.ts';
 import { cooldownConverter, equal } from '../utils.ts';
 
@@ -10,7 +12,7 @@ import type {
 } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  ChatInputCommandInteraction, Command, CooldownTypes, DefaultOptionType, Logger, ResolveContext, customPermissionChecksFn
+  ChatInputCommandInteraction, Command, DefaultOptionType, Logger, OptionsG, ResolveContext, customPermissionChecksFn
 } from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
 import type { RunnableReturns, StrictCommand } from '../command/utils.ts';
@@ -21,7 +23,7 @@ import type { CommandOptionConfig, StrictCommandOption, autocompleteObject, auto
 export class CommandOption<
   const CT extends readonly CommandType[] = [],
   const DM extends boolean = false,
-  const additionalRunOpts = never,
+  const AO = never,
   const Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[] = readonly DefaultOptionType<CT, DM>[]
 > {
   name: Lowercase<string>;
@@ -37,7 +39,8 @@ export class CommandOption<
 
   required = false;
 
-  cooldowns: Record<CooldownTypes, number> & {} = { guild: 0, channel: 0, user: 0 };
+  cooldowns: Record<CooldownType, number> = { [CooldownType.guild]: 0, [CooldownType.channel]: 0, [CooldownType.user]: 0 };
+  /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
   dmPermission: DM = false as DM;
 
   disabled!: boolean;
@@ -71,14 +74,14 @@ export class CommandOption<
       prefix: Message;
     }, CT>,
     lang: Translator,
-    options: additionalRunOpts, client: Client<true>
+    options: AO, client: Client<true>
   ) => unknown;
 
   #i18n!: I18nProvider;
   #cooldownsManager!: CooldownsManager;
   #logger!: Logger;
 
-  constructor(config: CommandOptionConfig<CT, DM, additionalRunOpts, Options>) {
+  constructor(config: CommandOptionConfig<CT, DM, AO, Options>) {
     this.name = config.name;
     this.type = config.type;
 
@@ -92,7 +95,7 @@ export class CommandOption<
 
         if ('dmPermission' in config) this.dmPermission = config.dmPermission;
         if (config.options)
-          this.options = config.options.map(e => (e instanceof CommandOption ? e : new CommandOption(e)));
+          this.options = config.options.map(e => CommandOption.from(e));
 
 
         /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, custom/unbound-method */
@@ -126,7 +129,7 @@ export class CommandOption<
   }
 
   init(
-    i18n: I18nProvider, parentId: Command.Command['id'] | CommandOption['id'],
+    i18n: I18nProvider, parentId: Command['id'] | CommandOption['id'],
     cooldownsManager: CooldownsManager, logger: Logger = console, position = 0
   ): this {
     this.#i18n = i18n;
@@ -266,7 +269,7 @@ export class CommandOption<
 
     if (interaction instanceof Message && arg) { // if it's an interaction then these checks will be done by Discord
       if (this.type == ApplicationCommandOptionType.Channel && this.channelTypes) {
-        const channel = interaction.guild?.channels.cache.get(arg);
+        const channel = interaction.guild?.channels.cache.get(arg as Snowflake);
         if (channel && !this.channelTypes.includes(channel.type)) return ['invalidChannelType', this.name];
       }
 
@@ -352,7 +355,7 @@ export class CommandOption<
   /**
    * @returns the currect cooldown for this subcommand(group) in ms.
    * Resets it if it's `0`. */
-  updateCooldowns(interaction: ThisParameterType<StrictCommandOption<CT, DM, additionalRunOpts, Options>['run']>): number {
+  updateCooldowns(interaction: ThisParameterType<StrictCommandOption<CT, DM, AO, Options>['run']>): number {
     return this.#cooldownsManager.update(this.id, interaction, this.cooldowns);
   }
 
@@ -401,5 +404,11 @@ export class CommandOption<
     }
 
     return true;
+  }
+
+  static from<
+    CT extends readonly CommandType[], DM extends boolean, AO, Options extends OptionsG<CT, DM>
+  >(commandOption: CommandOptionConfig<CT, DM, AO, Options> | CommandOption<CT, DM, AO, Options>): CommandOption<CT, DM, AO, Options> {
+    return commandOption instanceof this ? commandOption : new this(commandOption);
   }
 }

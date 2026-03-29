@@ -30,8 +30,8 @@ export function equal(a: unknown, b: unknown): boolean {
 
 export function cooldownConverter(
   cooldown: Partial<Record<string, validTimeString>>,
-  k: keyof Command.Command['cooldowns'], v: Command.Command['cooldowns'][keyof Command.Command['cooldowns']]
-): [keyof Command.Command['cooldowns'], number] {
+  k: keyof Command['cooldowns'], v: Command['cooldowns'][keyof Command['cooldowns']]
+): [keyof Command['cooldowns'], number] {
   if (!cooldown[k]) return [k, v];
 
   const ms = getMilliseconds(cooldown[k]);
