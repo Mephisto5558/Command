@@ -6,7 +6,7 @@ import type {
   MessageComponentInteraction, PermissionFlags, _NonNullableFields
 } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
-import type { ChatInputCommandInteraction, Command, DefaultOptionType, OptionsG, ResolveContext, SharedConfig } from '../../index.ts';
+import type { ChatInputCommandInteraction, Command, DefaultOptionType, OptionsG, PermissionType, ResolveContext, SharedConfig } from '../../index.ts';
 import type {
   CommandOptionConfig, RunnableReturns as OptionRunnableReturns, StrictCommandOption, ValidateOptionsArray
 } from '../commandOption/utils.ts';
@@ -33,7 +33,7 @@ export interface CommandConfig<
   types: CT;
   usage?: { usage?: string; examples?: string } & {};
   aliases?: { [K in NoInfer<CT>[number]]?: Lowercase<string>[] };
-  permissions?: { client?: PermissionFlags[keyof PermissionFlags][]; user?: PermissionFlags[keyof PermissionFlags][] } & {};
+  permissions?: Partial<Record<PermissionType, PermissionFlags[keyof PermissionFlags][]>>;
 
   options?: ValidateOptionsArray<Options, CT, DM>;
 
