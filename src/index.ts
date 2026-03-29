@@ -11,9 +11,16 @@ export { CommandOption } from './classes/commandOption/index.ts';
 export { CommandManager } from './classes/commandManager/index.ts';
 export { CommandExecutionError, CommandType } from './classes/utils.ts';
 export {
-  PermissionFlagsBits as Permissions,
+  PermissionFlagsBits as Permission,
   ApplicationCommandOptionType as OptionType
 } from 'discord.js';
+
+export enum PermissionType {
+  Client = 0,
+  Role = 1,
+  User = 2,
+  Channel = 3
+}
 
 export declare namespace BetterMS {
   function getMilliseconds<
@@ -44,9 +51,9 @@ export type DefaultOptionType<CT extends readonly CommandType[], DM extends bool
   = CommandOptionConfig<CT, DM, never, OptionsG<CT, DM>> | CommandOption<CT, DM, never, OptionsG<CT, DM>>;
 
 export enum CooldownType {
-  guild = 'guild',
-  channel = 'channel',
-  user = 'user'
+  Guild = 'guild',
+  Channel = 'channel',
+  User = 'user'
 }
 type Cooldowns = Record<CooldownType, validTimeString>;
 

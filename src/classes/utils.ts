@@ -57,7 +57,7 @@ export class CommandExecutionError extends Error {
 }
 
 export enum CommandType {
-  slash = 'slash',
-  prefix = 'prefix',
-  component = 'component'
+  Slash = 'slash',
+  Prefix = 'prefix',
+  Component = 'component'
 }

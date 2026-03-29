@@ -3,12 +3,12 @@
 import {
   ApplicationCommandOptionType, ApplicationCommandType, BaseInteraction, ChannelType,
   ChatInputCommandInteraction as _ChatInputCommandInteraction, Colors, CommandInteraction, EmbedBuilder,
-  Message, MessageComponentInteraction, MessageFlags, PermissionFlagsBits, PermissionsBitField, _NonNullableFields, inlineCode
+  Message, MessageComponentInteraction, MessageFlags, PermissionsBitField, _NonNullableFields, inlineCode
 } from 'discord.js';
 
 // @ts-expect-error Cannot augment that module
 import { getMilliseconds as getMilliseconds_ } from 'better-ms';
-import { CommandExecutionError, CommandOption, CooldownType } from '../../index.ts';
+import { CommandExecutionError, CommandOption, CooldownType, Permission, PermissionType } from '../../index.ts';
 import { descriptionMaxLength } from '../../utils/constants.ts';
 import { commandMention } from '../../utils/index.ts';
 import { CommandType, cooldownConverter, equal } from '../utils.ts';
@@ -18,7 +18,7 @@ import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
   BetterMS, ChatInputCommandInteraction, DefaultOptionType, Logger,
   OptionsG, ResolveContext, commandDoneFn, customPermissionChecksFn
-} from '../../index.ts';
+} from '../../index.js';
 import type { CooldownsManager } from '../../utils/index.ts';
 import type { CommandOptionConfig, StrictCommandOption } from '../commandOption/utils.ts';
 import type { CommandConfig, RunnableReturns, StrictCommand } from './utils.ts';
@@ -41,7 +41,7 @@ export class Command<
 > implements ChatInputApplicationCommandData {
   name!: Lowercase<string>;
   id!: `commands.${Command['category']}.${Command['name']}`;
-  commandId!: [CommandType.slash] extends NoInfer<CT> ? Snowflake : undefined;
+  commandId!: [CommandType.Slash] extends NoInfer<CT> ? Snowflake : undefined;
 
   /** Currently not used */
   nameLocalizations?: Partial<Record<Locale, Lowercase<string>>>;
@@ -61,16 +61,20 @@ export class Command<
 
   /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
   aliases: Record<NoInfer<CT>[number], Lowercase<string>[]> & {} = {
-    [CommandType.slash]: [], [CommandType.prefix]: []
+    [CommandType.Slash]: [], [CommandType.Prefix]: []
   } as Record<NoInfer<CT>[number], Lowercase<string>[]>;
 
-  cooldowns: Record<CooldownType, number> & {} = { [CooldownType.guild]: 0, [CooldownType.channel]: 0, [CooldownType.user]: 0 };
+  cooldowns: Record<CooldownType, number> & {} = { [CooldownType.Guild]: 0, [CooldownType.Channel]: 0, [CooldownType.User]: 0 };
 
-  permissions: Record<'client' | 'user', PermissionFlags[keyof PermissionFlags][]> & {}
-    = { client: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages], user: [PermissionFlagsBits.SendMessages] };
+  permissions: Record<PermissionType, PermissionFlags[keyof PermissionFlags][]> = {
+    [PermissionType.Client]: [Permission.ViewChannel, Permission.SendMessages],
+    [PermissionType.Role]: [],
+    [PermissionType.User]: [Permission.SendMessages],
+    [PermissionType.Channel]: []
+  };
 
   get defaultMemberPermissions(): PermissionsBitField['bitfield'] {
-    return new PermissionsBitField(this.permissions.user).bitfield;
+    return new PermissionsBitField(this.permissions[PermissionType.User]).bitfield;
   }
 
   /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
@@ -131,8 +135,8 @@ export class Command<
     }
 
     if (config.permissions) {
-      if (config.permissions.client) this.permissions.client.push(...config.permissions.client);
-      if (config.permissions.user) this.permissions.user.push(...config.permissions.user);
+      for (const permissionType of Object.values(PermissionType))
+        if (config.permissions[permissionType]) this.permissions[permissionType].push(...config.permissions[permissionType]);
     }
 
     if (config.dmPermission) this.dmPermission = config.dmPermission;
@@ -344,8 +348,8 @@ export class Command<
 
     const
       botChannelPerms = interaction.guild.members.me ? interaction.channel.permissionsFor(interaction.guild.members.me) : undefined,
-      userPermsMissing = interaction.channel.permissionsFor(author)?.missing(this.permissions.user) ?? [],
-      botPermsMissing = botChannelPerms?.missing(this.permissions.client);
+      userPermsMissing = interaction.channel.permissionsFor(author)?.missing(this.permissions[PermissionType.User]) ?? [],
+      botPermsMissing = botChannelPerms?.missing(this.permissions[PermissionType.Client]);
 
     if (!botPermsMissing?.length && !userPermsMissing.length) return false;
 
@@ -360,8 +364,8 @@ export class Command<
       color: Colors.Red
     });
 
-    if (botChannelPerms?.missing([PermissionFlagsBits.SendMessages, PermissionFlagsBits.ViewChannel]).length) {
-      if (interaction instanceof Message && botChannelPerms.has(PermissionFlagsBits.AddReactions))
+    if (botChannelPerms?.missing([Permission.SendMessages, Permission.ViewChannel]).length) {
+      if (interaction instanceof Message && botChannelPerms.has(Permission.AddReactions))
         void interaction.react('\u274C').then(() => void interaction.react('\u270D\uFE0F'));
 
       try { await author.send({ content: interaction instanceof Message ? interaction.url : '', embeds: [embed] }); }
@@ -422,7 +426,7 @@ export class Command<
 
     // TODO: remove hardcoded "Not provided"
 
-    if (interaction instanceof Message && !this.types.includes(CommandType.prefix)) return ['slashOnly', this.mention];
+    if (interaction instanceof Message && !this.types.includes(CommandType.Prefix)) return ['slashOnly', this.mention];
 
     if (!this.dmPermission && interaction.channel?.type == ChannelType.DM) return ['guildOnly'];
     if (this.category == 'nsfw' && interaction.channel && (!('nsfw' in interaction.channel) || !interaction.channel.nsfw)) return ['nsfw'];
@@ -447,7 +451,7 @@ export class Command<
 
   findOption(
     option: { name: string; type?: ApplicationCommandOptionType },
-    interaction?: ThisParameterType<StrictCommand<[CommandType.slash], DM>['run']>
+    interaction?: ThisParameterType<StrictCommand<[CommandType.Slash], DM>['run']>
   ): StrictCommandOption<CT, DM> | undefined {
     const
       group = interaction?.options.getSubcommandGroup(false),
