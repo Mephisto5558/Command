@@ -13,7 +13,7 @@ export type autocompleteOptions = autocompleteObject['value'] | autocompleteObje
 export type StrictCommandOption<
   CT extends readonly CommandType[], DM extends boolean, AO = never,
   Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[] = readonly DefaultOptionType<CT, DM>[]
-> = CommandOption.CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<Options>>;
+> = CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<Options>>;
 
 // #region option resolver
 type GetNamesAtLevel<Opts extends readonly unknown[], TargetType extends ApplicationCommandOptionType>

@@ -4,13 +4,13 @@ import type { Command } from './index.ts';
 
 export type Database = {
   botSettings: {
-    cmdStats: Record<Command.Command['name'], {
+    cmdStats: Record<Command['name'], {
       createdAt?: Date;
     } & Partial<Record<CommandType, number>>>;
   };
   guildSettings: Record<Guild['id'], {
     config: {
-      commands?: Record<Command.Command['name'], {
+      commands?: Record<Command['name'], {
         disabled?: {
           users: (User['id'] | '*')[];
           channels: (Channel['id'] | '*')[];
