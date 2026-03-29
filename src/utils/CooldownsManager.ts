@@ -26,13 +26,13 @@ export default class CooldownsManager {
 
       let areaId: Snowflake | undefined;
       switch (cdName) {
-        case CooldownType.user:
+        case CooldownType.User:
           areaId = context instanceof Message ? context.author.id : context.user.id;
           break;
-        case CooldownType.guild:
+        case CooldownType.Guild:
           areaId = context.guildId ?? undefined;
           break;
-        case CooldownType.channel:
+        case CooldownType.Channel:
           areaId = context.channelId;
           break;
       }

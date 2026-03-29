@@ -3,7 +3,7 @@ import { getMilliseconds as getMilliseconds_ } from 'better-ms';
 
 import type { CommandInteraction, Message, MessageComponentInteraction } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
-import type { BetterMS, Command, validTimeString } from '../index.ts';
+import type { BetterMS, Command, CooldownType, validTimeString } from '../index.ts';
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
 const getMilliseconds = getMilliseconds_ as typeof BetterMS.getMilliseconds;
@@ -29,7 +29,7 @@ export function equal(a: unknown, b: unknown): boolean {
 }
 
 export function cooldownConverter(
-  cooldown: Partial<Record<string, validTimeString>>,
+  cooldown: Partial<Record<CooldownType, validTimeString>>,
   k: keyof Command['cooldowns'], v: Command['cooldowns'][keyof Command['cooldowns']]
 ): [keyof Command['cooldowns'], number] {
   if (!cooldown[k]) return [k, v];

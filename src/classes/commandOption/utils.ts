@@ -11,7 +11,7 @@ export type autocompleteObject = StrictOmit<ApplicationCommandOptionChoiceData, 
 export type autocompleteOptions = autocompleteObject['value'] | autocompleteObject;
 
 export type StrictCommandOption<
-  CT extends readonly CommandType[], DM extends boolean, AO = never,
+  CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = never,
   Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[] = readonly DefaultOptionType<CT, DM>[]
 > = CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<Options>>;
 
@@ -195,7 +195,7 @@ type BaseOptionConfig = {
   required?: boolean;
 };
 
-type BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO> = {
+type BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO extends unknown[]> = {
   type: ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number;
 
   strictAutocomplete?: boolean;
@@ -203,43 +203,43 @@ type BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM exte
   choices?: ApplicationCommandOptionChoiceData['value'][];
 } & BaseOptionConfig;
 
-type SubcommandConfig<
-  CT extends readonly CommandType[], DM extends boolean, AO = never,
-  Options extends readonly PrimitiveCommandOptionConfig<CT, DM, AO>[] = readonly PrimitiveCommandOptionConfig<CT, DM, AO>[]> = {
+export type SubcommandConfig<
+  CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = never,
+  Options extends readonly (CommandOptionConfig<CT, DM, AO> | StrictCommandOption<CT, DM, AO>)[] = readonly DefaultOptionType<CT, DM, AO>[]> = {
     type: ApplicationCommandOptionType.Subcommand;
     options?: ValidateOptionsArray<Options, CT, DM>;
     run?(
       this: ResolveContext<{
-        slash: ChatInputCommandInteraction<'cached', Options>;
-        component: MessageComponentInteraction<'cached'>;
-        prefix: Message;
+        [CommandType.Slash]: ChatInputCommandInteraction<'cached', Options>;
+        [CommandType.Component]: MessageComponentInteraction<'cached'>;
+        [CommandType.Prefix]: Message;
       }, CT>,
       lang: Translator<false, Locale>, options: AO, client: Client<true>
     ): unknown;
   } & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
 
-type SubcommandGroupConfig<
-  CT extends readonly CommandType[], DM extends boolean, AO = never,
-  Options extends readonly SubcommandConfig<CT, DM, AO>[] = readonly SubcommandConfig<CT, DM, AO>[]> = {
+export type SubcommandGroupConfig<
+  CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = never,
+  Options extends OptionsG<CT, DM> = readonly DefaultOptionType<CT, DM, AO>[]> = {
     type: ApplicationCommandOptionType.SubcommandGroup;
     options?: ValidateOptionsArray<Options, CT, DM>;
   } & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
 
-type StringCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO> = {
+export type StringCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO extends unknown[]> = {
   type: ApplicationCommandOptionType.String;
 
   minLength?: number;
   maxLength?: number;
 } & BasePrimitiveCommandOptionConfig<CT, DM, AO>;
 
-type NumericCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO> = {
+export type NumericCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO extends unknown[]> = {
   type: ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number;
 
   minValue?: number;
   maxValue?: number;
 } & BasePrimitiveCommandOptionConfig<CT, DM, AO>;
 
-type ChannelCommandOptionConfig = {
+export type ChannelCommandOptionConfig = {
   type: ApplicationCommandOptionType.Channel;
 
   channelTypes?: ChannelType[];
@@ -251,7 +251,7 @@ type RoleCommandOptionConfig = { type: ApplicationCommandOptionType.Role } & Bas
 type MentionableCommandOptionConfig = { type: ApplicationCommandOptionType.Mentionable } & BaseOptionConfig;
 type AttachmentCommandOptionConfig = { type: ApplicationCommandOptionType.Attachment } & BaseOptionConfig;
 
-export type PrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO = never>
+export type PrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = never>
   = | StringCommandOptionConfig<CT, DM, AO>
     | NumericCommandOptionConfig<CT, DM, AO>
     | BooleanCommandOptionConfig
@@ -262,7 +262,7 @@ export type PrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM e
     | AttachmentCommandOptionConfig;
 
 export type CommandOptionConfig<
-  CT extends readonly CommandType[], DM extends boolean, AO = never,
+  CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = never,
   Options extends OptionsG<CT, DM> = readonly DefaultOptionType<CT, DM>[]
 > = PrimitiveCommandOptionConfig<CT, DM, AO>
   | SubcommandConfig<CT, DM, AO, Options>

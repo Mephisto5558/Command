@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-type-assertion, sonarjs/cognitive-complexity, custom/cyclomatic-complexity */
 /* eslint-disable max-lines */
 
 import {
@@ -17,14 +18,18 @@ import type {
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
 import type { RunnableReturns, StrictCommand } from '../command/utils.ts';
 import type { CommandType } from '../utils.ts';
-import type { CommandOptionConfig, StrictCommandOption, autocompleteObject, autocompleteOptions } from './utils.ts';
+import type {
+  ChannelCommandOptionConfig, CommandOptionConfig, NumericCommandOptionConfig, StrictCommandOption, StringCommandOptionConfig,
+  SubcommandConfig, SubcommandGroupConfig, autocompleteObject, autocompleteOptions
+} from './utils.ts';
 
 /* eslint-disable-next-line import-x/prefer-default-export */
 export class CommandOption<
   const CT extends readonly CommandType[] = [],
   const DM extends boolean = false,
-  const AO = never,
-  const Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[] = readonly DefaultOptionType<CT, DM>[]
+  AO extends unknown[] = never,
+  const Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[] = readonly DefaultOptionType<CT, DM>[],
+  T extends ApplicationCommandOptionType = ApplicationCommandOptionType
 > {
   name: Lowercase<string>;
   id!: `${string}.options.${CommandOption['name']}`;
@@ -35,12 +40,12 @@ export class CommandOption<
   description!: string;
   descriptionLocalizations!: Partial<Record<Locale, string>>;
 
-  type: ApplicationCommandOptionType;
+  type: T;
 
   required = false;
 
-  cooldowns: Record<CooldownType, number> = { [CooldownType.guild]: 0, [CooldownType.channel]: 0, [CooldownType.user]: 0 };
-  /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
+  cooldowns: Record<CooldownType, number> = { [CooldownType.Guild]: 0, [CooldownType.Channel]: 0, [CooldownType.User]: 0 };
+
   dmPermission: DM = false as DM;
 
   disabled!: boolean;
@@ -48,31 +53,50 @@ export class CommandOption<
 
   get autocomplete(): boolean { return !!this.autocompleteOptions; }
   strictAutocomplete = false;
-  autocompleteOptions: autocompleteOptions | autocompleteOptions[] | (
+  autocompleteOptions?: T extends (
+    ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number
+  ) ? autocompleteOptions | autocompleteOptions[] | (
       (
-        this: ResolveContext<{ slash: AutocompleteInteraction<'cached'>; prefix: Message }, NoInfer<CT>>,
+        this: ResolveContext<{ [CommandType.Slash]: AutocompleteInteraction<'cached'>; [CommandType.Prefix]: Message }, NoInfer<CT>>,
         query: string
       ) => autocompleteOptions[] | Promise<autocompleteOptions[]>
-    ) | undefined;
+    ) | undefined
+    : undefined;
 
-  choices: ApplicationCommandOptionChoiceData[] | undefined;
+  choices?: T extends ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number
+    ? ApplicationCommandOptionChoiceData[] | undefined
+    : undefined;
 
-  channelTypes: ChannelType[] | undefined;
+  channelTypes?: T extends ApplicationCommandOptionType.Channel
+    ? ChannelType[] | undefined
+    : undefined;
 
-  minValue?: number;
-  maxValue?: number;
+  minValue?: T extends ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number
+    ? number | undefined
+    : undefined;
 
-  minLength?: number;
-  maxLength?: number;
+  maxValue?: T extends ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number
+    ? number | undefined
+    : undefined;
 
-  options!: StrictCommandOption<CT, DM>[];
+  minLength?: T extends ApplicationCommandOptionType.String
+    ? number | undefined
+    : undefined;
+
+  maxLength?: T extends ApplicationCommandOptionType.String
+    ? number | undefined
+    : undefined;
+
+  options?: T extends ApplicationCommandOptionType.SubcommandGroup | ApplicationCommandOptionType.Subcommand
+    ? StrictCommandOption<CT, DM>[]
+    : undefined;
 
   run!: (
     this: ResolveContext<{
-      slash: ChatInputCommandInteraction<'cached', Options>;
-      component: MessageComponentInteraction<'cached'>;
-      prefix: Message;
-    }, CT>,
+      [CommandType.Slash]: ChatInputCommandInteraction<'cached', Options>;
+      [CommandType.Component]: MessageComponentInteraction<'cached'>;
+      [CommandType.Prefix]: Message;
+    }, NoInfer<CT>>,
     lang: Translator,
     options: AO, client: Client<true>
   ) => unknown;
@@ -81,7 +105,7 @@ export class CommandOption<
   #cooldownsManager!: CooldownsManager;
   #logger!: Logger;
 
-  constructor(config: CommandOptionConfig<CT, DM, AO, Options>) {
+  constructor(config: CommandOptionConfig<CT, DM, AO, Options> & { type: T }) {
     this.name = config.name;
     this.type = config.type;
 
@@ -89,40 +113,52 @@ export class CommandOption<
 
     switch (config.type) {
       case ApplicationCommandOptionType.SubcommandGroup:
-      case ApplicationCommandOptionType.Subcommand:
-        if (config.cooldowns)
-          this.cooldowns = Object.fromEntries(Object.entries(this.cooldowns).map(e => cooldownConverter(config.cooldowns!, ...e)));
-
-        if ('dmPermission' in config) this.dmPermission = config.dmPermission;
-        if (config.options)
-          this.options = config.options.map(e => CommandOption.from(e));
-
-
-        /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, custom/unbound-method */
-        if ('run' in config) this.run = config.run as unknown as typeof this.run;
-        break;
-
-      case ApplicationCommandOptionType.String:
-        if (config.minLength) this.minLength = config.minLength;
-        if (config.maxLength) this.maxLength = config.maxLength;
-
-      // fall through
-      case ApplicationCommandOptionType.Integer:
-      case ApplicationCommandOptionType.Number:
-        if (config.type != ApplicationCommandOptionType.String) {
-          if (config.minValue) this.minValue = config.minValue;
-          if (config.maxValue) this.maxValue = config.maxValue;
+      case ApplicationCommandOptionType.Subcommand: {
+        const subConfig = config as (SubcommandGroupConfig<CT, DM, AO, Options> | SubcommandConfig<CT, DM, AO, Options>);
+        if (subConfig.cooldowns) {
+          const { cooldowns } = subConfig;
+          this.cooldowns = Object.fromEntries(Object.entries(this.cooldowns).map(e => cooldownConverter(cooldowns, ...e)));
         }
 
-        if (config.choices) this.choices = config.choices.map(e => ({ name: String(e), value: e }));
+        if ('dmPermission' in subConfig) this.dmPermission = subConfig.dmPermission;
+        if (subConfig.options) {
+          (
+            this.options as StrictCommandOption<CT, DM, AO>[]
+          ) = subConfig.options.map(e => CommandOption.from(e as CommandOptionConfig<CT, DM, AO>));
+        }
 
-        this.autocompleteOptions = config.autocompleteOptions;
-        if (config.strictAutocomplete) this.strictAutocomplete = config.strictAutocomplete;
+        /* eslint-disable-next-line custom/unbound-method -- safe */
+        if ('run' in subConfig) this.run = subConfig.run as unknown as typeof this.run;
         break;
+      }
 
-      case ApplicationCommandOptionType.Channel:
-        this.channelTypes = config.channelTypes;
+      case ApplicationCommandOptionType.String: {
+        const stringConfig = config as StringCommandOptionConfig<CT, DM, AO>;
+        if (stringConfig.minLength) this.minLength = stringConfig.minLength as this['minLength'];
+        if (stringConfig.maxLength) this.maxLength = stringConfig.maxLength as this['maxLength'];
+      }
+
+      // fall through for choices and autocompleteOptions
+      case ApplicationCommandOptionType.Integer:
+      case ApplicationCommandOptionType.Number: {
+        const numericConfig = config as (NumericCommandOptionConfig<CT, DM, AO> | StringCommandOptionConfig<CT, DM, AO>);
+        if (numericConfig.type != ApplicationCommandOptionType.String) {
+          if (numericConfig.minValue) this.minValue = numericConfig.minValue as this['minValue'];
+          if (numericConfig.maxValue) this.maxValue = numericConfig.maxValue as this['maxValue'];
+        }
+
+        if (numericConfig.choices) this.choices = numericConfig.choices.map(e => ({ name: String(e), value: e })) as NonNullable<this['choices']>;
+
+        this.autocompleteOptions = numericConfig.autocompleteOptions as this['autocompleteOptions'];
+        if (numericConfig.strictAutocomplete) this.strictAutocomplete = numericConfig.strictAutocomplete;
         break;
+      }
+
+      case ApplicationCommandOptionType.Channel: {
+        const channelConfig = config as ChannelCommandOptionConfig;
+        if (channelConfig.channelTypes) this.channelTypes = channelConfig.channelTypes as this['channelTypes'];
+        break;
+      }
 
       default: // no special handling
     }
@@ -142,8 +178,10 @@ export class CommandOption<
     this.#validate();
     this.#localize();
 
-    for (const [i, option] of this.options.entries())
-      option.init(i18n, this.id, cooldownsManager, logger, i);
+    if (this.options) {
+      for (const [i, option] of this.options.entries())
+        option.init(i18n, this.id, cooldownsManager, logger, i);
+    }
 
     return this;
   }
@@ -156,7 +194,7 @@ export class CommandOption<
       this.name = this.name.toLowerCase();
     }
 
-    if (this.options.length) {
+    if (this.options?.length) {
       let foundOptional = false;
       for (const option of this.options) {
         if (!option.required) foundOptional = true;
@@ -173,12 +211,10 @@ export class CommandOption<
     for (const [locale] of this.#i18n.availableLocales) {
       const
         requiredTranslator = this.#i18n.getTranslator({ locale, errorNotFound: true, backupPaths: [this.id] }),
-        optionalTranslator = this.#i18n.getTranslator({ locale, undefinedNotFound: true, backupPaths: [this.id] });
+        optionalTranslator = this.#i18n.getTranslator({ locale, undefinedNotFound: true, backupPaths: [this.id] }),
 
-      ; /* eslint-disable-line @stylistic/no-extra-semi -- formatting reasons */
-
-      // description
-      const localizedDescription = locale == this.#i18n.config.defaultLocale ? optionalTranslator('description') : requiredTranslator('description');
+        // description
+        localizedDescription = locale == this.#i18n.config.defaultLocale ? optionalTranslator('description') : requiredTranslator('description');
       if (!localizedDescription) {
         if (!this.disabled)
           this.#logger.warn(`Missing "${locale}" description for command "${this.name}" (${this.id}.description)`);
@@ -275,8 +311,10 @@ export class CommandOption<
 
       if (
         this.autocomplete && this.strictAutocomplete
-        && !(await this.generateAutocomplete(interaction, arg, wrapperTranslator.config.locale ?? wrapperTranslator.defaultConfig.defaultLocale))
-          .some(e => e.value.toString().toLowerCase() === arg.toLowerCase())
+        && !(await this.generateAutocomplete(
+          interaction as Parameters<this['generateAutocomplete']>[0], arg,
+          wrapperTranslator.config.locale ?? wrapperTranslator.defaultConfig.defaultLocale
+        )).some(e => e.value.toString().toLowerCase() === arg.toLowerCase())
       ) {
         if (typeof this.autocompleteOptions == 'function') return ['strictAutocompleteNoMatch', this.name];
 
@@ -307,7 +345,7 @@ export class CommandOption<
   ): Promise<RunnableReturns | boolean> {
     const
       subcommandName = interaction instanceof CommandInteraction ? interaction.options.getSubcommand(true) : args?.[0],
-      subcommand = this.options.find(e => e.name == subcommandName);
+      subcommand = this.options?.find(e => e.name == subcommandName);
 
     return subcommand?.isRunnable(
       interaction, command, wrapperTranslator,
@@ -319,16 +357,18 @@ export class CommandOption<
     interaction: Parameters<customPermissionChecksFn>[0], command: StrictCommand<CT, DM, Options>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
+    if (!this.options) return false;
     for (const option of this.options) {
       const err = await option.isRunnable(interaction, command, wrapperTranslator, args);
       if (err) return err;
     }
+
     return false;
   }
 
   /** `translator` and `options` should not be supplied by an external caller. */
   async generateAutocomplete(
-    interaction: AutocompleteInteraction | Message,
+    interaction: ResolveContext<{ [CommandType.Slash]: AutocompleteInteraction<'cached'>; [CommandType.Prefix]: Message }, NoInfer<CT>>,
     query: string, locale: Locale, translator?: Translator<true, Locale>,
     options: StrictCommandOption<CT, DM>['autocompleteOptions'] = this.autocompleteOptions
   ): Promise<[] | autocompleteObject[]> {
@@ -355,27 +395,26 @@ export class CommandOption<
   /**
    * @returns the currect cooldown for this subcommand(group) in ms.
    * Resets it if it's `0`. */
-  updateCooldowns(interaction: ThisParameterType<StrictCommandOption<CT, DM, AO, Options>['run']>): number {
-    return this.#cooldownsManager.update(this.id, interaction, this.cooldowns);
+  updateCooldowns(interaction: ChatInputCommandInteraction | Message | MessageComponentInteraction): number {
+    return this.#cooldownsManager.update(this.id, interaction as Parameters<CooldownsManager['update']>[1], this.cooldowns);
   }
 
   isEqualTo(opt: CommandOption<CommandType[], boolean> | ApplicationCommandOption): boolean {
     for (const prop of ['name', 'description', 'type', 'autocomplete', 'required', 'minValue', 'maxValue', 'minLength', 'maxLength'] as const) {
-      /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
       const optProp = prop in opt ? opt[prop as keyof typeof opt] : undefined;
       if (this[prop] != (typeof this[prop] == 'boolean' ? !!optProp : optProp)) return false;
     }
 
     if (
       /* eslint-disable-next-line sonarjs/expression-complexity */
-      this.options.length != ('options' in opt ? opt.options.length : 0)
+      (this.options && 'options' in this.options ? this.options.length : 0) != ('options' in opt ? opt.options?.length : 0)
       || !equal(this.nameLocalizations, opt.nameLocalizations)
       || !equal(this.descriptionLocalizations, opt.descriptionLocalizations)
       || ('choices' in opt && opt.choices && !this.#choicesEqualTo(opt.choices))
       || ('channelTypes' in opt && opt.channelTypes && !this.#channelTypesEqualTo(opt.channelTypes))
     ) return false;
 
-    if (this.options.length && 'options' in opt) {
+    if (this.options?.length && 'options' in opt && opt.options) {
       for (const option of this.options) {
         const other = opt.options.find(e => e.name == option.name);
         if (!other || !option.isEqualTo(other)) return false;
@@ -407,8 +446,9 @@ export class CommandOption<
   }
 
   static from<
-    CT extends readonly CommandType[], DM extends boolean, AO, Options extends OptionsG<CT, DM>
-  >(commandOption: CommandOptionConfig<CT, DM, AO, Options> | CommandOption<CT, DM, AO, Options>): CommandOption<CT, DM, AO, Options> {
-    return commandOption instanceof this ? commandOption : new this(commandOption);
+    CT extends readonly CommandType[], DM extends boolean, AO extends unknown[], Options extends OptionsG<CT, DM>,
+    Config extends CommandOptionConfig<CT, DM, AO, Options>, InferredT extends Config['type']
+  >(commandOption: Config | CommandOption<CT, DM, AO, Options, InferredT>): CommandOption<CT, DM, AO, Options, InferredT> {
+    return commandOption instanceof this ? commandOption : new this(commandOption as Config & { type: InferredT });
   }
 }

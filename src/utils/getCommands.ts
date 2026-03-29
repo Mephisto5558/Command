@@ -31,13 +31,14 @@ export default function getCommands(
     category.list.push({
       commandName: cmd.name,
       commandUsage: (
-        (cmd.types.includes(CommandType.slash) ? lang('others.getCommands.lookAtOptionDesc') ?? '' : '')
-        + (lang(`${cmd.id}.usage.usage`)?.replaceAll(/slash command:/gi, '') ?? '') || (lang('others.getCommands.noInfo') ?? '')
+        (cmd.types.includes(CommandType.Slash) ? lang('others.getCommands.lookAtOptionDesc') ?? '' : '')
+        + (lang(`${cmd.id}.usage.usage`)?.replaceAll(new RegExp(`${CommandType.Slash} command:`, 'gi'), '') ?? '')
+        || (lang('others.getCommands.noInfo') ?? '')
       ).trim().replaceAll('\n', '<br>&nbsp'),
       commandDescription: cmd.descriptionLocalizations[lang.config.locale ?? lang.defaultConfig.defaultLocale] ?? cmd.description,
       commandAlias: (
-        (cmd.aliases[CommandType.prefix].length ? `${capitalize(CommandType.prefix)}: ${cmd.aliases[CommandType.prefix].join(', ')}\n` : '')
-        + (cmd.aliases[CommandType.slash].length ? `${capitalize(CommandType.slash)}: ${cmd.aliases[CommandType.slash].join(', ')}` : '')
+        (cmd.aliases[CommandType.Prefix].length ? `${capitalize(CommandType.Prefix)}: ${cmd.aliases[CommandType.Prefix].join(', ')}\n` : '')
+        + (cmd.aliases[CommandType.Slash].length ? `${capitalize(CommandType.Slash)}: ${cmd.aliases[CommandType.Slash].join(', ')}` : '')
         || (lang('global.none') ?? '')
       ).trim().replaceAll('\n', '<br>&nbsp')
     });

@@ -44,9 +44,9 @@ export interface CommandConfig<
 
   run(
     this: ResolveContext<{
-      slash: ChatInputCommandInteraction<DM extends false ? 'cached' : CacheType, NoInfer<Options>>;
-      component: MessageComponentInteraction<DM extends false ? 'cached' : CacheType>;
-      prefix: Message<DM extends false ? true : false>;
+      [CommandType.Slash]: ChatInputCommandInteraction<DM extends false ? 'cached' : CacheType, NoInfer<Options>>;
+      [CommandType.Component]: MessageComponentInteraction<DM extends false ? 'cached' : CacheType>;
+      [CommandType.Prefix]: Message<DM extends false ? true : false>;
     }, NoInfer<CT>>,
     lang: Translator<false, Locale>, client: Client<true>
   ): unknown;
