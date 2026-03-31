@@ -2,18 +2,17 @@
 /* eslint-disable max-lines */
 
 import {
-  ApplicationCommandOptionType, ChannelType, CommandInteraction, Locale as DLocale, Message, _NonNullableFields, inlineCode
+  ApplicationCommandOptionType, BaseInteraction, ChannelType, Locale as DLocale, Message as _Message, _NonNullableFields, inlineCode
 } from 'discord.js';
 import { CooldownType } from '../../index.ts';
 import { autocompleteOptionsMaxAmt, choiceValueMaxLength, choiceValueMinLength, choicesMaxAmt, descriptionMaxLength } from '../../utils/constants.ts';
 import { cooldownConverter, equal } from '../utils.ts';
 
-import type {
-  ApplicationCommandOption, ApplicationCommandOptionChoiceData, AutocompleteInteraction, Client, MessageComponentInteraction
-} from 'discord.js';
+import type { ApplicationCommandOption, ApplicationCommandOptionChoiceData } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  ChatInputCommandInteraction, Command, DefaultOptionType, Logger, OptionsG, ResolveContext, customPermissionChecksFn
+  AutocompleteInteraction, ChatInputCommandInteraction, Command, CommandClient, Logger, Message,
+  MessageComponentInteraction, OptionsG, ResolveContext
 } from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
 import type { RunnableReturns, StrictCommand } from '../command/utils.ts';
@@ -27,9 +26,10 @@ import type {
 export class CommandOption<
   const CT extends readonly CommandType[] = [],
   const DM extends boolean = false,
-  AO extends unknown[] = never,
-  const Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[] = readonly DefaultOptionType<CT, DM>[],
-  T extends ApplicationCommandOptionType = ApplicationCommandOptionType
+  AO extends unknown[] = [],
+  const ChildrenOptions extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>,
+  T extends ApplicationCommandOptionType = ApplicationCommandOptionType,
+  C extends CommandClient<true> = CommandClient<true>
 > {
   name: Lowercase<string>;
   id!: `${string}.options.${CommandOption['name']}`;
@@ -57,18 +57,18 @@ export class CommandOption<
     ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number
   ) ? autocompleteOptions | autocompleteOptions[] | (
       (
-        this: ResolveContext<{ [CommandType.Slash]: AutocompleteInteraction<'cached'>; [CommandType.Prefix]: Message }, NoInfer<CT>>,
+        this: ResolveContext<{ [CommandType.Slash]: AutocompleteInteraction<C, DM>; [CommandType.Prefix]: Message<C, DM> }, CT>,
         query: string
       ) => autocompleteOptions[] | Promise<autocompleteOptions[]>
     ) | undefined
     : undefined;
 
   choices?: T extends ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number
-    ? ApplicationCommandOptionChoiceData[] | undefined
+    ? readonly ApplicationCommandOptionChoiceData[] | undefined
     : undefined;
 
   channelTypes?: T extends ApplicationCommandOptionType.Channel
-    ? ChannelType[] | undefined
+    ? readonly ChannelType[] | undefined
     : undefined;
 
   minValue?: T extends ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number
@@ -88,24 +88,24 @@ export class CommandOption<
     : undefined;
 
   options?: T extends ApplicationCommandOptionType.SubcommandGroup | ApplicationCommandOptionType.Subcommand
-    ? StrictCommandOption<CT, DM>[]
+    ? StrictCommandOption<CT, DM, AO>[]
     : undefined;
 
-  run!: (
+  run?: (
     this: ResolveContext<{
-      [CommandType.Slash]: ChatInputCommandInteraction<'cached', Options>;
-      [CommandType.Component]: MessageComponentInteraction<'cached'>;
-      [CommandType.Prefix]: Message;
+      [CommandType.Slash]: ChatInputCommandInteraction<C, DM, NoInfer<ChildrenOptions>>;
+      [CommandType.Component]: MessageComponentInteraction<C, DM>;
+      [CommandType.Prefix]: Message<C, DM>;
     }, NoInfer<CT>>,
-    lang: Translator,
-    options: AO, client: Client<true>
+    lang: Translator<false, Locale>,
+    options: AO, client: C
   ) => unknown;
 
   #i18n!: I18nProvider;
   #cooldownsManager!: CooldownsManager;
   #logger!: Logger;
 
-  constructor(config: CommandOptionConfig<CT, DM, AO, Options> & { type: T }) {
+  constructor(config: CommandOptionConfig<CT, DM, AO, ChildrenOptions> & { type: T }) {
     this.name = config.name;
     this.type = config.type;
 
@@ -114,28 +114,25 @@ export class CommandOption<
     switch (config.type) {
       case ApplicationCommandOptionType.SubcommandGroup:
       case ApplicationCommandOptionType.Subcommand: {
-        const subConfig = config as (SubcommandGroupConfig<CT, DM, AO, Options> | SubcommandConfig<CT, DM, AO, Options>);
+        const subConfig = config as (SubcommandGroupConfig<CT, DM, AO, ChildrenOptions> | SubcommandConfig<CT, DM, AO, ChildrenOptions>);
         if (subConfig.cooldowns) {
           const { cooldowns } = subConfig;
           this.cooldowns = Object.fromEntries(Object.entries(this.cooldowns).map(e => cooldownConverter(cooldowns, ...e)));
         }
 
         if ('dmPermission' in subConfig) this.dmPermission = subConfig.dmPermission;
-        if (subConfig.options) {
-          (
-            this.options as StrictCommandOption<CT, DM, AO>[]
-          ) = subConfig.options.map(e => CommandOption.from(e as CommandOptionConfig<CT, DM, AO>));
-        }
+        if (subConfig.options)
+          (this.options as unknown) = subConfig.options.map(e => CommandOption.from(e));
 
         /* eslint-disable-next-line custom/unbound-method -- safe */
-        if ('run' in subConfig) this.run = subConfig.run as unknown as typeof this.run;
+        if ('run' in subConfig) this.run = subConfig.run as unknown as NonNullable<typeof this.run>;
         break;
       }
 
       case ApplicationCommandOptionType.String: {
         const stringConfig = config as StringCommandOptionConfig<CT, DM, AO>;
-        if (stringConfig.minLength) this.minLength = stringConfig.minLength as this['minLength'];
-        if (stringConfig.maxLength) this.maxLength = stringConfig.maxLength as this['maxLength'];
+        if (stringConfig.minLength != undefined) this.minLength = stringConfig.minLength as typeof this.minLength;
+        if (stringConfig.maxLength != undefined) this.maxLength = stringConfig.maxLength as typeof this.maxLength;
       }
 
       // fall through for choices and autocompleteOptions
@@ -143,20 +140,20 @@ export class CommandOption<
       case ApplicationCommandOptionType.Number: {
         const numericConfig = config as (NumericCommandOptionConfig<CT, DM, AO> | StringCommandOptionConfig<CT, DM, AO>);
         if (numericConfig.type != ApplicationCommandOptionType.String) {
-          if (numericConfig.minValue) this.minValue = numericConfig.minValue as this['minValue'];
-          if (numericConfig.maxValue) this.maxValue = numericConfig.maxValue as this['maxValue'];
+          if (numericConfig.minValue != undefined) this.minValue = numericConfig.minValue as typeof this.minValue;
+          if (numericConfig.maxValue != undefined) this.maxValue = numericConfig.maxValue as typeof this.maxValue;
         }
 
         if (numericConfig.choices) this.choices = numericConfig.choices.map(e => ({ name: String(e), value: e })) as NonNullable<this['choices']>;
 
-        this.autocompleteOptions = numericConfig.autocompleteOptions as this['autocompleteOptions'];
+        this.autocompleteOptions = numericConfig.autocompleteOptions as typeof this.autocompleteOptions;
         if (numericConfig.strictAutocomplete) this.strictAutocomplete = numericConfig.strictAutocomplete;
         break;
       }
 
       case ApplicationCommandOptionType.Channel: {
         const channelConfig = config as ChannelCommandOptionConfig;
-        if (channelConfig.channelTypes) this.channelTypes = channelConfig.channelTypes as this['channelTypes'];
+        if (channelConfig.channelTypes) this.channelTypes = channelConfig.channelTypes as typeof this.channelTypes;
         break;
       }
 
@@ -276,7 +273,11 @@ export class CommandOption<
   }
 
   async isRunnable(
-    interaction: Parameters<customPermissionChecksFn>[0], command: StrictCommand<CT, DM, Options>,
+    interaction: NonNullable<ResolveContext<{
+      [CommandType.Slash]: ChatInputCommandInteraction<C, DM, ChildrenOptions>;
+      [CommandType.Prefix]: Message<C, DM>
+  }, NoInfer<CT>>>,
+    command: StrictCommand<CT, DM, AO, ChildrenOptions>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
     if (
@@ -290,9 +291,7 @@ export class CommandOption<
       return this.#isRunnableSubcommand(interaction, command, wrapperTranslator, args);
 
     const
-      option = !(interaction instanceof Message) && interaction.isChatInputCommand()
-        ? interaction.options.get(this.name)?.value
-        : undefined,
+      option = interaction instanceof _Message ? undefined : interaction.options.get(this.name)?.value,
       arg = args?.[this.position];
 
     if (this.required && option === undefined && !arg) {
@@ -303,7 +302,7 @@ export class CommandOption<
       }];
     }
 
-    if (interaction instanceof Message && arg) { // if it's an interaction then these checks will be done by Discord
+    if (interaction instanceof _Message && arg) { // if it's an interaction then these checks will be done by Discord
       if (this.type == ApplicationCommandOptionType.Channel && this.channelTypes) {
         const channel = interaction.guild?.channels.cache.get(arg as Snowflake);
         if (channel && !this.channelTypes.includes(channel.type)) return ['invalidChannelType', this.name];
@@ -312,7 +311,7 @@ export class CommandOption<
       if (
         this.autocomplete && this.strictAutocomplete
         && !(await this.generateAutocomplete(
-          interaction as Parameters<this['generateAutocomplete']>[0], arg,
+          interaction, arg,
           wrapperTranslator.config.locale ?? wrapperTranslator.defaultConfig.defaultLocale
         )).some(e => e.value.toString().toLowerCase() === arg.toLowerCase())
       ) {
@@ -340,21 +339,29 @@ export class CommandOption<
   }
 
   async #isRunnableSubcommandGroup(
-    interaction: Parameters<customPermissionChecksFn>[0], command: StrictCommand<CT, DM, Options>,
+    interaction: NonNullable<ResolveContext<{
+      [CommandType.Slash]: ChatInputCommandInteraction<C, DM, ChildrenOptions>;
+      [CommandType.Prefix]: Message<C, DM>
+    }, NoInfer<CT>>>,
+    command: StrictCommand<CT, DM, AO, ChildrenOptions>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
     const
-      subcommandName = interaction instanceof CommandInteraction ? interaction.options.getSubcommand(true) : args?.[0],
+      subcommandName = interaction instanceof BaseInteraction ? interaction.options.getSubcommand(true) : args?.[0],
       subcommand = this.options?.find(e => e.name == subcommandName);
 
     return subcommand?.isRunnable(
       interaction, command, wrapperTranslator,
-      interaction instanceof Message ? args?.slice(1) : args
+      interaction instanceof _Message ? args?.slice(1) : args
     ) ?? false;
   }
 
   async #isRunnableSubcommand(
-    interaction: Parameters<customPermissionChecksFn>[0], command: StrictCommand<CT, DM, Options>,
+    interaction: NonNullable<ResolveContext<{
+      [CommandType.Slash]: ChatInputCommandInteraction<C, DM, ChildrenOptions>;
+      [CommandType.Prefix]: Message<C, DM>
+    }, NoInfer<CT>>>,
+    command: StrictCommand<CT, DM, AO, ChildrenOptions>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
     if (!this.options) return false;
@@ -368,7 +375,7 @@ export class CommandOption<
 
   /** `translator` and `options` should not be supplied by an external caller. */
   async generateAutocomplete(
-    interaction: ResolveContext<{ [CommandType.Slash]: AutocompleteInteraction<'cached'>; [CommandType.Prefix]: Message }, NoInfer<CT>>,
+    interaction: ResolveContext<{ [CommandType.Slash]: AutocompleteInteraction<C, DM>; [CommandType.Prefix]: Message<C, DM> }, NoInfer<CT>>,
     query: string, locale: Locale, translator?: Translator<true, Locale>,
     options: StrictCommandOption<CT, DM>['autocompleteOptions'] = this.autocompleteOptions
   ): Promise<[] | autocompleteObject[]> {
@@ -446,9 +453,16 @@ export class CommandOption<
   }
 
   static from<
-    CT extends readonly CommandType[], DM extends boolean, AO extends unknown[], Options extends OptionsG<CT, DM>,
-    Config extends CommandOptionConfig<CT, DM, AO, Options>, InferredT extends Config['type']
-  >(commandOption: Config | CommandOption<CT, DM, AO, Options, InferredT>): CommandOption<CT, DM, AO, Options, InferredT> {
-    return commandOption instanceof this ? commandOption : new this(commandOption as Config & { type: InferredT });
+    CT extends readonly CommandType[], DM extends boolean, AO extends unknown[],
+    ChildOptions extends OptionsG<CT, DM, AO>,
+    InferredT extends ApplicationCommandOptionType,
+    C extends CommandClient = CommandClient
+  >(
+    commandOption: CommandOptionConfig<CT, DM, AO, ChildOptions> | CommandOption<CT, DM, AO, ChildOptions, InferredT, C>
+  ): CommandOption<CT, DM, AO, ChildOptions, InferredT, C> {
+    if (commandOption instanceof CommandOption) return commandOption;
+    return new this(
+      commandOption as CommandOptionConfig<CT, DM, AO, ChildOptions> & { type: InferredT }
+    ) as CommandOption<CT, DM, AO, ChildOptions, InferredT, C>;
   }
 }

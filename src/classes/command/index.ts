@@ -2,8 +2,8 @@
 
 import {
   ApplicationCommandOptionType, ApplicationCommandType, BaseInteraction, ChannelType,
-  ChatInputCommandInteraction as _ChatInputCommandInteraction, Colors, CommandInteraction, EmbedBuilder,
-  Message, MessageComponentInteraction, MessageFlags, PermissionsBitField, _NonNullableFields, inlineCode
+  ChatInputCommandInteraction as _ChatInputCommandInteraction, Colors, EmbedBuilder,
+  MessageFlags, PermissionsBitField, _NonNullableFields, inlineCode, Message as _Message, MessageComponentInteraction as _MessageComponentInteraction
 } from 'discord.js';
 
 // @ts-expect-error Cannot augment that module
@@ -13,14 +13,14 @@ import { descriptionMaxLength } from '../../utils/constants.ts';
 import { commandMention } from '../../utils/index.ts';
 import { CommandType, cooldownConverter, equal } from '../utils.ts';
 
-import type { ApplicationCommand, CacheType, Client, PermissionFlags, User } from 'discord.js';
+import type { ApplicationCommand, CommandInteraction, PermissionFlags, User } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  BetterMS, ChatInputCommandInteraction, DefaultOptionType, Logger,
-  OptionsG, ResolveContext, commandDoneFn, customPermissionChecksFn
+  BetterMS, ChatInputCommandInteraction, CommandClient, DefaultOptionType, Logger,
+  Message, MessageComponentInteraction, OptionsG, ResolveContext, commandDoneFn, customPermissionChecksFn
 } from '../../index.js';
 import type { CooldownsManager } from '../../utils/index.ts';
-import type { CommandOptionConfig, StrictCommandOption } from '../commandOption/utils.ts';
+import type { StrictCommandOption } from '../commandOption/utils.ts';
 import type { CommandConfig, RunnableReturns, StrictCommand } from './utils.ts';
 
 const
@@ -35,9 +35,8 @@ const
 export class Command<
   const CT extends readonly CommandType[] = [],
   const DM extends boolean = false,
-  Options extends readonly (
-    CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>
-  )[] = readonly DefaultOptionType<CT, DM>[]
+  const Options extends OptionsG<CT, DM> = DefaultOptionType<CT, DM>[],
+  C extends CommandClient<true> = CommandClient<true>
 > /* implements ChatInputApplicationCommandData */ {
   name!: Lowercase<string>;
   id!: `commands.${Command['category']}.${Command['name']}`;
@@ -102,11 +101,11 @@ export class Command<
 
   run: (
     this: ResolveContext<{
-      [CommandType.Slash]: ChatInputCommandInteraction<DM extends false ? 'cached' : CacheType, NoInfer<Options>>;
-      [CommandType.Component]: MessageComponentInteraction<DM extends false ? 'cached' : CacheType>;
-      [CommandType.Prefix]: Message<DM extends false ? true : false>;
+      [CommandType.Slash]: ChatInputCommandInteraction<C, DM, NoInfer<Options>>;
+      [CommandType.Component]: MessageComponentInteraction<C, DM>;
+      [CommandType.Prefix]: Message<C, DM>;
     }, NoInfer<CT>>,
-    lang: Translator<false, Locale>, client: Client<true>
+    lang: Translator<false, Locale>, client: C
   ) => unknown;
 
   #i18n!: I18nProvider;
@@ -269,14 +268,14 @@ export class Command<
     interaction.commandName ??= this.name; // Is undefined on `MessageComponentInteraction`s
 
     let commandType;
-    if (interaction instanceof CommandInteraction) commandType = CommandType.Slash;
-    else if (interaction instanceof MessageComponentInteraction) commandType = CommandType.Component;
+    if (interaction instanceof _ChatInputCommandInteraction) commandType = CommandType.Slash;
+    else if (interaction instanceof _MessageComponentInteraction) commandType = CommandType.Component;
     else commandType = CommandType.Prefix;
 
     this.#logger.debug(`Executing ${commandType} command ${this.name}`);
 
     if (
-      commandType == CommandType.Slash && !(interaction instanceof Message)
+      commandType == CommandType.Slash && !(interaction instanceof _Message)
       && interaction.isChatInputCommand() && !this.noDefer && !interaction.replied
     ) await interaction.deferReply({ flags: this.ephemeralDefer ? MessageFlags.Ephemeral : undefined });
 
@@ -328,10 +327,10 @@ export class Command<
       return { group: commandInteraction.options.getSubcommandGroup(false) ?? undefined, subcommand: commandInteraction.options.getSubcommand(true) };
     }
 
-    if (interaction instanceof MessageComponentInteraction) return; // todo
+    if (interaction instanceof _MessageComponentInteraction) return; // todo
 
     const
-      args = (interaction as Message).content.split(/\s+/).slice(1),
+      args = (interaction as _Message).content.split(/\s+/).slice(1),
       option1 = this.options.find(e => e.name == args[0]);
 
     if (option1?.type == ApplicationCommandOptionType.Subcommand) return { group: undefined, subcommand: option1.name };
@@ -367,10 +366,10 @@ export class Command<
     });
 
     if (botChannelPerms?.missing([Permission.SendMessages, Permission.ViewChannel]).length) {
-      if (interaction instanceof Message && botChannelPerms.has(Permission.AddReactions))
+      if (interaction instanceof _Message && botChannelPerms.has(Permission.AddReactions))
         void interaction.react('\u274C').then(() => void interaction.react('\u270D\uFE0F'));
 
-      try { await author.send({ content: interaction instanceof Message ? interaction.url : '', embeds: [embed] }); }
+      try { await author.send({ content: interaction instanceof _Message ? interaction.url : '', embeds: [embed] }); }
       catch (err) {
         if (!(err instanceof Error && 'code' in err) || err.code != CANNOT_SEND_MESSAGE_API_ERR) throw err;
       }
@@ -387,7 +386,7 @@ export class Command<
   ): Promise<RunnableReturns | boolean> {
     const
       author = interaction instanceof BaseInteraction ? interaction.user : interaction.author,
-      args = interaction instanceof Message ? interaction.content.split(/\s+/).slice(1) : undefined,
+      args = interaction instanceof _Message ? interaction.content.split(/\s+/).slice(1) : undefined,
       staticErr = this.#staticRunnableChecks(interaction, author);
 
     if (staticErr) return staticErr;
@@ -404,7 +403,7 @@ export class Command<
 
     const activeOption = this.#resolveActiveOption(interaction, args);
     for (const option of activeOption ? [activeOption] : this.options) {
-      const err = await option.isRunnable(interaction, this, wrapperTranslator, args?.slice(activeOption && interaction instanceof Message ? 1 : 0));
+      const err = await option.isRunnable(interaction, this, wrapperTranslator, args?.slice(activeOption && interaction instanceof _Message ? 1 : 0));
       if (err) return err;
     }
 
@@ -421,14 +420,14 @@ export class Command<
   ): RunnableReturns | boolean {
     if (
       this.config.devOnlyCategories.has(this.category) && !this.config.devIds.has(author.id)
-      || (interaction instanceof Message && interaction.guild?.members.me?.communicationDisabledUntil)
+      || (interaction instanceof _Message && interaction.guild?.members.me?.communicationDisabledUntil)
     ) return true;
     if (this.config.runBetaCommandsOnly && !this.beta) return this.config.replyOn.nonBeta ? ['nonBeta'] : true;
     if (this.disabled) return this.config.replyOn.disabled ? ['disabled', this.disabledReason ?? 'Not provided'] : true;
 
     // TODO: remove hardcoded "Not provided"
 
-    if (interaction instanceof Message && !this.types.includes(CommandType.Prefix)) return ['slashOnly', this.mention];
+    if (interaction instanceof _Message && !this.types.includes(CommandType.Prefix)) return ['slashOnly', this.mention];
 
     if (!this.dmPermission && interaction.channel?.type == ChannelType.DM) return ['guildOnly'];
     if (this.category == 'nsfw' && interaction.channel && (!('nsfw' in interaction.channel) || !interaction.channel.nsfw)) return ['nsfw'];
