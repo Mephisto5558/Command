@@ -1,9 +1,11 @@
 // @ts-expect-error Cannot augment that module
 import { getMilliseconds as getMilliseconds_ } from 'better-ms';
 
-import type { CommandInteraction, Message, MessageComponentInteraction } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
-import type { BetterMS, Command, CooldownType, validTimeString } from '../index.ts';
+import type {
+  AutocompleteInteraction, BetterMS, ChatInputCommandInteraction, Command,
+  CooldownType, Message, MessageComponentInteraction, validTimeString
+} from '../index.ts';
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
 const getMilliseconds = getMilliseconds_ as typeof BetterMS.getMilliseconds;
@@ -42,7 +44,7 @@ export function cooldownConverter(
 
 export class CommandExecutionError extends Error {
   override readonly name = 'CommandExecutionError';
-  interaction: CommandInteraction | Message | MessageComponentInteraction;
+  interaction: ChatInputCommandInteraction | Message | MessageComponentInteraction | AutocompleteInteraction;
   translator: Translator<boolean, Locale>;
 
   constructor(

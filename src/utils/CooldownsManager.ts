@@ -1,11 +1,10 @@
 /* eslint-disable unicorn/filename-case -- class export */
 
-import { Message } from 'discord.js';
+import { Message as _Message } from 'discord.js';
 import { CooldownType } from '../index.ts';
 
-import type { ChatInputCommandInteraction, MessageComponentInteraction } from 'discord.js';
 import type { CommandType } from '../classes/utils.ts';
-import type { Command } from '../index.ts';
+import type { ChatInputCommandInteraction, Command, Message, MessageComponentInteraction } from '../index.ts';
 
 export default class CooldownsManager {
   cache = new Map<string, Map<CooldownType, Map<Snowflake, number>>>();
@@ -27,7 +26,7 @@ export default class CooldownsManager {
       let areaId: Snowflake | undefined;
       switch (cdName) {
         case CooldownType.User:
-          areaId = context instanceof Message ? context.author.id : context.user.id;
+          areaId = context instanceof _Message ? context.author.id : context.user.id;
           break;
         case CooldownType.Guild:
           areaId = context.guildId ?? undefined;

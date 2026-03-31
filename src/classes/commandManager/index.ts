@@ -7,23 +7,23 @@ import capitalize from '../../utils/capitalize.ts';
 import { Command } from '../command/index.ts';
 import { CommandType } from '../utils.ts';
 
-import type { ApplicationCommand, ApplicationCommandDataResolvable, Client } from 'discord.js';
+import type { ApplicationCommand, ApplicationCommandDataResolvable } from 'discord.js';
 import type { I18nProvider } from '@mephisto5558/i18n';
-import type { Logger, commandDoneFn, customPermissionChecksFn } from '../../index.ts';
+import type { CommandClient, Logger, commandDoneFn, customPermissionChecksFn } from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
 
 type CollectionMember = Command<readonly CommandType[], boolean>;
 
 /* eslint-disable-next-line import-x/prefer-default-export */
-export class CommandManager {
-  commands = new Collection<string, CollectionMember>();
-  client!: Client;
+export class CommandManager<C extends CommandClient = CommandClient> {
+  commands = new Collection<CollectionMember['name'], CollectionMember>();
+  client!: C;
   commandsPath!: string;
   doneFn: commandDoneFn | undefined;
   cooldownsManager!: CooldownsManager;
   i18n!: I18nProvider;
 
-  readonly #filePaths = new Collection<string, string>();
+  readonly #filePaths = new Collection<CollectionMember['name'], string>();
   #logger: Logger = console;
   #devIds = new Set<Snowflake>();
   #devOnlyCategories = new Set<string>();
@@ -33,7 +33,7 @@ export class CommandManager {
 
   init(
     commandsPath: string,
-    client: Client,
+    client: C,
     i18n: I18nProvider,
     config: {
       logger?: Logger;

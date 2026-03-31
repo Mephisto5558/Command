@@ -1,4 +1,7 @@
-import type { CacheType, ChatInputCommandInteraction as _ChatInputCommandInteraction, User, _NonNullableFields } from 'discord.js';
+import type {
+  AutocompleteInteraction as _AutocompleteInteraction, CacheType, ChatInputCommandInteraction as _ChatInputCommandInteraction,
+  Client, Message as _Message, MessageComponentInteraction as _MessageComponentInteraction, User, _NonNullableFields
+} from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type { Command } from './classes/command/index.ts';
 import type { CommandOption } from './classes/commandOption/index.ts';
@@ -14,6 +17,10 @@ export {
   PermissionFlagsBits as Permission,
   ApplicationCommandOptionType as OptionType
 } from 'discord.js';
+
+/** Interface intended for cross-package augmentation by the consumer. */
+/* eslint-disable-next-line @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-empty-object-type */
+export interface CommandClient<Ready extends boolean = boolean> extends Client<Ready> {}
 
 export enum PermissionType {
   Client = 0,
@@ -46,9 +53,10 @@ export type Logger = {
   error: typeof console.error;
 };
 
-export type OptionsG<CT extends readonly CommandType[], DM extends boolean> = readonly (CommandOptionConfig<CT, DM> | CommandOption<CT, DM>)[];
-export type DefaultOptionType<CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = never>
-  = CommandOptionConfig<CT, DM, AO, OptionsG<CT, DM>> | CommandOption<CT, DM, never, OptionsG<CT, DM>>;
+export type OptionsG<CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = []>
+  = readonly (CommandOptionConfig<CT, DM, AO> | CommandOption<CT, DM, AO>)[];
+export type DefaultOptionType<CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = []>
+  = CommandOptionConfig<CT, DM, AO, OptionsG<CT, DM, AO>> | CommandOption<CT, DM, AO, OptionsG<CT, DM, AO>>;
 
 export enum CooldownType {
   Guild = 'guild',
@@ -69,14 +77,34 @@ export interface SharedConfig<DM extends boolean> {
 
 /* eslint-disable-next-line @typescript-eslint/consistent-type-definitions */
 export interface ChatInputCommandInteraction<
-  Cached extends CacheType = CacheType, Options extends readonly unknown[] = []
-> extends StrictOmit<_ChatInputCommandInteraction<Cached>, 'options'> {
-  options: TypeSafeOptionResolver<Cached, Options>;
+  C extends CommandClient = CommandClient, DM extends boolean = boolean, Options extends readonly unknown[] = []
+> extends StrictOmit<_ChatInputCommandInteraction<DM extends false ? 'cached' : CacheType>, 'options' | 'client'> {
+  options: TypeSafeOptionResolver<DM extends false ? 'cached' : CacheType, Options>;
+  client: C;
 }
 
-export type ResolveContext<MAP, KEYS extends readonly string[]> = Prettify<{
-  [K in KEYS[number]]: K extends keyof MAP ? MAP[K] : undefined
-}>[KEYS[number]];
+/* eslint-disable-next-line @typescript-eslint/consistent-type-definitions */
+export interface Message<
+  C extends CommandClient = CommandClient, DM extends boolean = boolean
+> extends StrictOmit<_Message<DM extends false ? true : boolean>, 'client'> {
+  client: C;
+}
+
+/* eslint-disable-next-line @typescript-eslint/consistent-type-definitions */
+export interface AutocompleteInteraction<
+  C extends CommandClient = CommandClient, DM extends boolean = boolean
+> extends StrictOmit<_AutocompleteInteraction<DM extends false ? 'cached' : CacheType>, 'client'> {
+  client: C;
+}
+
+/* eslint-disable-next-line @typescript-eslint/consistent-type-definitions */
+export interface MessageComponentInteraction<
+  C extends CommandClient = CommandClient, DM extends boolean = boolean
+> extends StrictOmit<_MessageComponentInteraction<DM extends false ? 'cached' : CacheType>, 'client'> {
+  client: C;
+}
+
+export type ResolveContext<MAP, KEYS extends readonly string[]> = MAP[KEYS[number] & keyof MAP];
 
 export type commandDoneFn<cmd extends Command<readonly CommandType[], boolean> = Command<readonly CommandType[], boolean>> = (
   this: ThisParameterType<cmd['run']>,

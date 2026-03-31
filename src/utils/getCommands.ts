@@ -1,15 +1,14 @@
 import { CommandType } from '../classes/utils.ts';
 import capitalize from './capitalize.ts';
 
-import type { Client } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
-import type { Command, CommandManager } from '../index.ts';
+import type { Command, CommandClient, CommandManager } from '../index.ts';
 
 type category = { category: string; subTitle: ''; aliasesDisabled: boolean; list: command[] };
 type command = { commandName: string; commandUsage: string; commandDescription: string; commandAlias: string };
 
 export default function getCommands(
-  this: Client,
+  this: CommandClient,
   lang: Translator<true, Locale>,
   commands: CommandManager['commands'],
   excludeCategories?: Command['category'][]

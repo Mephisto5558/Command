@@ -1,19 +1,21 @@
 import type {
   APIInteractionDataResolvedChannel, APIRole, ApplicationCommandOptionChoiceData, ApplicationCommandOptionType,
-  Attachment, CacheType, CategoryChannel, ChannelType, Client, CommandInteractionOptionResolver, GuildBasedChannel,
-  GuildMember, Message, MessageComponentInteraction, NewsChannel, Role, StageChannel, TextChannel, ThreadChannel, User, VoiceChannel
+  Attachment, CacheType, CategoryChannel, ChannelType, CommandInteractionOptionResolver, GuildBasedChannel,
+  GuildMember, Message as _Message, NewsChannel, Role, StageChannel, TextChannel, ThreadChannel, User, VoiceChannel
 } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
-import type { ChatInputCommandInteraction, CommandOption, DefaultOptionType, OptionsG, ResolveContext, SharedConfig } from '../../index.ts';
+import type {
+  ChatInputCommandInteraction, CommandClient, CommandOption, Message, MessageComponentInteraction,
+  OptionsG, ResolveContext, SharedConfig
+} from '../../index.ts';
 import type { CommandType } from '../utils.ts';
 
 export type autocompleteObject = StrictOmit<ApplicationCommandOptionChoiceData, 'nameLocalizations'>;
 export type autocompleteOptions = autocompleteObject['value'] | autocompleteObject;
 
 export type StrictCommandOption<
-  CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = never,
-  Options extends readonly (CommandOptionConfig<CT, DM> | StrictCommandOption<CT, DM>)[] = readonly DefaultOptionType<CT, DM>[]
-> = CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<Options>>;
+  CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = []
+> = CommandOption<CT, DM, AO, OptionsG<CT, DM, AO>>;
 
 // #region option resolver
 type GetNamesAtLevel<Opts extends readonly unknown[], TargetType extends ApplicationCommandOptionType>
@@ -53,8 +55,8 @@ type ResolvedChannelType<T extends ChannelType>
 type MapChannelTypes<Types extends readonly ChannelType[]> = ResolvedChannelType<Types[number]>;
 
 type ResolvedChannel<Options extends readonly unknown[], Name extends string>
-  = GetOption<Options, Name, ApplicationCommandOptionType.Channel> extends { channelTypes: readonly ChannelType[] }
-    ? MapChannelTypes<GetOption<Options, Name, ApplicationCommandOptionType.Channel>['channelTypes']>
+  = [GetOption<Options, Name, ApplicationCommandOptionType.Channel>] extends [{ channelTypes: readonly ChannelType[] }]
+    ? MapChannelTypes<Extract<GetOption<Options, Name, ApplicationCommandOptionType.Channel>, { channelTypes: unknown }>['channelTypes']>
     : GuildBasedChannel | APIInteractionDataResolvedChannel; // Added APIInteractionDataResolvedChannel
 
 type ResolvedSubcommand<Options extends readonly unknown[]> = OptionName<Options, ApplicationCommandOptionType.Subcommand> extends never
@@ -68,7 +70,9 @@ type ResolveValue<Option, BaseType>
   : BaseType;
 
 type ResolvedValue<Options extends readonly unknown[], Name extends string, Type extends ApplicationCommandOptionType, BaseType>
-  = ResolveValue<GetOption<Options, Name, Type>, BaseType>;
+  = [GetOption<Options, Name, Type>] extends [never]
+    ? BaseType
+    : ResolveValue<GetOption<Options, Name, Type>, BaseType>;
 
 // Duplicate `${string}` prevents omitting `get`.
 export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options extends readonly unknown[] = unknown[]> = StrictOmit<
@@ -105,18 +109,16 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   getNumber(name: string, required: true): number;
   getNumber(name: string, required?: boolean): number | null;
 
-  getBoolean(name: OptionName<Options, ApplicationCommandOptionType.Boolean>, required: true): boolean;
+  getBoolean(name: OptionName<Options, ApplicationCommandOptionType.Boolean> | string, required: true): boolean;
   getBoolean<N extends OptionName<Options, ApplicationCommandOptionType.Boolean>>(
     name: N, required?: boolean
-  ): GetOption<Options, N, ApplicationCommandOptionType.Boolean> extends { required: true } ? boolean : boolean | null;
-  getBoolean(name: string, required: true): boolean;
+  ): boolean | ([GetOption<Options, N, ApplicationCommandOptionType.Boolean>] extends [{ required: true }] ? never : null);
   getBoolean(name: string, required?: boolean): boolean | null;
 
-  getUser(name: OptionName<Options, ApplicationCommandOptionType.User>, required: true): User;
+  getUser(name: OptionName<Options, ApplicationCommandOptionType.User> | string, required: true): User;
   getUser<N extends OptionName<Options, ApplicationCommandOptionType.User>>(
     name: N, required?: boolean
-  ): GetOption<Options, N, ApplicationCommandOptionType.User> extends { required: true } ? User : User | null;
-  getUser(name: string, required: true): User;
+  ): User | ([GetOption<Options, N, ApplicationCommandOptionType.User>] extends [{ required: true }] ? never : null);
   getUser(name: string, required?: boolean): User | null;
 
   getMember(name: OptionName<Options, ApplicationCommandOptionType.User>): GuildMember | null;
@@ -126,33 +128,31 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   ResolvedChannel<Options, N>;
   getChannel<N extends OptionName<Options, ApplicationCommandOptionType.Channel>>(name: N, required: false, channelTypes?: readonly ChannelType[]):
     ResolvedChannel<Options, N>
-    | (GetOption<Options, N, ApplicationCommandOptionType.Channel> extends { required: true } ? never : null);
+    | ([GetOption<Options, N, ApplicationCommandOptionType.Channel>] extends [{ required: true }] ? never : null);
   getChannel<N extends OptionName<Options, ApplicationCommandOptionType.Channel>>(name: N, required?: boolean, channelTypes?: readonly ChannelType[]):
     ResolvedChannel<Options, N>
-    | (GetOption<Options, N, ApplicationCommandOptionType.Channel> extends { required: true } ? never : null);
+    | ([GetOption<Options, N, ApplicationCommandOptionType.Channel>] extends [{ required: true }] ? never : null);
   getChannel(name: string, required: true, channelTypes?: readonly ChannelType[]): GuildBasedChannel | APIInteractionDataResolvedChannel;
   getChannel(name: string, required: false, channelTypes?: readonly ChannelType[]): GuildBasedChannel | APIInteractionDataResolvedChannel | null;
   getChannel(name: string, required?: boolean, channelTypes?: readonly ChannelType[]): GuildBasedChannel | APIInteractionDataResolvedChannel | null;
 
-  getRole(name: OptionName<Options, ApplicationCommandOptionType.Role>, required: true): Role | APIRole;
+  getRole(name: OptionName<Options, ApplicationCommandOptionType.Role> | string, required: true): Role | APIRole;
   getRole<N extends OptionName<Options, ApplicationCommandOptionType.Role>>(
     name: N, required?: boolean
-  ): GetOption<Options, N, ApplicationCommandOptionType.Role> extends { required: true } ? Role | APIRole : Role | APIRole | null;
-  getRole(name: string, required: true): Role | APIRole;
+  ): Role | APIRole | ([GetOption<Options, N, ApplicationCommandOptionType.Role>] extends [{ required: true }] ? never : null);
   getRole(name: string, required?: boolean): Role | APIRole | null;
 
-  getAttachment(name: OptionName<Options, ApplicationCommandOptionType.Attachment>, required: true): Attachment;
+  getAttachment(name: OptionName<Options, ApplicationCommandOptionType.Attachment> | string, required: true): Attachment;
   getAttachment<N extends OptionName<Options, ApplicationCommandOptionType.Attachment>>(
     name: N, required?: boolean
-  ): GetOption<Options, N, ApplicationCommandOptionType.Attachment> extends { required: true } ? Attachment : Attachment | null;
-  getAttachment(name: string, required: true): Attachment;
+  ): Attachment | ([GetOption<Options, N, ApplicationCommandOptionType.Attachment>] extends [{ required: true }] ? never : null);
   getAttachment(name: string, required?: boolean): Attachment | null;
 
   getMentionable(name: OptionName<Options, ApplicationCommandOptionType.Mentionable>, required: true): User | GuildMember | Role | APIRole;
   getMentionable<N extends OptionName<Options, ApplicationCommandOptionType.Mentionable>>(
     name: N, required?: boolean
   ): User | GuildMember | Role | APIRole
-    | (GetOption<Options, N, ApplicationCommandOptionType.Mentionable> extends { required: true } ? never : null);
+    | ([GetOption<Options, N, ApplicationCommandOptionType.Mentionable>] extends [{ required: true }] ? never : null);
   getMentionable(name: string, required: true): User | GuildMember | Role | APIRole;
   getMentionable(name: string, required?: boolean): User | GuildMember | Role | APIRole | null;
 
@@ -181,8 +181,8 @@ type MapToConfig<
   : O extends { type: ApplicationCommandOptionType.Subcommand } ? SubcommandConfig<CT, DM>
   : PrimitiveCommandOptionConfig<CT, DM>;
 
-type ValidateOption<O, CT extends readonly CommandType[], DM extends boolean> = MapToConfig<O, CT, DM> extends infer Config
-  ? Config & { [K in keyof O]: K extends keyof Config ? O[K] : never } : never;
+type ValidateOption<O, CT extends readonly CommandType[], DM extends boolean>
+  = MapToConfig<O, CT, DM> & { [K in keyof O]: K extends keyof MapToConfig<O, CT, DM> ? O[K] : never };
 
 export type ValidateOptionsArray<
   Arr, CT extends readonly CommandType[], DM extends boolean
@@ -200,27 +200,29 @@ type BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM exte
 
   strictAutocomplete?: boolean;
   autocompleteOptions?: StrictCommandOption<CT, DM, AO>['autocompleteOptions'];
-  choices?: ApplicationCommandOptionChoiceData['value'][];
+  choices?: readonly ApplicationCommandOptionChoiceData['value'][];
 } & BaseOptionConfig;
 
 export type SubcommandConfig<
-  CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = never,
-  Options extends readonly (CommandOptionConfig<CT, DM, AO> | StrictCommandOption<CT, DM, AO>)[] = readonly DefaultOptionType<CT, DM, AO>[]> = {
-    type: ApplicationCommandOptionType.Subcommand;
-    options?: ValidateOptionsArray<Options, CT, DM>;
-    run?(
-      this: ResolveContext<{
-        [CommandType.Slash]: ChatInputCommandInteraction<'cached', Options>;
-        [CommandType.Component]: MessageComponentInteraction<'cached'>;
-        [CommandType.Prefix]: Message;
-      }, CT>,
-      lang: Translator<false, Locale>, options: AO, client: Client<true>
-    ): unknown;
-  } & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
+  CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = [],
+  Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>,
+  C extends CommandClient<true> = CommandClient<true>
+> = {
+  type: ApplicationCommandOptionType.Subcommand;
+  options?: ValidateOptionsArray<Options, CT, DM>;
+  run?(
+    this: ResolveContext<{
+      [CommandType.Slash]: ChatInputCommandInteraction<C, DM, Options>;
+      [CommandType.Component]: MessageComponentInteraction<C, DM>;
+      [CommandType.Prefix]: Message<C, DM>;
+    }, CT>,
+    lang: Translator<false, Locale>, options: AO, client: C
+  ): unknown;
+} & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
 
 export type SubcommandGroupConfig<
-  CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = never,
-  Options extends OptionsG<CT, DM> = readonly DefaultOptionType<CT, DM, AO>[]> = {
+  CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = [],
+  Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>> = {
     type: ApplicationCommandOptionType.SubcommandGroup;
     options?: ValidateOptionsArray<Options, CT, DM>;
   } & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
@@ -242,7 +244,7 @@ export type NumericCommandOptionConfig<CT extends readonly CommandType[], DM ext
 export type ChannelCommandOptionConfig = {
   type: ApplicationCommandOptionType.Channel;
 
-  channelTypes?: ChannelType[];
+  channelTypes?: readonly ChannelType[];
 } & BaseOptionConfig;
 
 type BooleanCommandOptionConfig = { type: ApplicationCommandOptionType.Boolean } & BaseOptionConfig;
@@ -251,7 +253,7 @@ type RoleCommandOptionConfig = { type: ApplicationCommandOptionType.Role } & Bas
 type MentionableCommandOptionConfig = { type: ApplicationCommandOptionType.Mentionable } & BaseOptionConfig;
 type AttachmentCommandOptionConfig = { type: ApplicationCommandOptionType.Attachment } & BaseOptionConfig;
 
-export type PrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = never>
+export type PrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = []>
   = | StringCommandOptionConfig<CT, DM, AO>
     | NumericCommandOptionConfig<CT, DM, AO>
     | BooleanCommandOptionConfig
@@ -262,8 +264,8 @@ export type PrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM e
     | AttachmentCommandOptionConfig;
 
 export type CommandOptionConfig<
-  CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = never,
-  Options extends OptionsG<CT, DM> = readonly DefaultOptionType<CT, DM>[]
+  CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = [],
+  Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>
 > = PrimitiveCommandOptionConfig<CT, DM, AO>
   | SubcommandConfig<CT, DM, AO, Options>
   | SubcommandGroupConfig<CT, DM, AO, Options>;
