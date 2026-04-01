@@ -272,10 +272,10 @@ export class CommandOption<
   }
 
   async isRunnable(
-    interaction: NonNullable<ResolveContext<{
+    interaction: ResolveContext<{
       [CommandType.Slash]: ChatInputCommandInteraction<DM, ChildrenOptions>;
       [CommandType.Prefix]: Message<DM>;
-    }, NoInfer<CT>>>,
+    }, NoInfer<CT>>,
     command: StrictCommand<CT, DM, AO, ChildrenOptions>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
@@ -338,10 +338,10 @@ export class CommandOption<
   }
 
   async #isRunnableSubcommandGroup(
-    interaction: NonNullable<ResolveContext<{
+    interaction: ResolveContext<{
       [CommandType.Slash]: ChatInputCommandInteraction<DM, ChildrenOptions>;
       [CommandType.Prefix]: Message<DM>;
-    }, NoInfer<CT>>>,
+    }, NoInfer<CT>>,
     command: StrictCommand<CT, DM, AO, ChildrenOptions>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
@@ -356,10 +356,10 @@ export class CommandOption<
   }
 
   async #isRunnableSubcommand(
-    interaction: NonNullable<ResolveContext<{
+    interaction: ResolveContext<{
       [CommandType.Slash]: ChatInputCommandInteraction<DM, ChildrenOptions>;
       [CommandType.Prefix]: Message<DM>;
-    }, NoInfer<CT>>>,
+    }, NoInfer<CT>>,
     command: StrictCommand<CT, DM, AO, ChildrenOptions>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
