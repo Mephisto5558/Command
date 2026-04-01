@@ -7,17 +7,17 @@ import capitalize from '../../utils/capitalize.ts';
 import { Command } from '../command/index.ts';
 import { CommandType } from '../utils.ts';
 
-import type { ApplicationCommand, ApplicationCommandDataResolvable } from 'discord.js';
+import type { ApplicationCommand, ApplicationCommandDataResolvable, Client } from 'discord.js';
 import type { I18nProvider } from '@mephisto5558/i18n';
-import type { CommandClient, Logger, commandDoneFn, customPermissionChecksFn } from '../../index.ts';
+import type { Logger, commandDoneFn, customPermissionChecksFn } from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
 
 type CollectionMember = Command<readonly CommandType[], boolean>;
 
 /* eslint-disable-next-line import-x/prefer-default-export */
-export class CommandManager<C extends CommandClient = CommandClient> {
+export class CommandManager {
   commands = new Collection<CollectionMember['name'], CollectionMember>();
-  client!: C;
+  client!: Client<true>;
   commandsPath!: string;
   doneFn: commandDoneFn | undefined;
   cooldownsManager!: CooldownsManager;
@@ -33,7 +33,7 @@ export class CommandManager<C extends CommandClient = CommandClient> {
 
   init(
     commandsPath: string,
-    client: C,
+    client: Client<true>,
     i18n: I18nProvider,
     config: {
       logger?: Logger;

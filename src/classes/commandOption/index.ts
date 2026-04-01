@@ -8,10 +8,10 @@ import { CooldownType } from '../../index.ts';
 import { autocompleteOptionsMaxAmt, choiceValueMaxLength, choiceValueMinLength, choicesMaxAmt, descriptionMaxLength } from '../../utils/constants.ts';
 import { cooldownConverter, equal } from '../utils.ts';
 
-import type { ApplicationCommandOption, ApplicationCommandOptionChoiceData } from 'discord.js';
+import type { ApplicationCommandOption, ApplicationCommandOptionChoiceData, Client } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  AutocompleteInteraction, ChatInputCommandInteraction, Command, CommandClient, Logger, Message,
+  AutocompleteInteraction, ChatInputCommandInteraction, Command, Logger, Message,
   MessageComponentInteraction, OptionsG, ResolveContext
 } from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
@@ -28,8 +28,7 @@ export class CommandOption<
   const DM extends boolean = false,
   AO extends unknown[] = [],
   const ChildrenOptions extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>,
-  T extends ApplicationCommandOptionType = ApplicationCommandOptionType,
-  C extends CommandClient<true> = CommandClient<true>
+  T extends ApplicationCommandOptionType = ApplicationCommandOptionType
 > {
   name: Lowercase<string>;
   id!: `${string}.options.${CommandOption['name']}`;
@@ -57,7 +56,7 @@ export class CommandOption<
     ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number
   ) ? autocompleteOptions | autocompleteOptions[] | (
       (
-        this: ResolveContext<{ [CommandType.Slash]: AutocompleteInteraction<C, DM>; [CommandType.Prefix]: Message<C, DM> }, CT>,
+        this: ResolveContext<{ [CommandType.Slash]: AutocompleteInteraction<DM>; [CommandType.Prefix]: Message<DM> }, CT>,
         query: string
       ) => autocompleteOptions[] | Promise<autocompleteOptions[]>
     ) | undefined
@@ -93,12 +92,12 @@ export class CommandOption<
 
   run?: (
     this: ResolveContext<{
-      [CommandType.Slash]: ChatInputCommandInteraction<C, DM, NoInfer<ChildrenOptions>>;
-      [CommandType.Component]: MessageComponentInteraction<C, DM>;
-      [CommandType.Prefix]: Message<C, DM>;
+      [CommandType.Slash]: ChatInputCommandInteraction<DM, NoInfer<ChildrenOptions>>;
+      [CommandType.Component]: MessageComponentInteraction<DM>;
+      [CommandType.Prefix]: Message<DM>;
     }, NoInfer<CT>>,
     lang: Translator<false, Locale>,
-    options: AO, client: C
+    options: AO, client: Client<true>
   ) => unknown;
 
   #i18n!: I18nProvider;
@@ -274,9 +273,9 @@ export class CommandOption<
 
   async isRunnable(
     interaction: NonNullable<ResolveContext<{
-      [CommandType.Slash]: ChatInputCommandInteraction<C, DM, ChildrenOptions>;
-      [CommandType.Prefix]: Message<C, DM>
-  }, NoInfer<CT>>>,
+      [CommandType.Slash]: ChatInputCommandInteraction<DM, ChildrenOptions>;
+      [CommandType.Prefix]: Message<DM>;
+    }, NoInfer<CT>>>,
     command: StrictCommand<CT, DM, AO, ChildrenOptions>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
@@ -340,8 +339,8 @@ export class CommandOption<
 
   async #isRunnableSubcommandGroup(
     interaction: NonNullable<ResolveContext<{
-      [CommandType.Slash]: ChatInputCommandInteraction<C, DM, ChildrenOptions>;
-      [CommandType.Prefix]: Message<C, DM>
+      [CommandType.Slash]: ChatInputCommandInteraction<DM, ChildrenOptions>;
+      [CommandType.Prefix]: Message<DM>;
     }, NoInfer<CT>>>,
     command: StrictCommand<CT, DM, AO, ChildrenOptions>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
@@ -358,8 +357,8 @@ export class CommandOption<
 
   async #isRunnableSubcommand(
     interaction: NonNullable<ResolveContext<{
-      [CommandType.Slash]: ChatInputCommandInteraction<C, DM, ChildrenOptions>;
-      [CommandType.Prefix]: Message<C, DM>
+      [CommandType.Slash]: ChatInputCommandInteraction<DM, ChildrenOptions>;
+      [CommandType.Prefix]: Message<DM>;
     }, NoInfer<CT>>>,
     command: StrictCommand<CT, DM, AO, ChildrenOptions>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
@@ -375,7 +374,7 @@ export class CommandOption<
 
   /** `translator` and `options` should not be supplied by an external caller. */
   async generateAutocomplete(
-    interaction: ResolveContext<{ [CommandType.Slash]: AutocompleteInteraction<C, DM>; [CommandType.Prefix]: Message<C, DM> }, NoInfer<CT>>,
+    interaction: ResolveContext<{ [CommandType.Slash]: AutocompleteInteraction<DM>; [CommandType.Prefix]: Message<DM> }, NoInfer<CT>>,
     query: string, locale: Locale, translator?: Translator<true, Locale>,
     options: StrictCommandOption<CT, DM>['autocompleteOptions'] = this.autocompleteOptions
   ): Promise<[] | autocompleteObject[]> {
@@ -455,14 +454,13 @@ export class CommandOption<
   static from<
     CT extends readonly CommandType[], DM extends boolean, AO extends unknown[],
     ChildOptions extends OptionsG<CT, DM, AO>,
-    InferredT extends ApplicationCommandOptionType,
-    C extends CommandClient = CommandClient
+    InferredT extends ApplicationCommandOptionType
   >(
-    commandOption: CommandOptionConfig<CT, DM, AO, ChildOptions> | CommandOption<CT, DM, AO, ChildOptions, InferredT, C>
-  ): CommandOption<CT, DM, AO, ChildOptions, InferredT, C> {
+    commandOption: CommandOptionConfig<CT, DM, AO, ChildOptions> | CommandOption<CT, DM, AO, ChildOptions, InferredT>
+  ): CommandOption<CT, DM, AO, ChildOptions, InferredT> {
     if (commandOption instanceof CommandOption) return commandOption;
     return new this(
       commandOption as CommandOptionConfig<CT, DM, AO, ChildOptions> & { type: InferredT }
-    ) as CommandOption<CT, DM, AO, ChildOptions, InferredT, C>;
+    ) as CommandOption<CT, DM, AO, ChildOptions, InferredT>;
   }
 }
