@@ -2,8 +2,8 @@
 
 import {
   ApplicationCommandOptionType, ApplicationCommandType, BaseInteraction, ChannelType,
-  ChatInputCommandInteraction as _ChatInputCommandInteraction, Colors, EmbedBuilder,
-  MessageFlags, PermissionsBitField, _NonNullableFields, inlineCode, Message as _Message, MessageComponentInteraction as _MessageComponentInteraction
+  ChatInputCommandInteraction as _ChatInputCommandInteraction, Colors, EmbedBuilder, Message as _Message,
+  MessageComponentInteraction as _MessageComponentInteraction, MessageFlags, PermissionsBitField, _NonNullableFields, inlineCode
 } from 'discord.js';
 
 // @ts-expect-error Cannot augment that module
@@ -13,10 +13,10 @@ import { descriptionMaxLength } from '../../utils/constants.ts';
 import { commandMention } from '../../utils/index.ts';
 import { CommandType, cooldownConverter, equal } from '../utils.ts';
 
-import type { ApplicationCommand, CommandInteraction, PermissionFlags, User } from 'discord.js';
+import type { ApplicationCommand, Client, CommandInteraction, PermissionFlags, User } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  BetterMS, ChatInputCommandInteraction, CommandClient, DefaultOptionType, Logger,
+  BetterMS, ChatInputCommandInteraction, DefaultOptionType, Logger,
   Message, MessageComponentInteraction, OptionsG, ResolveContext, commandDoneFn, customPermissionChecksFn
 } from '../../index.js';
 import type { CooldownsManager } from '../../utils/index.ts';
@@ -35,8 +35,7 @@ const
 export class Command<
   const CT extends readonly CommandType[] = [],
   const DM extends boolean = false,
-  const Options extends OptionsG<CT, DM> = DefaultOptionType<CT, DM>[],
-  C extends CommandClient<true> = CommandClient<true>
+  const Options extends OptionsG<CT, DM> = DefaultOptionType<CT, DM>[]
 > /* implements ChatInputApplicationCommandData */ {
   name!: Lowercase<string>;
   id!: `commands.${Command['category']}.${Command['name']}`;
@@ -101,11 +100,11 @@ export class Command<
 
   run: (
     this: ResolveContext<{
-      [CommandType.Slash]: ChatInputCommandInteraction<C, DM, NoInfer<Options>>;
-      [CommandType.Component]: MessageComponentInteraction<C, DM>;
-      [CommandType.Prefix]: Message<C, DM>;
+      [CommandType.Slash]: ChatInputCommandInteraction<DM, NoInfer<Options>>;
+      [CommandType.Component]: MessageComponentInteraction<DM>;
+      [CommandType.Prefix]: Message<DM>;
     }, NoInfer<CT>>,
-    lang: Translator<false, Locale>, client: C
+    lang: Translator<false, Locale>, client: Client<true>
   ) => unknown;
 
   #i18n!: I18nProvider;

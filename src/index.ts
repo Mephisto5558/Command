@@ -1,6 +1,6 @@
 import type {
   AutocompleteInteraction as _AutocompleteInteraction, CacheType, ChatInputCommandInteraction as _ChatInputCommandInteraction,
-  Client, Message as _Message, MessageComponentInteraction as _MessageComponentInteraction, User, _NonNullableFields
+  Message as _Message, MessageComponentInteraction as _MessageComponentInteraction, User, _NonNullableFields
 } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type { Command } from './classes/command/index.ts';
@@ -17,10 +17,6 @@ export {
   PermissionFlagsBits as Permission,
   ApplicationCommandOptionType as OptionType
 } from 'discord.js';
-
-/** Interface intended for cross-package augmentation by the consumer. */
-/* eslint-disable-next-line @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-empty-object-type */
-export interface CommandClient<Ready extends boolean = boolean> extends Client<Ready> {}
 
 export enum PermissionType {
   Client = 0,
@@ -75,34 +71,16 @@ export interface SharedConfig<DM extends boolean> {
   disabledReason?: string;
 }
 
-/* eslint-disable-next-line @typescript-eslint/consistent-type-definitions */
-export interface ChatInputCommandInteraction<
-  C extends CommandClient = CommandClient, DM extends boolean = boolean, Options extends readonly unknown[] = []
-> extends StrictOmit<_ChatInputCommandInteraction<DM extends false ? 'cached' : CacheType>, 'options' | 'client'> {
-  options: TypeSafeOptionResolver<DM extends false ? 'cached' : CacheType, Options>;
-  client: C;
+/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-empty-object-type
+  -- Interfaces intended for cross-package augmentation by the consumer. */
+export interface ChatInputCommandInteraction<DM extends boolean = boolean, Options extends readonly unknown[] = []> {
+  readonly options: TypeSafeOptionResolver<DM extends false ? 'cached' : CacheType, Options>;
 }
+export interface Message<DM extends boolean = boolean> {}
+export interface AutocompleteInteraction<DM extends boolean = boolean> {}
+export interface MessageComponentInteraction<DM extends boolean = boolean> {}
 
-/* eslint-disable-next-line @typescript-eslint/consistent-type-definitions */
-export interface Message<
-  C extends CommandClient = CommandClient, DM extends boolean = boolean
-> extends StrictOmit<_Message<DM extends false ? true : boolean>, 'client'> {
-  client: C;
-}
-
-/* eslint-disable-next-line @typescript-eslint/consistent-type-definitions */
-export interface AutocompleteInteraction<
-  C extends CommandClient = CommandClient, DM extends boolean = boolean
-> extends StrictOmit<_AutocompleteInteraction<DM extends false ? 'cached' : CacheType>, 'client'> {
-  client: C;
-}
-
-/* eslint-disable-next-line @typescript-eslint/consistent-type-definitions */
-export interface MessageComponentInteraction<
-  C extends CommandClient = CommandClient, DM extends boolean = boolean
-> extends StrictOmit<_MessageComponentInteraction<DM extends false ? 'cached' : CacheType>, 'client'> {
-  client: C;
-}
+/* eslint-enable @typescript-eslint/no-unused-vars, @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-empty-object-type */
 
 export type ResolveContext<MAP, KEYS extends readonly string[]> = MAP[KEYS[number] & keyof MAP];
 

@@ -1,11 +1,11 @@
 import type {
   APIInteractionDataResolvedChannel, APIRole, ApplicationCommandOptionChoiceData, ApplicationCommandOptionType,
-  Attachment, CacheType, CategoryChannel, ChannelType, CommandInteractionOptionResolver, GuildBasedChannel,
+  Attachment, CacheType, CategoryChannel, ChannelType, Client, CommandInteractionOptionResolver, GuildBasedChannel,
   GuildMember, Message as _Message, NewsChannel, Role, StageChannel, TextChannel, ThreadChannel, User, VoiceChannel
 } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  ChatInputCommandInteraction, CommandClient, CommandOption, Message, MessageComponentInteraction,
+  ChatInputCommandInteraction, CommandOption, Message, MessageComponentInteraction,
   OptionsG, ResolveContext, SharedConfig
 } from '../../index.ts';
 import type { CommandType } from '../utils.ts';
@@ -85,7 +85,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   getString<N extends OptionName<Options, ApplicationCommandOptionType.String>>(
     name: N, required?: boolean
   ): ResolvedValue<Options, N, ApplicationCommandOptionType.String, string>
-    | (GetOption<Options, N, ApplicationCommandOptionType.String> extends { required: true } ? never : null);
+    | ([GetOption<Options, N, ApplicationCommandOptionType.String>] extends [{ required: true }] ? never : null);
   getString(name: string, required: true): string;
   getString(name: string, required?: boolean): string | null;
 
@@ -95,7 +95,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   getInteger<N extends OptionName<Options, ApplicationCommandOptionType.Integer>>(
     name: N, required?: boolean
   ): ResolvedValue<Options, N, ApplicationCommandOptionType.Integer, number>
-    | (GetOption<Options, N, ApplicationCommandOptionType.Integer> extends { required: true } ? never : null);
+    | ([GetOption<Options, N, ApplicationCommandOptionType.Integer>] extends [{ required: true }] ? never : null);
   getInteger(name: string, required: true): number;
   getInteger(name: string, required?: boolean): number | null;
 
@@ -105,7 +105,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   getNumber<N extends OptionName<Options, ApplicationCommandOptionType.Number>>(
     name: N, required?: boolean
   ): ResolvedValue<Options, N, ApplicationCommandOptionType.Number, number>
-    | (GetOption<Options, N, ApplicationCommandOptionType.Number> extends { required: true } ? never : null);
+    | ([GetOption<Options, N, ApplicationCommandOptionType.Number>] extends [{ required: true }] ? never : null);
   getNumber(name: string, required: true): number;
   getNumber(name: string, required?: boolean): number | null;
 
@@ -205,18 +205,17 @@ type BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM exte
 
 export type SubcommandConfig<
   CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = [],
-  Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>,
-  C extends CommandClient<true> = CommandClient<true>
+  Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>
 > = {
   type: ApplicationCommandOptionType.Subcommand;
   options?: ValidateOptionsArray<Options, CT, DM>;
   run?(
     this: ResolveContext<{
-      [CommandType.Slash]: ChatInputCommandInteraction<C, DM, Options>;
-      [CommandType.Component]: MessageComponentInteraction<C, DM>;
-      [CommandType.Prefix]: Message<C, DM>;
+      [CommandType.Slash]: ChatInputCommandInteraction<DM, Options>;
+      [CommandType.Component]: MessageComponentInteraction<DM>;
+      [CommandType.Prefix]: Message<DM>;
     }, CT>,
-    lang: Translator<false, Locale>, options: AO, client: C
+    lang: Translator<false, Locale>, options: AO, client: Client<true>
   ): unknown;
 } & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
 
