@@ -49,9 +49,9 @@ export type Logger = {
   error: typeof console.error;
 };
 
-export type OptionsG<CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = []>
+export type OptionsG<CT extends readonly CommandType[], DM extends boolean, AO = undefined>
   = readonly (CommandOptionConfig<CT, DM, AO> | CommandOption<CT, DM, AO>)[];
-export type DefaultOptionType<CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = []>
+export type DefaultOptionType<CT extends readonly CommandType[], DM extends boolean, AO = undefined>
   = CommandOptionConfig<CT, DM, AO, OptionsG<CT, DM, AO>> | CommandOption<CT, DM, AO, OptionsG<CT, DM, AO>>;
 
 export enum CooldownType {
