@@ -14,7 +14,7 @@ import type { CommandType } from '../utils.ts';
 
 
 export type StrictCommand<
-  CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = [],
+  CT extends readonly CommandType[], DM extends boolean, AO = undefined,
   Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>
 > = Command<NoInfer<CT>, NoInfer<DM>, Options extends OptionsG<NoInfer<CT>, NoInfer<DM>> ? Options : OptionsG<NoInfer<CT>, NoInfer<DM>>>;
 

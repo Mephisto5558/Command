@@ -14,7 +14,7 @@ export type autocompleteObject = StrictOmit<ApplicationCommandOptionChoiceData, 
 export type autocompleteOptions = autocompleteObject['value'] | autocompleteObject;
 
 export type StrictCommandOption<
-  CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = []
+  CT extends readonly CommandType[], DM extends boolean, AO = undefined
 > = CommandOption<CT, DM, AO, OptionsG<CT, DM, AO>>;
 
 // #region option resolver
@@ -195,7 +195,7 @@ type BaseOptionConfig = {
   required?: boolean;
 };
 
-type BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO extends unknown[]> = {
+type BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO> = {
   type: ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number;
 
   strictAutocomplete?: boolean;
@@ -204,7 +204,7 @@ type BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM exte
 } & BaseOptionConfig;
 
 export type SubcommandConfig<
-  CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = [],
+  CT extends readonly CommandType[], DM extends boolean, AO = undefined,
   Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>
 > = {
   type: ApplicationCommandOptionType.Subcommand;
@@ -220,20 +220,20 @@ export type SubcommandConfig<
 } & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
 
 export type SubcommandGroupConfig<
-  CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = [],
+  CT extends readonly CommandType[], DM extends boolean, AO = undefined,
   Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>> = {
     type: ApplicationCommandOptionType.SubcommandGroup;
     options?: ValidateOptionsArray<Options, CT, DM>;
   } & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
 
-export type StringCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO extends unknown[]> = {
+export type StringCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO> = {
   type: ApplicationCommandOptionType.String;
 
   minLength?: number;
   maxLength?: number;
 } & BasePrimitiveCommandOptionConfig<CT, DM, AO>;
 
-export type NumericCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO extends unknown[]> = {
+export type NumericCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO> = {
   type: ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number;
 
   minValue?: number;
@@ -252,7 +252,7 @@ type RoleCommandOptionConfig = { type: ApplicationCommandOptionType.Role } & Bas
 type MentionableCommandOptionConfig = { type: ApplicationCommandOptionType.Mentionable } & BaseOptionConfig;
 type AttachmentCommandOptionConfig = { type: ApplicationCommandOptionType.Attachment } & BaseOptionConfig;
 
-export type PrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = []>
+export type PrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO = undefined>
   = | StringCommandOptionConfig<CT, DM, AO>
     | NumericCommandOptionConfig<CT, DM, AO>
     | BooleanCommandOptionConfig
@@ -263,7 +263,7 @@ export type PrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM e
     | AttachmentCommandOptionConfig;
 
 export type CommandOptionConfig<
-  CT extends readonly CommandType[], DM extends boolean, AO extends unknown[] = [],
+  CT extends readonly CommandType[], DM extends boolean, AO = undefined,
   Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>
 > = PrimitiveCommandOptionConfig<CT, DM, AO>
   | SubcommandConfig<CT, DM, AO, Options>

@@ -26,7 +26,7 @@ import type {
 export class CommandOption<
   const CT extends readonly CommandType[] = [],
   const DM extends boolean = false,
-  AO extends unknown[] = [],
+  AO = undefined,
   const ChildrenOptions extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>,
   T extends ApplicationCommandOptionType = ApplicationCommandOptionType
 > {
@@ -452,7 +452,7 @@ export class CommandOption<
   }
 
   static from<
-    CT extends readonly CommandType[], DM extends boolean, AO extends unknown[],
+    CT extends readonly CommandType[], DM extends boolean, AO,
     ChildOptions extends OptionsG<CT, DM, AO>,
     InferredT extends ApplicationCommandOptionType
   >(
