@@ -10,7 +10,6 @@ import {
 import { getMilliseconds as getMilliseconds_ } from 'better-ms';
 import { CommandExecutionError, CommandOption, CooldownType, Permission, PermissionType } from '../../index.ts';
 import { descriptionMaxLength } from '../../utils/constants.ts';
-import { commandMention } from '../../utils/index.ts';
 import { CommandType, cooldownConverter, equal } from '../utils.ts';
 
 import type { ApplicationCommand, Client, CommandInteraction, PermissionFlags, User } from 'discord.js';
@@ -21,7 +20,7 @@ import type {
 } from '../../index.js';
 import type { CooldownsManager } from '../../utils/index.ts';
 import type { StrictCommandOption } from '../commandOption/utils.ts';
-import type { CommandConfig, RunnableReturns, StrictCommand } from './utils.ts';
+import type { CommandConfig, CommandMention, RunnableReturns, StrictCommand } from './utils.ts';
 
 const
   /* eslint-disable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-non-null-assertion */
@@ -94,8 +93,14 @@ export class Command<
     replyOn: { disabled: true, nonBeta: true }
   };
 
-  get mention(): ReturnType<typeof commandMention> {
-    return commandMention(this.name, this.commandId);
+  mention<SubCommandGroupName extends string | undefined = undefined, SubcommandName extends string | undefined = undefined>(
+    subcommandGroup?: SubCommandGroupName, subcommand?: SubcommandName
+  ): CommandMention<SubCommandGroupName, SubcommandName, CT> {
+    const path = [this.name, subcommandGroup, subcommand].filter(Boolean).join(' ');
+
+    // using `0` here to not break the mention in Discord
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- fine here */
+    return `</${path}:${this.commandId ?? 0}>` as CommandMention<SubCommandGroupName, SubcommandName, CT>;
   }
 
   run: (
@@ -426,7 +431,7 @@ export class Command<
 
     // TODO: remove hardcoded "Not provided"
 
-    if (interaction instanceof _Message && !this.types.includes(CommandType.Prefix)) return ['slashOnly', this.mention];
+    if (interaction instanceof _Message && !this.types.includes(CommandType.Prefix)) return ['slashOnly', this.mention()];
 
     if (!this.dmPermission && interaction.channel?.type == ChannelType.DM) return ['guildOnly'];
     if (this.category == 'nsfw' && interaction.channel && (!('nsfw' in interaction.channel) || !interaction.channel.nsfw)) return ['nsfw'];
