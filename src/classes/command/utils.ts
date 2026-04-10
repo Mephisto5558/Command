@@ -45,7 +45,7 @@ export interface CommandConfig<
   Options extends OptionsG<CT, DM> = DefaultOptionType<CT, DM>[]
 > extends SharedConfig<DM> {
   types: CT;
-  usage?: { usage?: string; examples?: string };
+  usage?: { usage?: string; examples?: string }; // TODO: support arrays
   aliases?: { [K in NoInfer<CT>[number]]?: Lowercase<string>[] };
   permissions?: Partial<Record<PermissionType, PermissionFlags[keyof PermissionFlags][]>>;
 
