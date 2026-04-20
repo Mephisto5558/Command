@@ -32,7 +32,7 @@
   },
   "dependencies": {
     "better-ms": "1.x",
-    "import-without-cache": "^0.2.5"
+    "import-without-cache": "^0.3.3"
   },
   "devDependencies": {
     "@mephisto5558/eslint-config": "latest",
