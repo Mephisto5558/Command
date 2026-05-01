@@ -399,8 +399,9 @@ export class CommandOption<
   }
 
   /**
+   * Resets it if it's `0`.
    * @returns the currect cooldown for this subcommand(group) in ms.
-   * Resets it if it's `0`. */
+   * @internal */
   updateCooldowns(interaction: ChatInputCommandInteraction | Message | MessageComponentInteraction): number {
     return this.#cooldownsManager.update(this.id, interaction as Parameters<CooldownsManager['update']>[1], this.cooldowns);
   }
