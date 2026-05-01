@@ -240,7 +240,8 @@ export type SubcommandConfig<
       [CommandType.Component]: MessageComponentInteraction<DM>;
       [CommandType.Prefix]: Message<DM>;
     }, CT>,
-    lang: Translator<false, Locale>, options: AO, client: Client<true>
+    lang: Translator<false, Locale>, options: AO,
+    client: Client<true>, optionConfig: SubcommandConfig<CT, DM, Options>
   ): unknown;
 } & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
 

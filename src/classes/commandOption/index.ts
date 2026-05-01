@@ -96,8 +96,8 @@ export class CommandOption<
       [CommandType.Component]: MessageComponentInteraction<DM>;
       [CommandType.Prefix]: Message<DM>;
     }, NoInfer<CT>>,
-    lang: Translator<false, Locale>,
-    options: AO, client: Client<true>
+    lang: Translator<false, Locale>, options: AO,
+    client: Client<true>, optionConfig: this
   ) => unknown;
 
   #i18n!: I18nProvider;
