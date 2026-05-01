@@ -295,7 +295,7 @@ export class Command<
   /**
    * @returns the currect cooldown for this command or the subcommand(group) (whichever is higher) in ms.
    * Resets it if it's `0`. */
-  private updateCooldowns(interaction: ThisParameterType<StrictCommand<CT, DM>['run']>): number {
+  #updateCooldowns(interaction: ThisParameterType<StrictCommand<CT, DM>['run']>): number {
     const
       currentCooldowns = [this.#cooldownsManager.update(this.id, interaction as unknown as Parameters<CooldownsManager['update']>[1], this.cooldowns)],
       { group, subcommand } = this.#getSubcommandNames(interaction) ?? {};
@@ -412,7 +412,7 @@ export class Command<
     }
 
     if (!this.config.runBetaCommandsOnly) {
-      const cooldown = this.updateCooldowns(interaction);
+      const cooldown = this.#updateCooldowns(interaction);
       if (cooldown) return ['cooldown', inlineCode(Math.round(cooldown / msInSeconds).toString())];
     }
 
