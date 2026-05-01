@@ -109,7 +109,8 @@ export class Command<
       [CommandType.Component]: MessageComponentInteraction<DM>;
       [CommandType.Prefix]: Message<DM>;
     }, NoInfer<CT>>,
-    lang: Translator<false, Locale>, client: Client<true>
+    lang: Translator<false, Locale>,
+    client: Client<true>, commandConfig: this
   ) => unknown;
 
   #i18n!: I18nProvider;
@@ -284,7 +285,7 @@ export class Command<
     ) await interaction.deferReply({ flags: this.ephemeralDefer ? MessageFlags.Ephemeral : undefined });
 
     try {
-      await this.run.call(interaction, commandTranslator, interaction.client);
+      await this.run.call(interaction, commandTranslator, interaction.client, this);
       await this.#doneFn.call(interaction, this, commandTranslator);
     }
     catch (err) {

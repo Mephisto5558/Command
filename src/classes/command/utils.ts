@@ -62,6 +62,7 @@ export interface CommandConfig<
       [CommandType.Component]: MessageComponentInteraction<DM>;
       [CommandType.Prefix]: Message<DM>;
     }, CT>,
-    lang: Translator<false, Locale>, client: Client<true>
+    lang: Translator<false, Locale>,
+    client: Client<true>, commandConfig: this
   ): unknown;
 }
