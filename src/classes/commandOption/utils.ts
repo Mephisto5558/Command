@@ -18,30 +18,41 @@ export type StrictCommandOption<
 > = CommandOption<CT, DM, AO, OptionsG<CT, DM, AO>>;
 
 // #region option resolver
-type GetNamesAtLevel<Opts extends readonly unknown[], TargetType extends ApplicationCommandOptionType>
-  = Opts[number] extends infer O
-    ? O extends { type: TargetType; name: infer N } ? (N extends string ? N : never) : never
+type GetSubOpts<O>
+  = O extends unknown
+    ? O extends { options?: infer Sub }
+      ? Sub extends readonly unknown[]
+        ? Sub[number]
+        : never
+      : never
     : never;
+
+type ExtractOptionName<O, Type extends ApplicationCommandOptionType>
+  = O extends unknown
+    ? O extends { name: infer N extends string; type: Type }
+      ? N
+      : never
+    : never;
+
+type ExtractGetOption<O, Name extends string, Type extends ApplicationCommandOptionType>
+  = O extends unknown
+    ? O extends { name: Name; type: Type }
+      ? O
+      : never
+    : never;
+
+type GetNamesAtLevel<Opts extends readonly unknown[], TargetType extends ApplicationCommandOptionType>
+  = ExtractOptionName<Opts[number], TargetType>;
 
 type OptionName<Options extends readonly unknown[], Type extends ApplicationCommandOptionType>
-  = Options[number] extends infer O
-    ? O extends { type: Type; name: infer N } ? (N extends string ? N : never)
-    : O extends { type: ApplicationCommandOptionType.SubcommandGroup; options: infer SubGroupOptions }
-      ? (SubGroupOptions extends readonly unknown[] ? GetNamesAtLevel<SubGroupOptions, Type> : never)
-      : O extends { type: ApplicationCommandOptionType.Subcommand; options: infer SubOptions }
-        ? (SubOptions extends readonly unknown[] ? GetNamesAtLevel<SubOptions, Type> : never)
-        : never
-    : never;
+  = ExtractOptionName<Options[number], Type>
+    | ExtractOptionName<GetSubOpts<Options[number]>, Type>
+    | ExtractOptionName<GetSubOpts<GetSubOpts<Options[number]>>, Type>;
 
 type GetOption<Options extends readonly unknown[], Name extends string, Type extends ApplicationCommandOptionType>
-  = Options[number] extends infer O
-    ? O extends { name: Name; type: Type } ? O
-    : O extends { type: ApplicationCommandOptionType.SubcommandGroup; options: infer SubGroupOptions }
-      ? (SubGroupOptions extends readonly unknown[] ? GetOption<SubGroupOptions, Name, Type> : never)
-      : O extends { type: ApplicationCommandOptionType.Subcommand; options: infer SubOptions }
-        ? (SubOptions extends readonly unknown[] ? GetOption<SubOptions, Name, Type> : never)
-        : never
-    : never;
+  = ExtractGetOption<Options[number], Name, Type>
+    | ExtractGetOption<GetSubOpts<Options[number]>, Name, Type>
+    | ExtractGetOption<GetSubOpts<GetSubOpts<Options[number]>>, Name, Type>;
 
 type ResolvedChannelType<T extends ChannelType>
   = T extends ChannelType.GuildText ? TextChannel
@@ -67,13 +78,16 @@ type ResolvedSubcommandGroup<Options extends readonly unknown[]> = OptionName<Op
 
 type ResolveValue<Option, BaseType>
   = Option extends { choices: readonly (infer C)[] } ? (C extends { value: infer V } ? V : C)
-  : Option extends { strictAutocomplete: true, autocompleteOptions: readonly (infer A)[] } ? (A extends { value: infer V } ? V : A)
+  : Option extends { strictAutocomplete: true; autocompleteOptions: readonly (infer A)[] } ? (A extends { value: infer V } ? V : A)
   : BaseType;
 
 type ResolvedValue<Options extends readonly unknown[], Name extends string, Type extends ApplicationCommandOptionType, BaseType>
   = [GetOption<Options, Name, Type>] extends [never]
     ? BaseType
     : ResolveValue<GetOption<Options, Name, Type>, BaseType>;
+
+type IsRequired<Options extends readonly unknown[], Name extends string, Type extends ApplicationCommandOptionType>
+  = Extract<Options[number], { name: Name; type: Type; required: true }> extends never ? false : true;
 
 export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options extends readonly unknown[] = unknown[]> = StrictOmit<
   CommandInteractionOptionResolver<Cached>, Extract<keyof CommandInteractionOptionResolver<Cached>, `get${string}${string}`>
@@ -87,7 +101,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   getString<N extends OptionName<Options, ApplicationCommandOptionType.String>>(
     name: N, required?: boolean
   ): ResolvedValue<Options, N, ApplicationCommandOptionType.String, string>
-    | ([GetOption<Options, N, ApplicationCommandOptionType.String>] extends [{ required: true }] ? never : null);
+    | (IsRequired<Options, N, ApplicationCommandOptionType.String> extends true ? never : null);
   getString(name: string, required: true): string;
   getString(name: string, required?: boolean): string | null;
 
@@ -98,7 +112,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   getInteger<N extends OptionName<Options, ApplicationCommandOptionType.Integer>>(
     name: N, required?: boolean
   ): ResolvedValue<Options, N, ApplicationCommandOptionType.Integer, number>
-    | ([GetOption<Options, N, ApplicationCommandOptionType.Integer>] extends [{ required: true }] ? never : null);
+    | (IsRequired<Options, N, ApplicationCommandOptionType.Integer> extends true ? never : null);
   getInteger(name: string, required: true): number;
   getInteger(name: string, required?: boolean): number | null;
 
@@ -109,7 +123,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   getNumber<N extends OptionName<Options, ApplicationCommandOptionType.Number>>(
     name: N, required?: boolean
   ): ResolvedValue<Options, N, ApplicationCommandOptionType.Number, number>
-    | ([GetOption<Options, N, ApplicationCommandOptionType.Number>] extends [{ required: true }] ? never : null);
+    | (IsRequired<Options, N, ApplicationCommandOptionType.Number> extends true ? never : null);
   getNumber(name: string, required: true): number;
   getNumber(name: string, required?: boolean): number | null;
 
@@ -119,7 +133,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   ): boolean;
   getBoolean<N extends OptionName<Options, ApplicationCommandOptionType.Boolean>>(
     name: N, required?: boolean
-  ): boolean | ([GetOption<Options, N, ApplicationCommandOptionType.Boolean>] extends [{ required: true }] ? never : null);
+  ): boolean | (IsRequired<Options, N, ApplicationCommandOptionType.Boolean> extends true ? never : null);
   getBoolean(name: string, required: true): boolean;
   getBoolean(name: string, required?: boolean): boolean | null;
 
@@ -129,7 +143,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   ): User;
   getUser<N extends OptionName<Options, ApplicationCommandOptionType.User>>(
     name: N, required?: boolean
-  ): User | ([GetOption<Options, N, ApplicationCommandOptionType.User>] extends [{ required: true }] ? never : null);
+  ): User | (IsRequired<Options, N, ApplicationCommandOptionType.User> extends true ? never : null);
   getUser(name: string, required: true): User;
   getUser(name: string, required?: boolean): User | null;
 
@@ -141,7 +155,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   ): ResolvedChannel<Options, N>;
   getChannel<N extends OptionName<Options, ApplicationCommandOptionType.Channel>>(
     name: N, required?: boolean, channelTypes?: readonly ChannelType[]
-  ): ResolvedChannel<Options, N> | ([GetOption<Options, N, ApplicationCommandOptionType.Channel>] extends [{ required: true }] ? never : null);
+  ): ResolvedChannel<Options, N> | (IsRequired<Options, N, ApplicationCommandOptionType.Channel> extends true ? never : null);
   getChannel(name: string, required: true, channelTypes?: readonly ChannelType[]): GuildBasedChannel | APIInteractionDataResolvedChannel;
   getChannel(name: string, required?: boolean, channelTypes?: readonly ChannelType[]): GuildBasedChannel | APIInteractionDataResolvedChannel | null;
 
@@ -151,7 +165,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   ): Role | APIRole;
   getRole<N extends OptionName<Options, ApplicationCommandOptionType.Role>>(
     name: N, required?: boolean
-  ): Role | APIRole | ([GetOption<Options, N, ApplicationCommandOptionType.Role>] extends [{ required: true }] ? never : null);
+  ): Role | APIRole | (IsRequired<Options, N, ApplicationCommandOptionType.Role> extends true ? never : null);
   getRole(name: string, required: true): Role | APIRole;
   getRole(name: string, required?: boolean): Role | APIRole | null;
 
@@ -159,7 +173,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   getAttachment<N extends OptionName<Options, ApplicationCommandOptionType.Attachment>>(name: N, required: true): Attachment;
   getAttachment<N extends OptionName<Options, ApplicationCommandOptionType.Attachment>>(
     name: N, required?: boolean
-  ): Attachment | ([GetOption<Options, N, ApplicationCommandOptionType.Attachment>] extends [{ required: true }] ? never : null);
+  ): Attachment | (IsRequired<Options, N, ApplicationCommandOptionType.Attachment> extends true ? never : null);
   getAttachment(name: string, required: true): Attachment;
   getAttachment(name: string, required?: boolean): Attachment | null;
 
@@ -170,7 +184,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   getMentionable<N extends OptionName<Options, ApplicationCommandOptionType.Mentionable>>(
     name: N, required?: boolean
   ): User | GuildMember | Role | APIRole
-    | ([GetOption<Options, N, ApplicationCommandOptionType.Mentionable>] extends [{ required: true }] ? never : null);
+    | (IsRequired<Options, N, ApplicationCommandOptionType.Mentionable> extends true ? never : null);
   getMentionable(name: string, required: true): User | GuildMember | Role | APIRole;
   getMentionable(name: string, required?: boolean): User | GuildMember | Role | APIRole | null;
 
@@ -182,11 +196,10 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   getSubcommandGroup(required: boolean): ResolvedSubcommandGroup<Options> | null;
 
   readonly subcommand: {
-    [K in GetNamesAtLevel<Options, ApplicationCommandOptionType.Subcommand>]: TypeSafeOptionResolver<Cached, 
-      Extract<Options[number], { name: K }> extends { options: infer O } ? (O extends readonly unknown[] ? O : []) : []
+    [K in GetNamesAtLevel<Options, ApplicationCommandOptionType.Subcommand>]: TypeSafeOptionResolver<Cached,
+      [Extract<Options[number], { name: K }>] extends [{ options: infer O }] ? (O extends readonly unknown[] ? O : []) : []
     >
   };
-  /* eslint-enable @typescript-eslint/unified-signatures */
 };
 
 // #endregion option resolver
