@@ -82,7 +82,9 @@ export interface MessageComponentInteraction<DM extends boolean = boolean> {}
 
 /* eslint-enable @typescript-eslint/no-unused-vars, @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-empty-object-type */
 
-export type ResolveContext<MAP, KEYS extends readonly string[]> = MAP[KEYS[number] & keyof MAP];
+type EagerResolve<MAP, K> = K extends keyof MAP ? MAP[K] : never;
+
+export type ResolveContext<MAP, KEYS extends readonly string[]> = EagerResolve<MAP, KEYS[number]>;
 
 export type commandDoneFn<cmd extends Command<readonly CommandType[], boolean> = Command<readonly CommandType[], boolean>> = (
   this: ThisParameterType<cmd['run']>,
