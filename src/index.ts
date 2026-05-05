@@ -25,6 +25,18 @@ export enum PermissionType {
   Channel = 3
 }
 
+export enum DMPermType {
+  CanBeDM = 0,
+  NeverDM = 1,
+  OnlyDM = 2
+}
+
+export type DMPermTypeToCaching = {
+  [DMPermType.CanBeDM]: CacheType;
+  [DMPermType.NeverDM]: 'cached';
+  [DMPermType.OnlyDM]: 'raw';
+};
+
 export declare namespace BetterMS {
   function getMilliseconds<
     T extends validTimeString | number
@@ -49,9 +61,9 @@ export type Logger = {
   error: typeof console.error;
 };
 
-export type OptionsG<CT extends readonly CommandType[], DM extends boolean, AO = undefined>
+export type OptionsG<CT extends readonly CommandType[], DM extends DMPermType, AO = undefined>
   = readonly (CommandOptionConfig<CT, DM, AO> | CommandOption<CT, DM, AO>)[];
-export type DefaultOptionType<CT extends readonly CommandType[], DM extends boolean, AO = undefined>
+export type DefaultOptionType<CT extends readonly CommandType[], DM extends DMPermType, AO = undefined>
   = CommandOptionConfig<CT, DM, AO, OptionsG<CT, DM, AO>> | CommandOption<CT, DM, AO, OptionsG<CT, DM, AO>>;
 
 export enum CooldownType {
@@ -62,7 +74,7 @@ export enum CooldownType {
 type Cooldowns = Record<CooldownType, validTimeString>;
 
 /* eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- extending from it */
-export interface SharedConfig<DM extends boolean> {
+export interface SharedConfig<DM extends DMPermType> {
   cooldowns?: Partial<Cooldowns>;
 
   dmPermission?: DM;
@@ -73,12 +85,12 @@ export interface SharedConfig<DM extends boolean> {
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-empty-object-type
   -- Interfaces intended for cross-package augmentation by the consumer. */
-export interface ChatInputCommandInteraction<DM extends boolean = boolean, Options extends readonly unknown[] = []> {
-  readonly options: TypeSafeOptionResolver<DM extends false ? 'cached' : CacheType, Options>;
+export interface ChatInputCommandInteraction<DM extends DMPermType = DMPermType, Options extends readonly unknown[] = []> {
+  readonly options: TypeSafeOptionResolver<DMPermTypeToCaching[DM], Options>;
 }
-export interface Message<DM extends boolean = boolean> {}
-export interface AutocompleteInteraction<DM extends boolean = boolean> {}
-export interface MessageComponentInteraction<DM extends boolean = boolean> {}
+export interface Message<DM extends DMPermType = DMPermType> {}
+export interface AutocompleteInteraction<DM extends DMPermType = DMPermType> {}
+export interface MessageComponentInteraction<DM extends DMPermType = DMPermType> {}
 
 /* eslint-enable @typescript-eslint/no-unused-vars, @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-empty-object-type */
 
@@ -86,7 +98,7 @@ type EagerResolve<MAP, K> = K extends keyof MAP ? MAP[K] : never;
 
 export type ResolveContext<MAP, KEYS extends readonly string[]> = EagerResolve<MAP, KEYS[number]>;
 
-export type commandDoneFn<cmd extends Command<readonly CommandType[], boolean> = Command<readonly CommandType[], boolean>> = (
+export type commandDoneFn<cmd extends Command<readonly CommandType[], DMPermType> = Command<readonly CommandType[], DMPermType>> = (
   this: ThisParameterType<cmd['run']>,
   command: cmd, lang: Translator<false, Locale>
 ) => Promise<never>;
@@ -96,7 +108,7 @@ export type commandDoneFn<cmd extends Command<readonly CommandType[], boolean> =
  * @returns If a permission error was handled by the function: `true`
  * @returns If no permission error was found: `false` */
 export type customPermissionChecksFn<
-  cmd extends Command<readonly CommandType[], boolean> = Command<readonly CommandType[], boolean>,
+  cmd extends Command<readonly CommandType[], DMPermType> = Command<readonly CommandType[], DMPermType>,
   RetMsgs extends Parameters<Translator> = Parameters<Translator>
 > = ((
   this: cmd, interaction: ThisParameterType<cmd['run']>,

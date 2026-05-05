@@ -8,17 +8,17 @@ import type {
 // Declaring them this way allows to inherit discord.js's properties without interfering with the lib user's own declaration.
 declare module './index.ts' {
   /* eslint-disable @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unused-vars */
-  interface ChatInputCommandInteraction<DM extends boolean = boolean, Options extends readonly unknown[] = []>
-    extends StrictOmit<_ChatInputCommandInteraction<DM extends false ? 'cached' : CacheType>, 'options'> {}
+  interface ChatInputCommandInteraction<DM extends DMPermType = DMPermType, Options extends readonly unknown[] = []>
+    extends StrictOmit<_ChatInputCommandInteraction<DMPermTypeToCaching[DM]>, 'options'> {}
 
-  interface Message<DM extends boolean = boolean>
-    extends _Message<DM extends false ? true : boolean> {}
+  interface Message<DM extends DMPermType = DMPermType>
+    extends _Message<DM extends DMPermType.OnlyDM ? true : DM extends DMPermType.NeverDM ? false : boolean> {}
 
-  interface AutocompleteInteraction<DM extends boolean = boolean>
-    extends _AutocompleteInteraction<DM extends false ? 'cached' : CacheType> {}
+  interface AutocompleteInteraction<DM extends DMPermType = DMPermType>
+    extends _AutocompleteInteraction<DMPermTypeToCaching[DM]> {}
 
-  interface MessageComponentInteraction<DM extends boolean = boolean>
-    extends _MessageComponentInteraction<DM extends false ? 'cached' : CacheType> {}
+  interface MessageComponentInteraction<DM extends DMPermType = DMPermType>
+    extends _MessageComponentInteraction<DMPermTypeToCaching[DM]> {}
 
   /* eslint-enable @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unused-vars */
 }

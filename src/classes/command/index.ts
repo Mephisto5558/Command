@@ -8,7 +8,7 @@ import {
 
 // @ts-expect-error Cannot augment that module
 import { getMilliseconds as getMilliseconds_ } from 'better-ms';
-import { CommandExecutionError, CommandOption, CooldownType, Permission, PermissionType } from '../../index.ts';
+import { CommandExecutionError, CommandOption, CooldownType, DMPermType, Permission, PermissionType } from '../../index.ts';
 import { descriptionMaxLength } from '../../utils/constants.ts';
 import { CommandType, cooldownConverter, equal } from '../utils.ts';
 
@@ -17,7 +17,7 @@ import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
   BetterMS, ChatInputCommandInteraction, DefaultOptionType, Logger,
   Message, MessageComponentInteraction, OptionsG, ResolveContext, commandDoneFn, customPermissionChecksFn
-} from '../../index.js';
+} from '../../index.ts';
 import type { CooldownsManager } from '../../utils/index.ts';
 import type { StrictCommandOption } from '../commandOption/utils.ts';
 import type { CommandConfig, CommandMention, RunnableReturns, StrictCommand } from './utils.ts';
@@ -33,7 +33,7 @@ const
 /* eslint-disable-next-line import-x/prefer-default-export */
 export class Command<
   const CT extends readonly CommandType[] = [],
-  const DM extends boolean = false,
+  const DM extends DMPermType = DMPermType.NeverDM,
   const Options extends OptionsG<CT, DM> = DefaultOptionType<CT, DM>[]
 > /* implements ChatInputApplicationCommandData */ {
   name!: Lowercase<string>;
@@ -75,7 +75,7 @@ export class Command<
   }
 
   /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
-  dmPermission: DM = false as DM;
+  dmPermission: DM = DMPermType.NeverDM as DM;
 
   disabled = false;
   disabledReason: string | undefined;
@@ -143,7 +143,7 @@ export class Command<
         if (config.permissions[permissionType]) this.permissions[permissionType].push(...config.permissions[permissionType]);
     }
 
-    if (config.dmPermission) this.dmPermission = config.dmPermission;
+    if ('dmPermission' in config) this.dmPermission = config.dmPermission;
     if (config.disabled) this.disabled = config.disabled;
 
     if (config.noDefer) this.noDefer = config.noDefer;
@@ -434,7 +434,7 @@ export class Command<
 
     if (interaction instanceof _Message && !this.types.includes(CommandType.Prefix)) return ['slashOnly', this.mention()];
 
-    if (!this.dmPermission && interaction.channel?.type == ChannelType.DM) return ['guildOnly'];
+    if (this.dmPermission == DMPermType.NeverDM && interaction.channel?.type == ChannelType.DM) return ['guildOnly'];
     if (this.category == 'nsfw' && interaction.channel && (!('nsfw' in interaction.channel) || !interaction.channel.nsfw)) return ['nsfw'];
     return false;
   }
@@ -470,12 +470,12 @@ export class Command<
     return options.find(e => e.name == option.name && (!option.type || e.type == option.type));
   }
 
-  isEqualTo(cmd?: Command<readonly CommandType[], boolean> | ApplicationCommand): boolean {
+  isEqualTo(cmd?: Command<readonly CommandType[], DMPermType> | ApplicationCommand): boolean {
     if (!cmd) return false;
     if (
       /* eslint-disable-next-line sonarjs/expression-complexity */
       this.name != cmd.name || this.description != cmd.description || this.type != cmd.type
-      /* eslint-disable-next-line @typescript-eslint/no-deprecated */
+      /* eslint-disable-next-line @typescript-eslint/no-deprecated -- todo */
       || this.dmPermission != cmd.dmPermission
       || this.defaultMemberPermissions != (
         cmd.defaultMemberPermissions instanceof PermissionsBitField ? cmd.defaultMemberPermissions.bitfield : cmd.defaultMemberPermissions
@@ -496,7 +496,7 @@ export class Command<
   }
 
   static from<
-    CT extends readonly CommandType[], DM extends boolean, Options extends OptionsG<CT, DM>
+    CT extends readonly CommandType[], DM extends DMPermType, Options extends OptionsG<CT, DM>
   >(command: CommandConfig<CT, DM, Options> | Command<CT, DM, Options>): Command<CT, DM, Options> {
     return command instanceof this ? command : new this(command);
   }

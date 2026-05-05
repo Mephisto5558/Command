@@ -6,7 +6,7 @@ import type {
 } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  ChatInputCommandInteraction, Command, DefaultOptionType, Message, MessageComponentInteraction,
+  ChatInputCommandInteraction, Command, DMPermType, DefaultOptionType, Message, MessageComponentInteraction,
   OptionsG, PermissionType, ResolveContext, SharedConfig
 } from '../../index.ts';
 import type { RunnableReturns as OptionRunnableReturns, ValidateOptionsArray } from '../commandOption/utils.ts';
@@ -14,7 +14,7 @@ import type { CommandType } from '../utils.ts';
 
 
 export type StrictCommand<
-  CT extends readonly CommandType[], DM extends boolean, AO = undefined,
+  CT extends readonly CommandType[], DM extends DMPermType, AO = undefined,
   Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>
 > = Command<NoInfer<CT>, NoInfer<DM>, Options extends OptionsG<NoInfer<CT>, NoInfer<DM>> ? Options : OptionsG<NoInfer<CT>, NoInfer<DM>>>;
 
@@ -41,7 +41,7 @@ export type CommandMention<
     : `</${Name} ${Group} ${Subcommand}:${Id}>`;
 
 export interface CommandConfig<
-  CT extends readonly CommandType[], DM extends boolean,
+  CT extends readonly CommandType[], DM extends DMPermType,
   Options extends OptionsG<CT, DM> = DefaultOptionType<CT, DM>[]
 > extends SharedConfig<DM> {
   types: CT;
