@@ -1,6 +1,6 @@
 import type {
-  AutocompleteInteraction as _AutocompleteInteraction, ChatInputCommandInteraction as _ChatInputCommandInteraction,
-  Message as _Message, MessageComponentInteraction as _MessageComponentInteraction, User, _NonNullableFields
+  APIInteractionGuildMember, AutocompleteInteraction as _AutocompleteInteraction, ChatInputCommandInteraction as _ChatInputCommandInteraction,
+  Message as _Message, MessageComponentInteraction as _MessageComponentInteraction, PartialDMChannel, PartialGroupDMChannel, User, _NonNullableFields
 } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type { Command } from './classes/command/index.ts';
@@ -91,14 +91,43 @@ export interface SharedConfig<DM extends DMPermType> {
   disabledReason?: string;
 }
 
+// Excluding APIInteractionGuildMember because it's an edge case and annoying for now.
+type Member<DM extends DMPermType, T extends _Message | _ChatInputCommandInteraction>
+  = DM extends DMPermType.NeverDM ? NonNullable<Exclude<T['member'], APIInteractionGuildMember>>
+  : DM extends DMPermType.OnlyDM ? null
+  : DM extends DMPermType.CanBeDM ? NonNullable<Exclude<T['member'], APIInteractionGuildMember>> | null
+  : unknown;
+
+// Channel may be null or partial in reality, but with the right Partials and Intents it won't.
+type InteractionChannel<
+  DM extends DMPermType, T1 extends _Message | _ChatInputCommandInteraction, T2 extends _Message | _ChatInputCommandInteraction
+> = Exclude<NonNullable<
+  DM extends DMPermType.NeverDM ? T1['channel']
+  : DM extends DMPermType.OnlyDM ? T2['channel']
+  : DM extends DMPermType.CanBeDM ? (T1 | T2)['channel']
+  : unknown
+>, PartialDMChannel | PartialGroupDMChannel>;
+
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-empty-object-type
   -- Interfaces intended for cross-package augmentation by the consumer. */
-export interface ChatInputCommandInteraction<DM extends DMPermType = DMPermType, Options extends readonly unknown[] = []> {
+export interface ChatInputCommandInteraction<DM extends DMPermType = DMPermType.CanBeDM, Options extends readonly unknown[] = []> {
+  readonly member: Member<DM, _ChatInputCommandInteraction<'cached'>>;
+  readonly channel: InteractionChannel<
+    DM, _ChatInputCommandInteraction<DMPermTypeToCaching[DMPermType.NeverDM]>,
+    _ChatInputCommandInteraction<DMPermTypeToCaching[DMPermType.OnlyDM]>
+  >;
   readonly options: TypeSafeOptionResolver<DMPermTypeToCaching[DM], Options>;
 }
-export interface Message<DM extends DMPermType = DMPermType> {}
-export interface AutocompleteInteraction<DM extends DMPermType = DMPermType> {}
-export interface MessageComponentInteraction<DM extends DMPermType = DMPermType> {}
+export interface Message<DM extends DMPermType = DMPermType.CanBeDM> {
+  readonly member: Member<DM, _Message>;
+  readonly channel: InteractionChannel<
+    DM, _Message<DMPermTypeToInGuild[DMPermType.NeverDM]>,
+    _Message<DMPermTypeToInGuild[DMPermType.OnlyDM]>
+  >;
+}
+
+export interface AutocompleteInteraction<DM extends DMPermType = DMPermType.CanBeDM> {}
+export interface MessageComponentInteraction<DM extends DMPermType = DMPermType.CanBeDM> {}
 
 /* eslint-enable @typescript-eslint/no-unused-vars, @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-empty-object-type */
 
