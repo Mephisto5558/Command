@@ -5,7 +5,7 @@ import type {
 } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  ChatInputCommandInteraction, CommandOption, Message, MessageComponentInteraction,
+  AutocompleteInteraction, ChatInputCommandInteraction, CommandOption, DMPermType, Message, MessageComponentInteraction,
   OptionsG, ResolveContext, SharedConfig
 } from '../../index.ts';
 import type { CommandType } from '../utils.ts';
@@ -14,7 +14,7 @@ export type autocompleteObject = StrictOmit<ApplicationCommandOptionChoiceData, 
 export type autocompleteOptions = autocompleteObject['value'] | autocompleteObject;
 
 export type StrictCommandOption<
-  CT extends readonly CommandType[], DM extends boolean, AO = undefined
+  CT extends readonly CommandType[], DM extends DMPermType, AO = undefined
 > = CommandOption<CT, DM, AO, OptionsG<CT, DM, AO>>;
 
 // #region option resolver
@@ -206,7 +206,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
 
 // #region option config
 type MapToConfig<
-  O, CT extends readonly CommandType[], DM extends boolean>
+  O, CT extends readonly CommandType[], DM extends DMPermType>
   = O extends { type: ApplicationCommandOptionType.String } ? StringCommandOptionConfig<CT, DM, never>
   : O extends { type: ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number } ? NumericCommandOptionConfig<CT, DM, never>
   : O extends { type: ApplicationCommandOptionType.Boolean } ? BooleanCommandOptionConfig
@@ -219,12 +219,14 @@ type MapToConfig<
   : O extends { type: ApplicationCommandOptionType.Subcommand } ? SubcommandConfig<CT, DM>
   : PrimitiveCommandOptionConfig<CT, DM>;
 
-type ValidateOption<O, CT extends readonly CommandType[], DM extends boolean>
+type ValidateOption<O, CT extends readonly CommandType[], DM extends DMPermType>
   = MapToConfig<O, CT, DM> & { [K in keyof O]: K extends keyof MapToConfig<O, CT, DM> ? O[K] : never };
 
 export type ValidateOptionsArray<
-  Arr, CT extends readonly CommandType[], DM extends boolean
-> = Arr extends readonly unknown[] ? { [K in keyof Arr]: ValidateOption<Arr[K], CT, DM> } : Arr;
+  Arr, CT extends readonly CommandType[], DM extends DMPermType
+> = Arr extends readonly unknown[]
+  ? { [K in keyof Arr]: ValidateOption<Arr[K], CT, DM> }
+  : Arr;
 
 
 type BaseOptionConfig = {
@@ -233,16 +235,21 @@ type BaseOptionConfig = {
   required?: boolean;
 };
 
-type BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO> = {
+type BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends DMPermType, AO> = {
   type: ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number;
 
   strictAutocomplete?: boolean;
-  autocompleteOptions?: StrictCommandOption<CT, DM, AO>['autocompleteOptions'];
+  autocompleteOptions?: autocompleteOptions | autocompleteOptions[] | (
+        (
+          this: ResolveContext<{ [CommandType.Slash]: AutocompleteInteraction<DM>; [CommandType.Prefix]: Message<DM> }, CT>,
+          query: string
+        ) => autocompleteOptions[] | Promise<autocompleteOptions[]>
+      ) | undefined;
   choices?: readonly ApplicationCommandOptionChoiceData['value'][];
 } & BaseOptionConfig;
 
 export type SubcommandConfig<
-  CT extends readonly CommandType[], DM extends boolean, AO = undefined,
+  CT extends readonly CommandType[], DM extends DMPermType, AO = undefined,
   Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>
 > = {
   type: ApplicationCommandOptionType.Subcommand;
@@ -259,20 +266,21 @@ export type SubcommandConfig<
 } & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
 
 export type SubcommandGroupConfig<
-  CT extends readonly CommandType[], DM extends boolean, AO = undefined,
-  Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>> = {
-    type: ApplicationCommandOptionType.SubcommandGroup;
-    options?: ValidateOptionsArray<Options, CT, DM>;
-  } & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
+  CT extends readonly CommandType[], DM extends DMPermType, AO = undefined,
+  Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>
+> = {
+  type: ApplicationCommandOptionType.SubcommandGroup;
+  options?: ValidateOptionsArray<Options, CT, DM>;
+} & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
 
-export type StringCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO> = {
+export type StringCommandOptionConfig<CT extends readonly CommandType[], DM extends DMPermType, AO> = {
   type: ApplicationCommandOptionType.String;
 
   minLength?: number;
   maxLength?: number;
 } & BasePrimitiveCommandOptionConfig<CT, DM, AO>;
 
-export type NumericCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO> = {
+export type NumericCommandOptionConfig<CT extends readonly CommandType[], DM extends DMPermType, AO> = {
   type: ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number;
 
   minValue?: number;
@@ -291,7 +299,7 @@ type RoleCommandOptionConfig = { type: ApplicationCommandOptionType.Role } & Bas
 type MentionableCommandOptionConfig = { type: ApplicationCommandOptionType.Mentionable } & BaseOptionConfig;
 type AttachmentCommandOptionConfig = { type: ApplicationCommandOptionType.Attachment } & BaseOptionConfig;
 
-export type PrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends boolean, AO = undefined>
+export type PrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends DMPermType, AO = undefined>
   = | StringCommandOptionConfig<CT, DM, AO>
     | NumericCommandOptionConfig<CT, DM, AO>
     | BooleanCommandOptionConfig
@@ -302,7 +310,7 @@ export type PrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM e
     | AttachmentCommandOptionConfig;
 
 export type CommandOptionConfig<
-  CT extends readonly CommandType[], DM extends boolean, AO = undefined,
+  CT extends readonly CommandType[], DM extends DMPermType, AO = undefined,
   Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>
 > = PrimitiveCommandOptionConfig<CT, DM, AO>
   | SubcommandConfig<CT, DM, AO, Options>

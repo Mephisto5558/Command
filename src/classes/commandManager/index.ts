@@ -9,10 +9,10 @@ import { CommandType } from '../utils.ts';
 
 import type { ApplicationCommand, ApplicationCommandDataResolvable, Client } from 'discord.js';
 import type { I18nProvider } from '@mephisto5558/i18n';
-import type { Logger, commandDoneFn, customPermissionChecksFn } from '../../index.ts';
+import type { DMPermType, Logger, commandDoneFn, customPermissionChecksFn } from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
 
-type CollectionMember = Command<readonly CommandType[], boolean>;
+type CollectionMember = Command<readonly CommandType[], DMPermType>;
 
 /* eslint-disable-next-line import-x/prefer-default-export */
 export class CommandManager {
@@ -186,7 +186,7 @@ export class CommandManager {
   }
 
   async #registerAlias(
-    newCommand: Command<readonly CommandType[], boolean>, oldCommand: Command<readonly CommandType[], boolean> | undefined,
+    newCommand: Command<readonly CommandType[], DMPermType>, oldCommand: Command<readonly CommandType[], DMPermType> | undefined,
     alias: Lowercase<string>, isEqual: boolean, existingCommands: Collection<string, ApplicationCommand>
   ): Promise<void> {
     if (!this.client.application) throw new Error('Client#application must exist (Client must be logged in!)');

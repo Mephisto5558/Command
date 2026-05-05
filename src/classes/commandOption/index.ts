@@ -4,7 +4,7 @@
 import {
   ApplicationCommandOptionType, BaseInteraction, ChannelType, Locale as DLocale, Message as _Message, _NonNullableFields, inlineCode
 } from 'discord.js';
-import { CooldownType } from '../../index.ts';
+import { CooldownType, DMPermType } from '../../index.ts';
 import { autocompleteOptionsMaxAmt, choiceValueMaxLength, choiceValueMinLength, choicesMaxAmt, descriptionMaxLength } from '../../utils/constants.ts';
 import { cooldownConverter, equal } from '../utils.ts';
 
@@ -25,7 +25,7 @@ import type {
 /* eslint-disable-next-line import-x/prefer-default-export */
 export class CommandOption<
   const CT extends readonly CommandType[] = [],
-  const DM extends boolean = false,
+  const DM extends DMPermType = DMPermType.NeverDM,
   AO = undefined,
   const ChildrenOptions extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>,
   T extends ApplicationCommandOptionType = ApplicationCommandOptionType
@@ -45,7 +45,7 @@ export class CommandOption<
 
   cooldowns: Record<CooldownType, number> = { [CooldownType.Guild]: 0, [CooldownType.Channel]: 0, [CooldownType.User]: 0 };
 
-  dmPermission: DM = false as DM;
+  dmPermission: DM = DMPermType.NeverDM as DM;
 
   disabled!: boolean;
   disabledReason: string | undefined;
@@ -143,7 +143,8 @@ export class CommandOption<
           if (numericConfig.maxValue != undefined) this.maxValue = numericConfig.maxValue as typeof this.maxValue;
         }
 
-        if (numericConfig.choices) this.choices = numericConfig.choices.map(e => ({ name: String(e), value: e })) as NonNullable<this['choices']>;
+        if (numericConfig.choices)
+          this.choices = numericConfig.choices.map(e => ({ name: String(e), value: e })) as unknown as NonNullable<this['choices']>;
 
         this.autocompleteOptions = numericConfig.autocompleteOptions as typeof this.autocompleteOptions;
         if (numericConfig.strictAutocomplete) this.strictAutocomplete = numericConfig.strictAutocomplete;
@@ -281,7 +282,7 @@ export class CommandOption<
   ): Promise<RunnableReturns | boolean> {
     if (
       [ApplicationCommandOptionType.SubcommandGroup, ApplicationCommandOptionType.Subcommand].includes(this.type)
-      && !this.dmPermission && (!interaction.channel || interaction.channel.type == ChannelType.DM)
+      && this.dmPermission == DMPermType.NeverDM && (!interaction.channel || interaction.channel.type == ChannelType.DM)
     ) return ['guildOnly'];
 
     if (this.type == ApplicationCommandOptionType.SubcommandGroup)
@@ -403,10 +404,10 @@ export class CommandOption<
    * @returns the currect cooldown for this subcommand(group) in ms.
    * @internal */
   updateCooldowns(interaction: ChatInputCommandInteraction | Message | MessageComponentInteraction): number {
-    return this.#cooldownsManager.update(this.id, interaction as Parameters<CooldownsManager['update']>[1], this.cooldowns);
+    return this.#cooldownsManager.update(this.id, interaction, this.cooldowns);
   }
 
-  isEqualTo(opt: CommandOption<CommandType[], boolean> | ApplicationCommandOption): boolean {
+  isEqualTo(opt: CommandOption<CommandType[], DMPermType> | ApplicationCommandOption): boolean {
     for (const prop of ['name', 'description', 'type', 'autocomplete', 'required', 'minValue', 'maxValue', 'minLength', 'maxLength'] as const) {
       const optProp = prop in opt ? opt[prop as keyof typeof opt] : undefined;
       if (this[prop] != (typeof this[prop] == 'boolean' ? !!optProp : optProp)) return false;
@@ -453,7 +454,7 @@ export class CommandOption<
   }
 
   static from<
-    CT extends readonly CommandType[], DM extends boolean, AO,
+    CT extends readonly CommandType[], DM extends DMPermType, AO,
     ChildOptions extends OptionsG<CT, DM, AO>,
     InferredT extends ApplicationCommandOptionType
   >(
