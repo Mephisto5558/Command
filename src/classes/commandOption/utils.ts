@@ -248,12 +248,9 @@ type BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM exte
   choices?: readonly ApplicationCommandOptionChoiceData['value'][];
 } & BaseOptionConfig;
 
-export type SubcommandConfig<
-  CT extends readonly CommandType[], DM extends DMPermType, AO = undefined,
-  Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>
-> = {
-  type: ApplicationCommandOptionType.Subcommand;
+type BaseSubcommandConfig<CT extends readonly CommandType[], DM extends DMPermType, AO, Options extends OptionsG<CT, DM, AO>> = {
   options?: ValidateOptionsArray<Options, CT, DM>;
+
   run?(
     this: ResolveContext<{
       [CommandType.Slash]: ChatInputCommandInteraction<DM, Options>;
@@ -263,15 +260,21 @@ export type SubcommandConfig<
     lang: Translator<false, Locale>, options: AO,
     client: Client<true>, optionConfig: SubcommandConfig<CT, DM, Options>
   ): unknown;
-} & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
+};
+
+export type SubcommandConfig<
+  CT extends readonly CommandType[], DM extends DMPermType, AO = undefined,
+  Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>
+> = {
+  type: ApplicationCommandOptionType.Subcommand;
+} & StrictOmit<BaseOptionConfig, 'required'> & BaseSubcommandConfig<CT, DM, AO, Options> & SharedConfig<DM>;
 
 export type SubcommandGroupConfig<
   CT extends readonly CommandType[], DM extends DMPermType, AO = undefined,
   Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>
 > = {
   type: ApplicationCommandOptionType.SubcommandGroup;
-  options?: ValidateOptionsArray<Options, CT, DM>;
-} & StrictOmit<BaseOptionConfig, 'required'> & SharedConfig<DM>;
+} & StrictOmit<BaseOptionConfig, 'required'> & BaseSubcommandConfig<CT, DM, AO, Options> & SharedConfig<DM>;
 
 export type StringCommandOptionConfig<CT extends readonly CommandType[], DM extends DMPermType, AO> = {
   type: ApplicationCommandOptionType.String;
