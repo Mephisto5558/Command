@@ -12,7 +12,7 @@ declare module './index.ts' {
     extends StrictOmit<_ChatInputCommandInteraction<DMPermTypeToCaching[DM]>, 'options'> {}
 
   interface Message<DM extends DMPermType = DMPermType>
-    extends _Message<DM extends DMPermType.OnlyDM ? true : DM extends DMPermType.NeverDM ? false : boolean> {}
+    extends _Message<DMPermTypeToInGuild[DM]> {}
 
   interface AutocompleteInteraction<DM extends DMPermType = DMPermType>
     extends _AutocompleteInteraction<DMPermTypeToCaching[DM]> {}

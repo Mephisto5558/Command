@@ -1,5 +1,5 @@
 import type {
-  AutocompleteInteraction as _AutocompleteInteraction, CacheType, ChatInputCommandInteraction as _ChatInputCommandInteraction,
+  AutocompleteInteraction as _AutocompleteInteraction, ChatInputCommandInteraction as _ChatInputCommandInteraction,
   Message as _Message, MessageComponentInteraction as _MessageComponentInteraction, User, _NonNullableFields
 } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
@@ -32,9 +32,17 @@ export enum DMPermType {
 }
 
 export type DMPermTypeToCaching = {
-  [DMPermType.CanBeDM]: CacheType;
+  /* This is the real behavior, but CacheType "raw" is an edge case which is not implemented for simplicity sake.
+     [DMPermType.CanBeDM]: CacheType; */
+
+  [DMPermType.CanBeDM]: 'cached' | undefined;
   [DMPermType.NeverDM]: 'cached';
-  [DMPermType.OnlyDM]: 'raw';
+  [DMPermType.OnlyDM]: undefined;
+};
+export type DMPermTypeToInGuild = {
+  [DMPermType.CanBeDM]: boolean;
+  [DMPermType.NeverDM]: true;
+  [DMPermType.OnlyDM]: false;
 };
 
 export declare namespace BetterMS {
