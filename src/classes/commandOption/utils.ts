@@ -249,6 +249,7 @@ type BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM exte
 } & BaseOptionConfig;
 
 type BaseSubcommandConfig<CT extends readonly CommandType[], DM extends DMPermType, AO, Options extends OptionsG<CT, DM, AO>> = {
+  dmPermission?: DM;
   options?: ValidateOptionsArray<Options, CT, DM>;
 
   run?(
