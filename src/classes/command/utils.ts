@@ -2,14 +2,10 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style -- using index signature to improve readability for lib user */
 
 import type {
-  ChatInputCommandInteraction as _ChatInputCommandInteraction, Client, Message as _Message, PermissionFlags, _NonNullableFields
+  ChatInputCommandInteraction as _ChatInputCommandInteraction, Message as _Message, PermissionFlags, _NonNullableFields
 } from 'discord.js';
-import type { Locale, Translator } from '@mephisto5558/i18n';
-import type {
-  ChatInputCommandInteraction, Command, DMPermType, DefaultOptionType, Message, MessageComponentInteraction,
-  OptionsG, PermissionType, ResolveContext, SharedConfig
-} from '../../index.ts';
-import type { RunnableReturns as OptionRunnableReturns, ValidateOptionsArray } from '../commandOption/utils.ts';
+import type { Command, DMPermType, DefaultOptionType, OptionsG, PermissionType, SharedConfig } from '../../index.ts';
+import type { RunnableReturns as OptionRunnableReturns, StrictCommandOption, ValidateOptionsArray } from '../commandOption/utils.ts';
 import type { CommandType } from '../utils.ts';
 
 
@@ -56,13 +52,9 @@ export interface CommandConfig<
 
   beta?: true;
 
-  run(
-    this: ResolveContext<{
-      [CommandType.Slash]: ChatInputCommandInteraction<DM, Options>;
-      [CommandType.Component]: MessageComponentInteraction<DM>;
-      [CommandType.Prefix]: Message<DM>;
-    }, CT>,
-    lang: Translator<false, Locale>,
-    client: Client<true>, commandConfig: this
-  ): unknown;
+  run: Command<CT, DM, Options>['run'];
 }
+
+export type DeepOptions<T> = T extends { options: readonly (infer U)[] } ? T | DeepOptions<U> : T;
+export type ResolvedOption<CT extends readonly CommandType[], DM extends DMPermType, E>
+  = StrictOmit<StrictCommandOption<CT, DM>, keyof E> & E;
