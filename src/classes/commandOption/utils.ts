@@ -327,3 +327,5 @@ export type RunnableReturns = ['guildOnly']
   | ['invalidChannelType', string]
   | ['strictAutocompleteNoMatch', string]
   | ['strictAutocompleteNoMatchWValues', { option: string; availableOptions: string }];
+
+export type MaybeWithUndefined<X, T extends boolean> = T extends true ? X : X | undefined;

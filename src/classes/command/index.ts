@@ -20,7 +20,7 @@ import type {
 } from '../../index.ts';
 import type { CooldownsManager } from '../../utils/index.ts';
 import type { StrictCommandOption } from '../commandOption/utils.ts';
-import type { CommandConfig, CommandMention, RunnableReturns, StrictCommand } from './utils.ts';
+import type { CommandConfig, CommandMention, DeepOptions, ResolvedOption, RunnableReturns, StrictCommand } from './utils.ts';
 
 const
   /* eslint-disable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-non-null-assertion */
@@ -110,7 +110,7 @@ export class Command<
       [CommandType.Prefix]: Message<DM>;
     }, NoInfer<CT>>,
     lang: Translator<false, Locale>,
-    client: Client<true>, commandConfig: this
+    data: { client: Client<true>; command: Command<CT, DM, Options> }
   ) => unknown;
 
   #i18n!: I18nProvider;
@@ -157,8 +157,7 @@ export class Command<
     this.types = config.types;
     this.disabledReason = config.disabledReason;
 
-    /* eslint-disable-next-line custom/unbound-method */
-    this.run = config.run as typeof this.run;
+    this.run = config.run;
   }
 
   init(i18n: I18nProvider, name: string, category: string, config: {
@@ -285,7 +284,7 @@ export class Command<
     ) await interaction.deferReply({ flags: this.ephemeralDefer ? MessageFlags.Ephemeral : undefined });
 
     try {
-      await this.run.call(interaction, commandTranslator, interaction.client, this);
+      await this.run.call(interaction, commandTranslator, { client: interaction.client, command: this });
       await this.#doneFn.call(interaction, this, commandTranslator);
     }
     catch (err) {
@@ -455,10 +454,13 @@ export class Command<
     }
   }
 
-  findOption(
-    option?: { name?: string; type?: ApplicationCommandOptionType },
-    interaction?: ThisParameterType<StrictCommand<[CommandType.Slash], DM>['run']>
-  ): StrictCommandOption<CT, DM> | undefined {
+  findOption<O extends { name: CommandOption['name']; type?: CommandOption['type'] } | { name?: string; type: ApplicationCommandOptionType }>(
+    option?: O, interaction?: ThisParameterType<StrictCommand<[CommandType.Slash], DM>['run']>
+  ): O extends undefined
+    ? Options['length'] extends 0 ? undefined : StrictCommandOption<CT, DM>
+    : Extract<DeepOptions<Options[number]>, O> extends infer E
+      ? [E] extends [never] ? undefined : ResolvedOption<CT, DM, E>
+      : never {
     const
       group = interaction?.options.getSubcommandGroup(false),
       subcommand = interaction?.options.getSubcommand(false);

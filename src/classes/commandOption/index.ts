@@ -18,7 +18,7 @@ import type CooldownsManager from '../../utils/CooldownsManager.ts';
 import type { RunnableReturns, StrictCommand } from '../command/utils.ts';
 import type { CommandType } from '../utils.ts';
 import type {
-  ChannelCommandOptionConfig, CommandOptionConfig, NumericCommandOptionConfig, StrictCommandOption, StringCommandOptionConfig,
+  ChannelCommandOptionConfig, CommandOptionConfig, MaybeWithUndefined, NumericCommandOptionConfig, StrictCommandOption, StringCommandOptionConfig,
   SubcommandConfig, SubcommandGroupConfig, autocompleteObject, autocompleteOptions
 } from './utils.ts';
 
@@ -97,7 +97,11 @@ export class CommandOption<
       [CommandType.Prefix]: Message<DM>;
     }, NoInfer<CT>>,
     lang: Translator<false, Locale>, options: AO,
-    client: Client<true>, optionConfig: this
+    data: {
+      client: Client<true>;
+      command: Command<CT, DM, OptionsG<CT, DM, AO>>;
+      option: CommandOption<CT, DM, AO, ChildrenOptions, T>;
+    }
   ) => unknown;
 
   #i18n!: I18nProvider;
@@ -181,6 +185,29 @@ export class CommandOption<
     }
 
     return this;
+  }
+
+  getChannel<RetSelf extends boolean = false>(
+    interaction: ResolveContext<{
+      [CommandType.Slash]: ChatInputCommandInteraction<DM, NoInfer<ChildrenOptions>>;
+      [CommandType.Prefix]: Message<DM>;
+    }, NoInfer<CT>
+    >, returnSelf: RetSelf
+  ): T extends ApplicationCommandOptionType.Channel
+    ? MaybeWithUndefined<ExtractChannelTypesFromInstance<this, DM>, RetSelf>
+    : never {
+    if (this.type != ApplicationCommandOptionType.Channel)
+      throw new Error(`This method does not run on ${ApplicationCommandOptionType[this.type]} options!`);
+
+    let target = interaction instanceof _Message
+      ? interaction.mentions.channels.first()
+      : interaction.options.getChannel(this.name, false, this.channelTypes);
+
+    if (!target && interaction instanceof _Message)
+      target = interaction.guild?.channels.cache.find(e => [e.id, e.name].some(e => interaction.content.includes(e)));
+    if (target) return target;
+    if (returnSelf) return interaction.channel;
+    return undefined;
   }
 
   #validate(): void {
