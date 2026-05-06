@@ -456,7 +456,7 @@ export class Command<
   }
 
   findOption(
-    option: { name: string; type?: ApplicationCommandOptionType },
+    option?: { name?: string; type?: ApplicationCommandOptionType },
     interaction?: ThisParameterType<StrictCommand<[CommandType.Slash], DM>['run']>
   ): StrictCommandOption<CT, DM> | undefined {
     const
@@ -467,7 +467,7 @@ export class Command<
     if (group) options = this.options.find(e => e.name == group)?.options ?? [];
     if (subcommand) options = options.find(e => e.name == subcommand)?.options ?? [];
 
-    return options.find(e => e.name == option.name && (!option.type || e.type == option.type));
+    return options.find(e => (!option?.name || e.name == option.name) && (!option?.type || e.type == option.type));
   }
 
   isEqualTo(cmd?: Command<readonly CommandType[], DMPermType> | ApplicationCommand): boolean {
