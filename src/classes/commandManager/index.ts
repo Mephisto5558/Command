@@ -26,7 +26,7 @@ export class CommandManager {
   readonly #filePaths = new Collection<CollectionMember['name'], string>();
   #logger: Logger = console;
   #devIds = new Set<Snowflake>();
-  #devOnlyCategories = new Set<string>();
+  #devOnlyCategories = new Set<CollectionMember['category']>();
   #runBetaCommandsOnly = false;
   #replyOn: { disabled: boolean; nonBeta: boolean } = { disabled: false, nonBeta: false };
   #customPermissionChecks: customPermissionChecksFn | undefined;
