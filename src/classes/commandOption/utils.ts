@@ -5,8 +5,7 @@ import type {
 } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  AutocompleteInteraction, ChatInputCommandInteraction, CommandOption, DMPermType, Message, MessageComponentInteraction,
-  OptionsG, ResolveContext, SharedConfig
+  ChatInputCommandInteraction, CommandOption, DMPermType, Message, MessageComponentInteraction, OptionsG, SharedConfig
 } from '../../index.ts';
 import type { CommandType } from '../utils.ts';
 
@@ -19,27 +18,17 @@ export type StrictCommandOption<
 
 // #region option resolver
 type GetSubOpts<O>
-  = O extends unknown
-    ? O extends { options?: infer Sub }
-      ? Sub extends readonly unknown[]
-        ? Sub[number]
-        : never
-      : never
+  = O extends { options?: infer Sub extends readonly unknown[] }
+    ? Sub[number]
     : never;
 
 type ExtractOptionName<O, Type extends ApplicationCommandOptionType>
-  = O extends unknown
-    ? O extends { name: infer N extends string; type: Type }
-      ? N
-      : never
+  = O extends { name: infer N extends string; type: Type }
+    ? N
     : never;
 
 type ExtractGetOption<O, Name extends string, Type extends ApplicationCommandOptionType>
-  = O extends unknown
-    ? O extends { name: Name; type: Type }
-      ? O
-      : never
-    : never;
+  = Extract<O, { name: Name; type: Type }>;
 
 type GetNamesAtLevel<Opts extends readonly unknown[], TargetType extends ApplicationCommandOptionType>
   = ExtractOptionName<Opts[number], TargetType>;
@@ -54,40 +43,55 @@ type GetOption<Options extends readonly unknown[], Name extends string, Type ext
     | ExtractGetOption<GetSubOpts<Options[number]>, Name, Type>
     | ExtractGetOption<GetSubOpts<GetSubOpts<Options[number]>>, Name, Type>;
 
-type ResolvedChannelType<T extends ChannelType>
-  = T extends ChannelType.GuildText ? TextChannel
-  : T extends ChannelType.GuildVoice ? VoiceChannel
-  : T extends ChannelType.GuildCategory ? CategoryChannel
-  : T extends ChannelType.GuildAnnouncement ? NewsChannel
-  : T extends ChannelType.GuildStageVoice ? StageChannel
-  : T extends ChannelType.PublicThread | ChannelType.PrivateThread | ChannelType.AnnouncementThread ? ThreadChannel
-  : GuildBasedChannel | APIInteractionDataResolvedChannel;
+type ResolvedChannelType<T extends ChannelType> = ExtendsMatch<T, [
+  [ChannelType.GuildText, TextChannel],
+  [ChannelType.GuildVoice, VoiceChannel],
+  [ChannelType.GuildCategory, CategoryChannel],
+  [ChannelType.GuildAnnouncement, NewsChannel],
+  [ChannelType.GuildStageVoice, StageChannel],
+  [ChannelType.PublicThread | ChannelType.PrivateThread | ChannelType.AnnouncementThread, ThreadChannel]
+], GuildBasedChannel | APIInteractionDataResolvedChannel>;
 
 type MapChannelTypes<Types extends readonly ChannelType[]> = ResolvedChannelType<Types[number]>;
 
-type ResolvedChannel<Options extends readonly unknown[], Name extends string>
-  = [GetOption<Options, Name, ApplicationCommandOptionType.Channel>] extends [{ channelTypes: readonly ChannelType[] }]
-    ? MapChannelTypes<Extract<GetOption<Options, Name, ApplicationCommandOptionType.Channel>, { channelTypes: unknown }>['channelTypes']>
-    : GuildBasedChannel | APIInteractionDataResolvedChannel;
+type ResolvedChannel<Options extends readonly unknown[], Name extends string> = IfExtendsStrict<
+  GetOption<Options, Name, ApplicationCommandOptionType.Channel>, { channelTypes: readonly ChannelType[] }, {
+    ifTrue: MapChannelTypes<
+      Extract<GetOption<Options, Name, ApplicationCommandOptionType.Channel>, { channelTypes: readonly ChannelType[] }>['channelTypes']
+    >; ifFalse: GuildBasedChannel | APIInteractionDataResolvedChannel;
+  }
+>;
 
-type ResolvedSubcommand<Options extends readonly unknown[]> = OptionName<Options, ApplicationCommandOptionType.Subcommand> extends never
-  ? string : OptionName<Options, ApplicationCommandOptionType.Subcommand>;
+type ResolvedSubcommand<Options extends readonly unknown[]> = IfExtends<OptionName<Options, ApplicationCommandOptionType.Subcommand>, never,
+  { ifTrue: string; ifFalse: OptionName<Options, ApplicationCommandOptionType.Subcommand> }
+>;
 
-type ResolvedSubcommandGroup<Options extends readonly unknown[]> = OptionName<Options, ApplicationCommandOptionType.SubcommandGroup> extends never
-  ? string : OptionName<Options, ApplicationCommandOptionType.SubcommandGroup>;
+type ResolvedSubcommandGroup<Options extends readonly unknown[]> = IfExtends<OptionName<Options, ApplicationCommandOptionType.SubcommandGroup>, never,
+  { ifTrue: string; ifFalse: OptionName<Options, ApplicationCommandOptionType.SubcommandGroup> }
+>;
 
-type ResolveValue<Option, BaseType>
-  = Option extends { choices: readonly (infer C)[] } ? (C extends { value: infer V } ? V : C)
-  : Option extends { strictAutocomplete: true; autocompleteOptions: readonly (infer A)[] } ? (A extends { value: infer V } ? V : A)
-  : BaseType;
+type ResolveChoiceValue<T> = T extends { value: infer V } ? V : T;
 
-type ResolvedValue<Options extends readonly unknown[], Name extends string, Type extends ApplicationCommandOptionType, BaseType>
-  = [GetOption<Options, Name, Type>] extends [never]
-    ? BaseType
-    : ResolveValue<GetOption<Options, Name, Type>, BaseType>;
+type ResolveValue<Option, BaseType> = Match<[
+  [
+    Extends<Option, { choices: readonly unknown[] }>,
+    ResolveChoiceValue<Extract<Option, { choices: readonly unknown[] }>['choices'][number]>
+  ],
+  [
+    Extends<Option, { strictAutocomplete: true; autocompleteOptions: readonly unknown[] }>,
+    ResolveChoiceValue<Extract<Option, { strictAutocomplete: true; autocompleteOptions: readonly unknown[] }>['autocompleteOptions'][number]>
+  ]
+], BaseType>;
+
+type ResolvedValue<Options extends readonly unknown[], Name extends string, Type extends ApplicationCommandOptionType, BaseType> = IfExtends<
+  GetOption<Options, Name, Type>, never, {
+    ifTrue: BaseType;
+    ifFalse: ResolveValue<GetOption<Options, Name, Type>, BaseType>;
+  }
+>;
 
 type IsRequired<Options extends readonly unknown[], Name extends string, Type extends ApplicationCommandOptionType>
-  = Extract<Options[number], { name: Name; type: Type; required: true }> extends never ? false : true;
+  = Not<Extends<Extract<Options[number], { name: Name; type: Type; required: true }>, never>>;
 
 export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options extends readonly unknown[] = unknown[]> = StrictOmit<
   CommandInteractionOptionResolver<Cached>, Extract<keyof CommandInteractionOptionResolver<Cached>, `get${string}${string}`>
@@ -101,7 +105,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   getString<N extends OptionName<Options, ApplicationCommandOptionType.String>>(
     name: N, required?: boolean
   ): ResolvedValue<Options, N, ApplicationCommandOptionType.String, string>
-    | (IsRequired<Options, N, ApplicationCommandOptionType.String> extends true ? never : null);
+    | IfExtendsStrict<IsRequired<Options, N, ApplicationCommandOptionType.String>, false, { ifTrue: null }>;
   getString(name: string, required: true): string;
   getString(name: string, required?: boolean): string | null;
 
@@ -112,7 +116,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   getInteger<N extends OptionName<Options, ApplicationCommandOptionType.Integer>>(
     name: N, required?: boolean
   ): ResolvedValue<Options, N, ApplicationCommandOptionType.Integer, number>
-    | (IsRequired<Options, N, ApplicationCommandOptionType.Integer> extends true ? never : null);
+    | IfExtendsStrict<IsRequired<Options, N, ApplicationCommandOptionType.Integer>, false, { ifTrue: null }>;
   getInteger(name: string, required: true): number;
   getInteger(name: string, required?: boolean): number | null;
 
@@ -123,7 +127,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   getNumber<N extends OptionName<Options, ApplicationCommandOptionType.Number>>(
     name: N, required?: boolean
   ): ResolvedValue<Options, N, ApplicationCommandOptionType.Number, number>
-    | (IsRequired<Options, N, ApplicationCommandOptionType.Number> extends true ? never : null);
+    | IfExtendsStrict<IsRequired<Options, N, ApplicationCommandOptionType.Number>, false, { ifTrue: null }>;
   getNumber(name: string, required: true): number;
   getNumber(name: string, required?: boolean): number | null;
 
@@ -133,7 +137,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   ): boolean;
   getBoolean<N extends OptionName<Options, ApplicationCommandOptionType.Boolean>>(
     name: N, required?: boolean
-  ): boolean | (IsRequired<Options, N, ApplicationCommandOptionType.Boolean> extends true ? never : null);
+  ): boolean | IfExtendsStrict<IsRequired<Options, N, ApplicationCommandOptionType.Boolean>, false, { ifTrue: null }>;
   getBoolean(name: string, required: true): boolean;
   getBoolean(name: string, required?: boolean): boolean | null;
 
@@ -143,7 +147,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   ): User;
   getUser<N extends OptionName<Options, ApplicationCommandOptionType.User>>(
     name: N, required?: boolean
-  ): User | (IsRequired<Options, N, ApplicationCommandOptionType.User> extends true ? never : null);
+  ): User | IfExtendsStrict<IsRequired<Options, N, ApplicationCommandOptionType.User>, false, { ifTrue: null }>;
   getUser(name: string, required: true): User;
   getUser(name: string, required?: boolean): User | null;
 
@@ -155,7 +159,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   ): ResolvedChannel<Options, N>;
   getChannel<N extends OptionName<Options, ApplicationCommandOptionType.Channel>>(
     name: N, required?: boolean, channelTypes?: readonly ChannelType[]
-  ): ResolvedChannel<Options, N> | (IsRequired<Options, N, ApplicationCommandOptionType.Channel> extends true ? never : null);
+  ): ResolvedChannel<Options, N> | IfExtendsStrict<IsRequired<Options, N, ApplicationCommandOptionType.Channel>, true, { ifFalse: null }>;
   getChannel(name: string, required: true, channelTypes?: readonly ChannelType[]): GuildBasedChannel | APIInteractionDataResolvedChannel;
   getChannel(name: string, required?: boolean, channelTypes?: readonly ChannelType[]): GuildBasedChannel | APIInteractionDataResolvedChannel | null;
 
@@ -165,7 +169,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   ): Role | APIRole;
   getRole<N extends OptionName<Options, ApplicationCommandOptionType.Role>>(
     name: N, required?: boolean
-  ): Role | APIRole | (IsRequired<Options, N, ApplicationCommandOptionType.Role> extends true ? never : null);
+  ): Role | APIRole | IfExtendsStrict<IsRequired<Options, N, ApplicationCommandOptionType.Role>, true, { ifFalse: null }>;
   getRole(name: string, required: true): Role | APIRole;
   getRole(name: string, required?: boolean): Role | APIRole | null;
 
@@ -173,7 +177,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   getAttachment<N extends OptionName<Options, ApplicationCommandOptionType.Attachment>>(name: N, required: true): Attachment;
   getAttachment<N extends OptionName<Options, ApplicationCommandOptionType.Attachment>>(
     name: N, required?: boolean
-  ): Attachment | (IsRequired<Options, N, ApplicationCommandOptionType.Attachment> extends true ? never : null);
+  ): Attachment | IfExtendsStrict<IsRequired<Options, N, ApplicationCommandOptionType.Attachment>, true, { ifFalse: null }>;
   getAttachment(name: string, required: true): Attachment;
   getAttachment(name: string, required?: boolean): Attachment | null;
 
@@ -184,7 +188,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
   getMentionable<N extends OptionName<Options, ApplicationCommandOptionType.Mentionable>>(
     name: N, required?: boolean
   ): User | GuildMember | Role | APIRole
-    | (IsRequired<Options, N, ApplicationCommandOptionType.Mentionable> extends true ? never : null);
+    | IfExtendsStrict<IsRequired<Options, N, ApplicationCommandOptionType.Mentionable>, true, { ifFalse: null }>;
   getMentionable(name: string, required: true): User | GuildMember | Role | APIRole;
   getMentionable(name: string, required?: boolean): User | GuildMember | Role | APIRole | null;
 
@@ -197,7 +201,7 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
 
   readonly subcommand: {
     [K in GetNamesAtLevel<Options, ApplicationCommandOptionType.Subcommand>]: TypeSafeOptionResolver<Cached,
-      [Extract<Options[number], { name: K }>] extends [{ options: infer O }] ? (O extends readonly unknown[] ? O : []) : []
+      [Extract<Options[number], { name: K }>] extends [{ options: infer O extends readonly unknown[] }] ? O : []
     >
   };
 };
@@ -206,28 +210,33 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
 
 // #region option config
 type MapToConfig<
-  O, CT extends readonly CommandType[], DM extends DMPermType>
-  = O extends { type: ApplicationCommandOptionType.String } ? StringCommandOptionConfig<CT, DM, never>
-  : O extends { type: ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number } ? NumericCommandOptionConfig<CT, DM, never>
-  : O extends { type: ApplicationCommandOptionType.Boolean } ? BooleanCommandOptionConfig
-  : O extends { type: ApplicationCommandOptionType.User } ? UserCommandOptionConfig
-  : O extends { type: ApplicationCommandOptionType.Channel } ? ChannelCommandOptionConfig
-  : O extends { type: ApplicationCommandOptionType.Role } ? RoleCommandOptionConfig
-  : O extends { type: ApplicationCommandOptionType.Mentionable } ? MentionableCommandOptionConfig
-  : O extends { type: ApplicationCommandOptionType.Attachment } ? AttachmentCommandOptionConfig
-  : O extends { type: ApplicationCommandOptionType.SubcommandGroup } ? SubcommandGroupConfig<CT, DM>
-  : O extends { type: ApplicationCommandOptionType.Subcommand } ? SubcommandConfig<CT, DM>
-  : PrimitiveCommandOptionConfig<CT, DM>;
+  O extends { type: ApplicationCommandOptionType },
+  CT extends readonly CommandType[], DM extends DMPermType
+> = ExtendsMatch<O['type'], [
+  [ApplicationCommandOptionType.String, StringCommandOptionConfig<CT, DM, never>],
+  [ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number, NumericCommandOptionConfig<CT, DM, never>],
+  [ApplicationCommandOptionType.Boolean, BooleanCommandOptionConfig],
+  [ApplicationCommandOptionType.User, UserCommandOptionConfig],
+  [ApplicationCommandOptionType.Channel, ChannelCommandOptionConfig],
+  [ApplicationCommandOptionType.Role, RoleCommandOptionConfig],
+  [ApplicationCommandOptionType.Mentionable, MentionableCommandOptionConfig],
+  [ApplicationCommandOptionType.Attachment, AttachmentCommandOptionConfig],
+  [ApplicationCommandOptionType.SubcommandGroup, SubcommandGroupConfig<CT, DM>],
+  [ApplicationCommandOptionType.Subcommand, SubcommandConfig<CT, DM>]
+], PrimitiveCommandOptionConfig<CT, DM>>;
 
-type ValidateOption<O, CT extends readonly CommandType[], DM extends DMPermType>
-  = MapToConfig<O, CT, DM> & { [K in keyof O]: K extends keyof MapToConfig<O, CT, DM> ? O[K] : never };
+type ValidateOption<O extends { type: ApplicationCommandOptionType }, CT extends readonly CommandType[], DM extends DMPermType>
+  = MapToConfig<O, CT, DM> & StrictPick<O, MapToConfig<O, CT, DM>>;
 
 export type ValidateOptionsArray<
-  Arr, CT extends readonly CommandType[], DM extends DMPermType
-> = Arr extends readonly unknown[]
-  ? { [K in keyof Arr]: ValidateOption<Arr[K], CT, DM> }
-  : Arr;
-
+  Arr extends readonly { type: ApplicationCommandOptionType }[],
+  CT extends readonly CommandType[], DM extends DMPermType
+> = IfExtends<Arr, readonly unknown[],
+  {
+    ifTrue: { [K in keyof Arr]: ValidateOption<Arr[K], CT, DM> };
+    ifFalse: Arr;
+  }
+>;
 
 type BaseOptionConfig = {
   name: Lowercase<string>;
@@ -239,12 +248,9 @@ type BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM exte
   type: ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number;
 
   strictAutocomplete?: boolean;
-  autocompleteOptions?: autocompleteOptions | autocompleteOptions[] | (
-        (
-          this: ResolveContext<{ [CommandType.Slash]: AutocompleteInteraction<DM>; [CommandType.Prefix]: Message<DM> }, CT>,
-          query: string
-        ) => autocompleteOptions[] | Promise<autocompleteOptions[]>
-      ) | undefined;
+  autocompleteOptions?: CommandOption<CT, DM, AO, OptionsG<CT, DM, AO>,
+    ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number
+  >['autocompleteOptions'];
   choices?: readonly ApplicationCommandOptionChoiceData['value'][];
 } & BaseOptionConfig;
 
@@ -253,13 +259,13 @@ type BaseSubcommandConfig<CT extends readonly CommandType[], DM extends DMPermTy
   options?: ValidateOptionsArray<Options, CT, DM>;
 
   run?(
-    this: ResolveContext<{
-      [CommandType.Slash]: ChatInputCommandInteraction<DM, Options>;
-      [CommandType.Component]: MessageComponentInteraction<DM>;
-      [CommandType.Prefix]: Message<DM>;
-    }, CT>,
+    this: ExtendsMultiMatch<CT, [
+      [CommandType.Slash, ChatInputCommandInteraction<DM, Options>],
+      [CommandType.Component, MessageComponentInteraction<DM>],
+      [CommandType.Prefix, Message<DM>]
+    ]>,
     lang: Translator<false, Locale>, options: AO,
-    client: Client<true>, optionConfig: SubcommandConfig<CT, DM, Options>
+    data: { client: Client<true>; option: CommandOption<CT, DM, AO, Options> & SubcommandConfig<CT, DM, AO, Options> }
   ): unknown;
 };
 
@@ -327,5 +333,3 @@ export type RunnableReturns = ['guildOnly']
   | ['invalidChannelType', string]
   | ['strictAutocompleteNoMatch', string]
   | ['strictAutocompleteNoMatchWValues', { option: string; availableOptions: string }];
-
-export type MaybeWithUndefined<X, T extends boolean> = T extends true ? X : X | undefined;

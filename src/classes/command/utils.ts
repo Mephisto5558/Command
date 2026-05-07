@@ -22,19 +22,15 @@ export type RunnableReturns = ['nonBeta']
   | ['cooldown', string]
   | OptionRunnableReturns;
 
+type Space<T extends string | undefined> = T extends string ? ` ${T}` : '';
+
 export type CommandMention<
   Group extends string | undefined,
   Subcommand extends string | undefined,
   CT extends readonly CommandType[] = CommandType[],
   Name extends Command['name'] = Command['name'],
   Id extends NonNullable<Command<CT>['commandId']> | bigint = NonNullable<Command<CT>['commandId']> | bigint
-> = Group extends undefined
-  ? Subcommand extends undefined
-    ? `</${Name}:${Id}>`
-    : `</${Name} ${Subcommand}:${Id}>`
-  : Subcommand extends undefined
-    ? `</${Name} ${Group}:${Id}>`
-    : `</${Name} ${Group} ${Subcommand}:${Id}>`;
+> = `</${Name}${Space<Group>}${Space<Subcommand>}:${Id}>`;
 
 export interface CommandConfig<
   CT extends readonly CommandType[], DM extends DMPermType,

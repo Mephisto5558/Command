@@ -52,50 +52,51 @@ export class CommandOption<
 
   get autocomplete(): boolean { return !!this.autocompleteOptions; }
   strictAutocomplete = false;
-  autocompleteOptions?: T extends (
-    ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number
-  ) ? autocompleteOptions | autocompleteOptions[] | (
-      (
-        this: ResolveContext<{ [CommandType.Slash]: AutocompleteInteraction<DM>; [CommandType.Prefix]: Message<DM> }, CT>,
-        query: string
-      ) => autocompleteOptions[] | Promise<autocompleteOptions[]>
-    ) | undefined
-    : undefined;
+  autocompleteOptions?: IfExtends<
+    T, ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number,
+    {
+      ifTrue: autocompleteOptions | autocompleteOptions[] | Fn<
+        ResolveContext<{ [CommandType.Slash]: AutocompleteInteraction<DM>; [CommandType.Prefix]: Message<DM> }, CT>,
+        [query: string], autocompleteOptions[] | Promise<autocompleteOptions[]>
+      >;
+      ifFalse: undefined;
+    }
+  >;
 
-  choices?: T extends ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number
-    ? readonly ApplicationCommandOptionChoiceData[] | undefined
-    : undefined;
+  choices?: IfExtends<T, ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number,
+    { ifTrue: readonly ApplicationCommandOptionChoiceData[] }
+  > | undefined;
 
-  channelTypes?: T extends ApplicationCommandOptionType.Channel
-    ? readonly ChannelType[] | undefined
-    : undefined;
+  channelTypes?: IfExtends<T, ApplicationCommandOptionType.Channel,
+    { ifTrue: readonly ChannelType[] }
+  > | undefined;
 
-  minValue?: T extends ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number
-    ? number | undefined
-    : undefined;
+  minValue?: IfExtends<T, ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number,
+    { ifTrue: number }
+  > | undefined;
 
-  maxValue?: T extends ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number
-    ? number | undefined
-    : undefined;
+  maxValue?: IfExtends<T, ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number,
+    { ifTrue: number }
+  > | undefined;
 
-  minLength?: T extends ApplicationCommandOptionType.String
-    ? number | undefined
-    : undefined;
+  minLength?: IfExtends<T, ApplicationCommandOptionType.String,
+    { ifTrue: number }
+  > | undefined;
 
-  maxLength?: T extends ApplicationCommandOptionType.String
-    ? number | undefined
-    : undefined;
+  maxLength?: IfExtends<T, ApplicationCommandOptionType.String,
+    { ifTrue: number }
+  > | undefined;
 
-  options?: T extends ApplicationCommandOptionType.SubcommandGroup | ApplicationCommandOptionType.Subcommand
-    ? StrictCommandOption<CT, DM, AO>[]
-    : undefined;
+  options?: IfExtends<T, ApplicationCommandOptionType.SubcommandGroup | ApplicationCommandOptionType.Subcommand,
+    { ifTrue: StrictCommandOption<CT, DM, AO>[] }
+  > | undefined;
 
   run?: (
-    this: ResolveContext<{
-      [CommandType.Slash]: ChatInputCommandInteraction<DM, NoInfer<ChildrenOptions>>;
-      [CommandType.Component]: MessageComponentInteraction<DM>;
-      [CommandType.Prefix]: Message<DM>;
-    }, NoInfer<CT>>,
+    this: ExtendsMultiMatch<CT, [
+      [CommandType.Slash, ChatInputCommandInteraction<DM, NoInfer<ChildrenOptions>>],
+      [CommandType.Component, MessageComponentInteraction<DM>],
+      [CommandType.Prefix, Message<DM>]
+    ]>,
     lang: Translator<false, Locale>, options: AO,
     data: {
       client: Client<true>;
@@ -188,14 +189,12 @@ export class CommandOption<
   }
 
   getChannel<RetSelf extends boolean = false>(
-    interaction: ResolveContext<{
-      [CommandType.Slash]: ChatInputCommandInteraction<DM, NoInfer<ChildrenOptions>>;
-      [CommandType.Prefix]: Message<DM>;
-    }, NoInfer<CT>
-    >, returnSelf: RetSelf
-  ): T extends ApplicationCommandOptionType.Channel
-    ? MaybeWithUndefined<ExtractChannelTypesFromInstance<this, DM>, RetSelf>
-    : never {
+    interaction: ExtendsMultiMatch<CT, [
+      [CommandType.Slash, ChatInputCommandInteraction<DM, NoInfer<ChildrenOptions>>],
+      [CommandType.Prefix, Message<DM>]
+    ]>, returnSelf: RetSelf
+  ): IfExtends<T, ApplicationCommandOptionType.Channel,
+    MaybeWithUndefined<ExtractChannelTypesFromInstance<this, DM>, RetSelf>> {
     if (this.type != ApplicationCommandOptionType.Channel)
       throw new Error(`This method does not run on ${ApplicationCommandOptionType[this.type]} options!`);
 
@@ -300,10 +299,10 @@ export class CommandOption<
   }
 
   async isRunnable(
-    interaction: ResolveContext<{
-      [CommandType.Slash]: ChatInputCommandInteraction<DM, ChildrenOptions>;
-      [CommandType.Prefix]: Message<DM>;
-    }, NoInfer<CT>>,
+    interaction: ExtendsMultiMatch<CT, [
+      [CommandType.Slash, ChatInputCommandInteraction<DM, NoInfer<ChildrenOptions>>],
+      [CommandType.Prefix, Message<DM>]
+    ]>,
     command: StrictCommand<CT, DM, AO, ChildrenOptions>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
@@ -366,10 +365,10 @@ export class CommandOption<
   }
 
   async #isRunnableSubcommandGroup(
-    interaction: ResolveContext<{
-      [CommandType.Slash]: ChatInputCommandInteraction<DM, ChildrenOptions>;
-      [CommandType.Prefix]: Message<DM>;
-    }, NoInfer<CT>>,
+    interaction: ExtendsMultiMatch<CT, [
+      [CommandType.Slash, ChatInputCommandInteraction<DM, NoInfer<ChildrenOptions>>],
+      [CommandType.Prefix, Message<DM>]
+    ]>,
     command: StrictCommand<CT, DM, AO, ChildrenOptions>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
@@ -384,10 +383,10 @@ export class CommandOption<
   }
 
   async #isRunnableSubcommand(
-    interaction: ResolveContext<{
-      [CommandType.Slash]: ChatInputCommandInteraction<DM, ChildrenOptions>;
-      [CommandType.Prefix]: Message<DM>;
-    }, NoInfer<CT>>,
+    interaction: ExtendsMultiMatch<CT, [
+      [CommandType.Slash, ChatInputCommandInteraction<DM, NoInfer<ChildrenOptions>>],
+      [CommandType.Prefix, Message<DM>]
+    ]>,
     command: StrictCommand<CT, DM, AO, ChildrenOptions>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
@@ -402,7 +401,10 @@ export class CommandOption<
 
   /** `translator` and `options` should not be supplied by an external caller. */
   async generateAutocomplete(
-    interaction: ResolveContext<{ [CommandType.Slash]: AutocompleteInteraction<DM>; [CommandType.Prefix]: Message<DM> }, NoInfer<CT>>,
+    interaction: ExtendsMultiMatch<CT, [
+      [CommandType.Slash, AutocompleteInteraction<DM>],
+      [CommandType.Prefix, Message<DM>]
+    ]>,
     query: string, locale: Locale, translator?: Translator<true, Locale>,
     options: StrictCommandOption<CT, DM>['autocompleteOptions'] = this.autocompleteOptions
   ): Promise<[] | autocompleteObject[]> {

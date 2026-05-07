@@ -48,7 +48,7 @@ export type DMPermTypeToInGuild = {
 export declare namespace BetterMS {
   function getMilliseconds<
     T extends validTimeString | number
-  >(val: T, options?: { long: boolean }): (T extends string ? number : string) | undefined;
+  >(val: T, options?: { long: boolean }): If<Extends<T, string>, { ifTrue: number; ifFalse: string }> | undefined;
 }
 
 type BuildOrderedCooldown<T extends readonly string[]> = T extends [infer Head extends string, ...infer Tail extends string[]]
@@ -92,33 +92,34 @@ export interface SharedConfig<DM extends DMPermType> {
 }
 
 // Excluding APIInteractionGuildMember because it's an edge case and annoying for now.
-type Member<DM extends DMPermType, T extends _Message | _ChatInputCommandInteraction>
-  = DM extends DMPermType.NeverDM ? NonNullable<Exclude<T['member'], APIInteractionGuildMember>>
-  : DM extends DMPermType.OnlyDM ? null
-  : DM extends DMPermType.CanBeDM ? NonNullable<Exclude<T['member'], APIInteractionGuildMember>> | null
-  : unknown;
+type Member<DM extends DMPermType, T extends _Message | _ChatInputCommandInteraction> = ExtendsMatch<DM, [
+  [DMPermType.CanBeDM, NonNullable<Exclude<T['member'], APIInteractionGuildMember>> | null],
+  [DMPermType.NeverDM, NonNullable<Exclude<T['member'], APIInteractionGuildMember>>],
+  [DMPermType.OnlyDM, null]
+], unknown>;
 
 // Channel may be null or partial in reality, but with the right Partials and Intents it won't.
 type InteractionChannel<
   DM extends DMPermType, T1 extends _Message | _ChatInputCommandInteraction, T2 extends _Message | _ChatInputCommandInteraction
-> = Exclude<NonNullable<
-  DM extends DMPermType.NeverDM ? T1['channel']
-  : DM extends DMPermType.OnlyDM ? T2['channel']
-  : DM extends DMPermType.CanBeDM ? (T1 | T2)['channel']
-  : unknown
->, PartialDMChannel | PartialGroupDMChannel>;
+> = Exclude<NonNullable<ExtendsMatch<DM, [
+  [DMPermType.NeverDM, T1['channel']],
+  [DMPermType.OnlyDM, T2['channel']],
+  [DMPermType.CanBeDM, (T1 | T2)['channel']]
+], unknown>>, PartialDMChannel | PartialGroupDMChannel>;
 
-/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-empty-object-type
-  -- Interfaces intended for cross-package augmentation by the consumer. */
-export interface ChatInputCommandInteraction<DM extends DMPermType = DMPermType.CanBeDM, Options extends readonly unknown[] = []> {
+
+/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-extraneous-class, @typescript-eslint/no-unnecessary-type-parameters
+  -- Intended for cross-package augmentation by the consumer. */
+export declare class ChatInputCommandInteraction<DM extends DMPermType = DMPermType.CanBeDM, Options extends readonly unknown[] = []> {
   readonly member: Member<DM, _ChatInputCommandInteraction<'cached'>>;
   readonly channel: InteractionChannel<
     DM, _ChatInputCommandInteraction<DMPermTypeToCaching[DMPermType.NeverDM]>,
     _ChatInputCommandInteraction<DMPermTypeToCaching[DMPermType.OnlyDM]>
   >;
+
   readonly options: TypeSafeOptionResolver<DMPermTypeToCaching[DM], Options>;
 }
-export interface Message<DM extends DMPermType = DMPermType.CanBeDM> {
+export declare class Message<DM extends DMPermType = DMPermType.CanBeDM> {
   readonly member: Member<DM, _Message>;
   readonly channel: InteractionChannel<
     DM, _Message<DMPermTypeToInGuild[DMPermType.NeverDM]>,
@@ -126,14 +127,10 @@ export interface Message<DM extends DMPermType = DMPermType.CanBeDM> {
   >;
 }
 
-export interface AutocompleteInteraction<DM extends DMPermType = DMPermType.CanBeDM> {}
-export interface MessageComponentInteraction<DM extends DMPermType = DMPermType.CanBeDM> {}
+export declare class AutocompleteInteraction<DM extends DMPermType = DMPermType.CanBeDM> {}
+export declare class MessageComponentInteraction<DM extends DMPermType = DMPermType.CanBeDM> {}
 
-/* eslint-enable @typescript-eslint/no-unused-vars, @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-empty-object-type */
-
-type EagerResolve<MAP, K> = K extends keyof MAP ? MAP[K] : never;
-
-export type ResolveContext<MAP, KEYS extends readonly string[]> = EagerResolve<MAP, KEYS[number]>;
+/* eslint-enable @typescript-eslint/no-unused-vars, @typescript-eslint/no-extraneous-class, @typescript-eslint/no-unnecessary-type-parameters */
 
 export type commandDoneFn<cmd extends Command<readonly CommandType[], DMPermType> = Command<readonly CommandType[], DMPermType>> = (
   this: ThisParameterType<cmd['run']>,
@@ -147,11 +144,7 @@ export type commandDoneFn<cmd extends Command<readonly CommandType[], DMPermType
 export type customPermissionChecksFn<
   cmd extends Command<readonly CommandType[], DMPermType> = Command<readonly CommandType[], DMPermType>,
   RetMsgs extends Parameters<Translator> = Parameters<Translator>
-> = ((
+> = (
   this: cmd, interaction: ThisParameterType<cmd['run']>,
   author: User, translator: Translator<false, Locale>
-) => Promise<RetMsgs | boolean>)
-| ((
-  this: cmd, interaction: ThisParameterType<cmd['run']>,
-  author: User, translator: Translator<false, Locale>
-) => RetMsgs | boolean);
+) => RetMsgs | boolean | Promise<RetMsgs | boolean>;

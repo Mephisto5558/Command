@@ -54,12 +54,10 @@ export class Command<
   readonly types: CT = [] as unknown as CT;
 
   usage: Record<'usage' | 'examples', string | undefined> & {} = { usage: undefined, examples: undefined };
-  usageLocalizations: Partial<Record<Locale, StrictCommand<CT, DM>['usage']>> = {};
+  usageLocalizations: Partial<Record<Locale, StrictCommand<NoInfer<CT>, NoInfer<DM>>['usage']>> = {};
 
-  /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
-  aliases: Record<NoInfer<CT>[number], Lowercase<string>[]> & {} = {
-    [CommandType.Slash]: [], [CommandType.Prefix]: []
-  } as Record<NoInfer<CT>[number], Lowercase<string>[]>;
+  /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- get's filled in the constructor */
+  aliases: Record<NoInfer<CT>[number], Command['name'][]> = {} as Record<NoInfer<CT>[number], Command['name'][]>;
 
   cooldowns: Record<CooldownType, number> & {} = { [CooldownType.Guild]: 0, [CooldownType.Channel]: 0, [CooldownType.User]: 0 };
 
@@ -104,11 +102,11 @@ export class Command<
   }
 
   run: (
-    this: ResolveContext<{
-      [CommandType.Slash]: ChatInputCommandInteraction<DM, NoInfer<Options>>;
-      [CommandType.Component]: MessageComponentInteraction<DM>;
-      [CommandType.Prefix]: Message<DM>;
-    }, NoInfer<CT>>,
+    this: ExtendsMultiMatch<CT, [
+      [CommandType.Slash, ChatInputCommandInteraction<DM, NoInfer<Options>>],
+      [CommandType.Component, MessageComponentInteraction<DM> & { commandName: Command['name'] }],
+      [CommandType.Prefix, Message<DM>]
+    ]>,
     lang: Translator<false, Locale>,
     data: { client: Client<true>; command: Command<CT, DM, Options> }
   ) => unknown;
@@ -125,12 +123,6 @@ export class Command<
       if (config.usage.examples) this.usage.examples = config.usage.examples;
     }
 
-    if (config.aliases) {
-      for (const commandType of Object.values(CommandType)) {
-        const aliasList = config.aliases[commandType as NoInfer<CT>[number]];
-        if (aliasList?.length) this.aliases[commandType as NoInfer<CT>[number]] = aliasList;
-      }
-    }
 
     if (config.cooldowns) {
       this.cooldowns = Object.fromEntries(
@@ -154,6 +146,11 @@ export class Command<
 
     if (config.beta) this.beta = config.beta;
 
+    for (const commandType of config.types as NoInfer<CT>) {
+      const type = commandType as NoInfer<CT>[number];
+      this.aliases[type] = config.aliases?.[type] ?? [];
+    }
+
     this.types = config.types;
     this.disabledReason = config.disabledReason;
 
@@ -175,7 +172,7 @@ export class Command<
     if (config.logger) this.#logger = config.logger;
     if (config.doneFn) this.#doneFn = config.doneFn;
     if (config.cooldownsManager) this.#cooldownsManager = config.cooldownsManager;
-    this.#customPermissionChecks = config.customPermissionChecks?.bind(this as unknown as Command<unknown, unknown, unknown>);
+    this.#customPermissionChecks = config.customPermissionChecks?.bind(this);
 
     if (config.devIds) this.config.devIds = config.devIds;
     if (config.devOnlyCategories) this.config.devOnlyCategories = config.devOnlyCategories;
@@ -253,7 +250,7 @@ export class Command<
   }
 
   async runWrapper(
-    interaction: ThisParameterType<StrictCommand<CT, DM>['run']>,
+    interaction: ThisParameterType<this['run']>,
     i18n: I18nProvider, locale: Locale
   ): Promise<void> {
     const
@@ -295,9 +292,9 @@ export class Command<
   /**
    * @returns the currect cooldown for this command or the subcommand(group) (whichever is higher) in ms.
    * Resets it if it's `0`. */
-  #updateCooldowns(interaction: ThisParameterType<StrictCommand<CT, DM>['run']>): number {
+  #updateCooldowns(interaction: ThisParameterType<this['run']>): number {
     const
-      currentCooldowns = [this.#cooldownsManager.update(this.id, interaction as unknown as Parameters<CooldownsManager['update']>[1], this.cooldowns)],
+      currentCooldowns = [this.#cooldownsManager.update(this.id, interaction, this.cooldowns)],
       { group, subcommand } = this.#getSubcommandNames(interaction) ?? {};
 
     if (group) {
@@ -322,9 +319,7 @@ export class Command<
     return Math.max(0, ...currentCooldowns);
   }
 
-  #getSubcommandNames(
-    interaction: ChatInputCommandInteraction | Message | MessageComponentInteraction
-  ): { group: string | undefined; subcommand: string } | undefined {
+  #getSubcommandNames(interaction: ThisParameterType<this['run']>): { group: string | undefined; subcommand: string } | undefined {
     if (interaction instanceof BaseInteraction && interaction.isChatInputCommand()) {
       const commandInteraction = interaction as ChatInputCommandInteraction;
       if (!commandInteraction.options.getSubcommand(false)) return;
@@ -386,7 +381,8 @@ export class Command<
   }
 
   async #isRunnable(
-    interaction: CommandInteraction | Message | MessageComponentInteraction, wrapperTranslator: Translator<false, Locale>
+    interaction: CommandInteraction | Message | MessageComponentInteraction,
+    wrapperTranslator: Translator<false, Locale>
   ): Promise<RunnableReturns | boolean> {
     const
       author = interaction instanceof BaseInteraction ? interaction.user : interaction.author,
@@ -454,13 +450,16 @@ export class Command<
     }
   }
 
-  findOption<O extends { name: CommandOption['name']; type?: CommandOption['type'] } | { name?: string; type: ApplicationCommandOptionType }>(
-    option?: O, interaction?: ThisParameterType<StrictCommand<[CommandType.Slash], DM>['run']>
-  ): O extends undefined
-    ? Options['length'] extends 0 ? undefined : StrictCommandOption<CT, DM>
-    : Extract<DeepOptions<Options[number]>, O> extends infer E
-      ? [E] extends [never] ? undefined : ResolvedOption<CT, DM, E>
-      : never {
+  findOption<O extends { name: CommandOption['name']; type?: CommandOption['type'] } | { name?: string; type: ApplicationCommandOptionType } | undefined>(
+    option?: O,
+    interaction?: ThisParameterType<Command<[CommandType.Slash], NoInfer<DM>>['run']>
+  ): IfExtendsStrict<O, undefined, {
+    ifTrue: If<IsEmptyArray<Options>, { ifTrue: undefined; ifFalse: StrictCommandOption<CT, DM> }>;
+    ifFalse: Extract<DeepOptions<Options[number]>, O> extends infer E ? IfExtendsStrict<E, never, { 
+        ifTrue: undefined; 
+        ifFalse: ResolvedOption<CT, DM, E> 
+      }> : never;
+  }> {
     const
       group = interaction?.options.getSubcommandGroup(false),
       subcommand = interaction?.options.getSubcommand(false);
