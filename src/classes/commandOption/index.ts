@@ -1,9 +1,9 @@
 import {
-  ApplicationCommandOptionType, BaseInteraction, ChannelType, Locale as DLocale, Message as _Message, _NonNullableFields, inlineCode
+  ApplicationCommandOptionType, ChannelType, Locale as DLocale, Message as _Message, _NonNullableFields, inlineCode
 } from 'discord.js';
 import { CooldownType, DMPermType } from '../../index.ts';
 import { autocompleteOptionsMaxAmt, choiceValueMaxLength, choiceValueMinLength, choicesMaxAmt, descriptionMaxLength } from '../../utils/constants.ts';
-import { cooldownConverter, equal } from '../utils.ts';
+import { CommandValidationError, cooldownConverter, equal } from '../utils.ts';
 
 import type { ApplicationCommandOption, ApplicationCommandOptionChoiceData, Client } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
@@ -14,8 +14,8 @@ import type CooldownsManager from '../../utils/CooldownsManager.ts';
 import type { RunnableReturns } from '../command/utils.ts';
 import type { CommandType } from '../utils.ts';
 import type {
-  ChannelCommandOptionConfig, CommandOptionConfig, NumericCommandOptionConfig, StringCommandOptionConfig,
-  SubcommandConfig, SubcommandGroupConfig, autocompleteObject, autocompleteOptions
+  AutocompleteGeneratorOptions, ChannelCommandOptionConfig, CommandOptionConfig, NumericCommandOptionConfig,
+  PublicAutocompleteGeneratorOptions, StringCommandOptionConfig, SubcommandConfig, SubcommandGroupConfig, autocompleteObject, autocompleteOptions
 } from './utils.ts';
 
 /* eslint-disable-next-line import-x/prefer-default-export -- simplifies re-export */
@@ -108,6 +108,7 @@ export class CommandOption<
   #cooldownsManager!: CooldownsManager;
   #logger!: Logger;
 
+  /* eslint-disable-next-line @typescript-eslint/class-methods-use-this -- typing-only method */
   #resolveConfigType(
     config: CommandOptionConfig<CT, DM, AO, ChildrenOptions> & { type: T }
   ): ExtendsMatch<T, [
@@ -158,9 +159,11 @@ export class CommandOption<
           Object.fromEntries(Object.entries(this.cooldowns).map(e => cooldownConverter(config.cooldowns!, ...e)));
 
         if ('dmPermission' in config) this.dmPermission = config.dmPermission;
-        if (config.options) {
-          this.options = (config.options as (CommandOption<NoInfer<CT>, NoInfer<DM>> | CommandOptionConfig<NoInfer<CT>, NoInfer<DM>>)[])
-            .map(opt => (opt instanceof CommandOption ? opt : new CommandOption<NoInfer<CT>, NoInfer<DM>>(opt)));
+        if ('options' in config) {
+          this.options = (config.options as (
+              CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>> | CommandOptionConfig<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>>
+          )[])
+            .map(opt => (opt instanceof CommandOption ? opt : new CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>>(opt))) as typeof this.options;
         }
 
         /* eslint-disable-next-line custom/unbound-method -- safe here */
@@ -168,32 +171,35 @@ export class CommandOption<
         break;
 
       case ApplicationCommandOptionType.String:
-        if (config.minLength != undefined) this.minLength = config.minLength as typeof this.minLength;
-        if (config.maxLength != undefined) this.maxLength = config.maxLength as typeof this.maxLength;
+        if ('minLength' in config) this.minLength = config.minLength as typeof this.minLength;
+        if ('maxLength' in config) this.maxLength = config.maxLength as typeof this.maxLength;
 
         // fall through for choices and autocompleteOptions
       case ApplicationCommandOptionType.Integer:
       case ApplicationCommandOptionType.Number:
         if (config.type != ApplicationCommandOptionType.String) {
-          if (config.minValue != undefined) this.minValue = config.minValue as typeof this.minValue;
-          if (config.maxValue != undefined) this.maxValue = config.maxValue as typeof this.maxValue;
+          if ('minValue' in config) this.minValue = config.minValue as typeof this.minValue;
+          if ('maxValue' in config) this.maxValue = config.maxValue as typeof this.maxValue;
         }
 
-        if (config.choices)
+        if ('choices' in config)
           this.choices = config.choices.map(e => ({ name: String(e), value: e })) as unknown as NonNullable<typeof this.choices>;
 
         this.autocompleteOptions = config.autocompleteOptions as typeof this.autocompleteOptions;
-        if (config.strictAutocomplete) this.strictAutocomplete = config.strictAutocomplete;
+        if ('strictAutocomplete' in config) this.strictAutocomplete = config.strictAutocomplete;
         break;
 
       case ApplicationCommandOptionType.Channel:
-        if (config.channelTypes) this.channelTypes = config.channelTypes as typeof this.channelTypes;
+        if ('channelTypes' in config) this.channelTypes = config.channelTypes as typeof this.channelTypes;
         break;
 
       default: // no special handling
     }
   }
 
+  /**
+   * {@link Command.init Commands} and not the user should initialize `CommandOption`s.
+   * @internal */
   init(
     i18n: I18nProvider, parentId: Command['id'] | CommandOption['id'],
     cooldownsManager: CooldownsManager, logger: Logger = console, position = 0
@@ -228,13 +234,13 @@ export class CommandOption<
 
     let target = interaction instanceof _Message
       ? interaction.mentions.channels.first()
-      : interaction.options.getChannel(this.name, false, this.channelTypes);
+      : (interaction as ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>).options.getChannel(this.name, false, this.channelTypes);
 
     if (!target && interaction instanceof _Message)
       target = interaction.guild?.channels.cache.find(e => [e.id, e.name].some(e => interaction.content.includes(e)));
     if (target) return target;
 
-    return (returnSelf ? interaction.channel : undefined) as ReturnType<typeof this.getChannel<RetSelf>>;
+    return returnSelf ? interaction.channel : undefined;
   }
 
   #validate(): void {
@@ -250,8 +256,9 @@ export class CommandOption<
       for (const option of this.options) {
         if (!option.required) foundOptional = true;
         else if (foundOptional) {
-          throw new TypeError(
-            `Invalid option order in subcommand(group) ${this.id}. Required options (${option.id}) cannot appear after optional options.`
+          throw new CommandValidationError(
+            `Invalid option order in subcommand(group) ${this.id}. Required options (${option.id}) cannot appear after optional options.`,
+            undefined, this
           );
         }
       }
@@ -336,7 +343,7 @@ export class CommandOption<
   ): Promise<RunnableReturns | boolean> {
     if (
       [ApplicationCommandOptionType.SubcommandGroup, ApplicationCommandOptionType.Subcommand].includes(this.type)
-      && this.dmPermission == DMPermType.NeverDM && (!interaction.channel || interaction.channel.type == ChannelType.DM)
+      && this.dmPermission == DMPermType.NeverDM && interaction.channel.type == ChannelType.DM
     ) return ['guildOnly'];
 
     if (this.type == ApplicationCommandOptionType.SubcommandGroup)
@@ -345,7 +352,9 @@ export class CommandOption<
       return this.#isRunnableSubcommand(interaction, command, wrapperTranslator, args);
 
     const
-      option = interaction instanceof _Message ? undefined : interaction.options.get(this.name)?.value,
+      option = interaction instanceof _Message
+        ? undefined
+        : (interaction as ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>).options.get(this.name)?.value,
       arg = args?.[this.position];
 
     if (this.required && option === undefined && !arg) {
@@ -365,23 +374,23 @@ export class CommandOption<
       if (
         this.autocomplete && this.strictAutocomplete
         && !(await this.generateAutocomplete(
-          interaction, arg,
+          interaction as unknown as Parameters<typeof this.generateAutocomplete>[0], arg,
           wrapperTranslator.config.locale ?? wrapperTranslator.defaultConfig.defaultLocale
         )).some(e => e.value.toString().toLowerCase() === arg.toLowerCase())
       ) {
         if (typeof this.autocompleteOptions == 'function') return ['strictAutocompleteNoMatch', this.name];
 
-        let availableOptions: string;
+        let availableOptions: string | number;
         if (!this.autocompleteOptions) availableOptions = '';
         else if (Array.isArray(this.autocompleteOptions))
           availableOptions = this.autocompleteOptions.map(e => (typeof e == 'object' ? e.value : e).toString()).map(inlineCode).join(', ');
-        else if (typeof this.autocompleteOptions == 'object') availableOptions = this.autocompleteOptions.value.toString();
-        else availableOptions = this.autocompleteOptions.toString();
+        else if (typeof this.autocompleteOptions == 'object') availableOptions = (this.autocompleteOptions as autocompleteObject).value;
+        else availableOptions = this.autocompleteOptions;
 
-        return ['strictAutocompleteNoMatchWValues', { option: this.name, availableOptions }];
+        return ['strictAutocompleteNoMatchWValues', { option: this.name, availableOptions: availableOptions.toString() }];
       }
 
-      if (this.choices && !this.choices.some(e => e.value == arg)) {
+      if (this.choices && !this.choices.some(e => e.value.toString().toLowerCase() == arg.toLowerCase())) {
         return ['strictAutocompleteNoMatchWValues', {
           option: this.name,
           availableOptions: this.choices.map(e => inlineCode(e.value.toString())).join(', ')
@@ -401,7 +410,9 @@ export class CommandOption<
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
     const
-      subcommandName = interaction instanceof BaseInteraction ? interaction.options.getSubcommand(true) : args?.[0],
+      subcommandName = interaction instanceof _Message
+        ? args?.[this.position]
+        : (interaction as ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>).options.getSubcommand(true),
       subcommand = this.options?.find(e => e.name == subcommandName);
 
     return subcommand?.isRunnable(
@@ -427,14 +438,21 @@ export class CommandOption<
     return false;
   }
 
-  /** `translator` and `options` should not be supplied by an external caller. */
+  /**
+   * `translator` and `options` should not be supplied by an external caller.
+   * @internal */
   async generateAutocomplete(
-    interaction: ExtendsMultiMatch<CT, [
-      [CommandType.Slash, AutocompleteInteraction<NoInfer<DM>>],
-      [CommandType.Prefix, Message<NoInfer<DM>>]
-    ]>,
-    query: string, locale: Locale, translator?: Translator<true, Locale>,
-    options: CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>>['autocompleteOptions'] = this.autocompleteOptions
+    ...args: AutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>>
+  ): Promise<[] | autocompleteObject[]>;
+  async generateAutocomplete(...args: PublicAutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>>): Promise<[] | autocompleteObject[]>;
+  async generateAutocomplete(
+    /* eslint-disable @typescript-eslint/no-magic-numbers -- simple number order */
+    interaction: AutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>>[0],
+    query: AutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>>[1],
+    locale: AutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>>[2],
+    translator?: AutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>>[3],
+    options: AutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>>[4] = this.autocompleteOptions
+    /* eslint-enable @typescript-eslint/no-magic-numbers */
   ): Promise<[] | autocompleteObject[]> {
     if (options == undefined) return [];
 
@@ -471,7 +489,6 @@ export class CommandOption<
     }
 
     if (
-      /* eslint-disable-next-line sonarjs/expression-complexity */
       (this.options && 'options' in this.options ? this.options.length : 0) != ('options' in opt ? opt.options?.length : 0)
       || !equal(this.nameLocalizations, opt.nameLocalizations)
       || !equal(this.descriptionLocalizations, opt.descriptionLocalizations)

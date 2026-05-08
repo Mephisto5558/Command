@@ -6,7 +6,7 @@ import {
 
 import { CommandExecutionError, CommandOption, CooldownType, DMPermType, Permission, PermissionType } from '../../index.ts';
 import { descriptionMaxLength } from '../../utils/constants.ts';
-import { CommandType, cooldownConverter, equal, getMilliseconds } from '../utils.ts';
+import { CommandType, CommandValidationError, cooldownConverter, equal, getMilliseconds } from '../utils.ts';
 
 import type { ApplicationCommand, Client, CommandInteraction, PermissionFlags, User } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
@@ -108,10 +108,10 @@ export class Command<
   #customPermissionChecks: customPermissionChecksFn | undefined;
 
   /** @internal */
-  constructor(config: Command<NoInfer<CT>, NoInfer<DM>, NoInfer<Options>>);
+  constructor(config: Command<CT, DM, Options>);
   /* eslint-disable-next-line @typescript-eslint/unified-signatures -- TS disagrees */
-  constructor(config: CommandConfig<NoInfer<CT>, NoInfer<DM>, NoInfer<Options>>);
-  constructor(config: CommandConfig<NoInfer<CT>, NoInfer<DM>, NoInfer<Options>> | Command<NoInfer<CT>, NoInfer<DM>, NoInfer<Options>>) {
+  constructor(config: CommandConfig<CT, DM, Options>);
+  constructor(config: CommandConfig<CT, DM, Options> | Command<CT, DM, Options>) {
     // need to set these specifically for typing
     this.run = config.run;
 
@@ -133,30 +133,27 @@ export class Command<
       return;
     }
 
-    if (config.usage) {
+    if ('usage' in config) {
       if (config.usage.usage) this.usage.usage = config.usage.usage;
       if (config.usage.examples) this.usage.examples = config.usage.examples;
     }
 
 
-    if (config.cooldowns) {
-      this.cooldowns = Object.fromEntries(
-        Object.entries(this.cooldowns).map(([k, v]) => cooldownConverter(config.cooldowns!, k, v))
-      );
-    }
+    if ('cooldowns' in config)
+      this.cooldowns = Object.fromEntries(Object.entries(this.cooldowns).map(([k, v]) => cooldownConverter(config.cooldowns!, k, v)));
 
-    if (config.permissions) {
+    if ('permissions' in config) {
       for (const permissionType of Object.values(PermissionType))
         if (config.permissions[permissionType]) this.permissions[permissionType].push(...config.permissions[permissionType]);
     }
 
     if ('dmPermission' in config) this.dmPermission = config.dmPermission;
-    if (config.disabled) this.disabled = config.disabled;
+    if ('disabled' in config) this.disabled = config.disabled;
 
-    if (config.noDefer) this.noDefer = config.noDefer;
-    if (config.ephemeralDefer) this.ephemeralDefer = config.ephemeralDefer;
+    if ('noDefer' in config) this.noDefer = config.noDefer;
+    if ('ephemeralDefer' in config) this.ephemeralDefer = config.ephemeralDefer;
 
-    if (config.options) {
+    if ('options' in config) {
       this.options = (config.options as (CommandOption<NoInfer<CT>, NoInfer<DM>> | CommandOptionConfig<NoInfer<CT>, NoInfer<DM>>)[])
         .map(opt => (opt instanceof CommandOption ? opt : new CommandOption<NoInfer<CT>, NoInfer<DM>>(opt)));
     }
@@ -213,17 +210,29 @@ export class Command<
     if (this.disabled) return;
 
     if (!['function', 'async function', 'async run(', 'run('].some(e => String(this.run).startsWith(e)))
-      throw new TypeError(`The "run" method of command "${this.id}" is an arrow function! You cannot use arrow functions!`);
+      throw new CommandValidationError(`The "run" method of command "${this.id}" is an arrow function! You cannot use arrow functions!`, this);
 
     if (this.options.length) {
       let foundOptional = false;
+      const optionMap = new Map<CommandOption['name'], CommandOption<CommandType[], DMPermType>>();
       for (const option of this.options) {
-        if (!option.required) foundOptional = true;
-        else if (foundOptional) {
-          throw new TypeError(
-            `Invalid option order in command "${this.id}". Required options ("${option.id}") cannot appear after optional options.`
+        if (foundOptional) {
+          throw new CommandValidationError(
+            `Invalid option order in command "${this.id}". Required options ("${option.id}") cannot appear after optional options.`,
+            this, option
           );
         }
+
+        if (optionMap.has(option.name)) {
+          throw new CommandValidationError(
+            'A option name must be unique across all subcommands of the same command.'
+            + `Found duplicate name "${option.name}": "${optionMap.get(option.name)!.id}" and "${option.id}".`,
+            this, option
+          );
+        }
+        else optionMap.set(option.name, option as unknown as CommandOption<CommandType[], DMPermType>);
+
+        if (!option.required) foundOptional = true;
       }
     }
   }
@@ -512,6 +521,7 @@ export class Command<
     return true;
   }
 
+  /** @internal */
   clone(): Command<NoInfer<CT>, NoInfer<DM>, NoInfer<Options>> {
     return new Command(this);
   }
