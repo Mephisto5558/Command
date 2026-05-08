@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/consistent-type-definitions */
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style -- using index signature to improve readability for lib user */
 
 import type {
@@ -27,6 +26,7 @@ export type CommandMention<
   Id extends NonNullable<Command<CT>['commandId']> | bigint = NonNullable<Command<CT>['commandId']> | bigint
 > = `</${Name}${Space<Group>}${Space<Subcommand>}:${Id}>`;
 
+/* eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- interface is correct here */
 export interface CommandConfig<
   CT extends readonly CommandType[], DM extends DMPermType,
   Options extends OptionsG<CT, DM> = DefaultOptionType<CT, DM>[]

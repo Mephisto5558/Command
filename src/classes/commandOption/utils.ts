@@ -5,7 +5,8 @@ import type {
 } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  ChatInputCommandInteraction, CommandOption, DMPermType, Message, MessageComponentInteraction, OptionsG, SharedConfig
+  AutocompleteInteraction, ChatInputCommandInteraction, CommandOption, DMPermType, Message, MessageComponentInteraction,
+  OptionsG, SharedConfig
 } from '../../index.ts';
 import type { CommandType } from '../utils.ts';
 
@@ -331,3 +332,27 @@ export type RunnableReturns = ['guildOnly']
   | ['invalidChannelType', string]
   | ['strictAutocompleteNoMatch', string]
   | ['strictAutocompleteNoMatchWValues', { option: string; availableOptions: string }];
+
+type PrivateAutocompleteGeneratorOptions<
+  CT extends readonly CommandType[], DM extends DMPermType, AO,
+  ChildrenOptions extends OptionsG<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>>
+> = [
+    translator?: Translator<true, Locale>,
+    options?: CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>>['autocompleteOptions']
+];
+
+export type PublicAutocompleteGeneratorOptions<CT extends readonly CommandType[], DM extends DMPermType> = [
+  interaction: ExtendsMultiMatch<CT, [
+    [CommandType.Slash, AutocompleteInteraction<NoInfer<DM>>],
+    [CommandType.Prefix, Message<NoInfer<DM>>]
+  ]>,
+  query: string, locale: Locale
+];
+
+export type AutocompleteGeneratorOptions<
+  CT extends readonly CommandType[], DM extends DMPermType, AO,
+  ChildrenOptions extends OptionsG<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>>
+> = [
+  ...PublicAutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>>,
+  ...PrivateAutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>>
+];
