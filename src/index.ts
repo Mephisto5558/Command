@@ -52,7 +52,7 @@ export type DMPermTypeToInGuild = {
 export declare namespace BetterMS {
   function getMilliseconds<
     T extends validTimeString | number
-  >(val: T, options?: { long: boolean }): If<Extends<T, string>, { ifTrue: number; ifFalse: string }> | undefined;
+  >(val: T, options?: { long: boolean }): IfExtends<T, string, { ifTrue: number; ifFalse: string }> | undefined;
 }
 
 type BuildOrderedCooldown<T extends readonly string[]> = T extends [infer Head extends string, ...infer Tail extends string[]]
@@ -74,9 +74,11 @@ export type Logger = {
 };
 
 export type OptionsG<CT extends readonly CommandType[], DM extends DMPermType, AO = undefined>
-  = readonly (CommandOptionConfig<CT, DM, AO> | CommandOption<CT, DM, AO>)[];
-export type DefaultOptionType<CT extends readonly CommandType[], DM extends DMPermType, AO = undefined>
-  = CommandOptionConfig<CT, DM, AO, OptionsG<CT, DM, AO>> | CommandOption<CT, DM, AO, OptionsG<CT, DM, AO>>;
+  = readonly (CommandOptionConfig<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>> | CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>>)[];
+export type DefaultOptionType<CT extends readonly CommandType[], DM extends DMPermType, AO = undefined> = CommandOptionConfig<
+  NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, OptionsG<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>>>
+  | CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, OptionsG<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>>
+  >;
 
 export enum CooldownType {
   Guild = 'guild',
@@ -115,18 +117,18 @@ type InteractionChannel<
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-extraneous-class, @typescript-eslint/no-unnecessary-type-parameters
   -- Intended for cross-package augmentation by the consumer. */
 export declare class ChatInputCommandInteraction<DM extends DMPermType = DMPermType.CanBeDM, Options extends readonly unknown[] = []> {
-  readonly member: Member<DM, _ChatInputCommandInteraction<'cached'>>;
+  readonly member: Member<NoInfer<DM>, _ChatInputCommandInteraction<'cached'>>;
   readonly channel: InteractionChannel<
-    DM, _ChatInputCommandInteraction<DMPermTypeToCaching[DMPermType.NeverDM]>,
+    NoInfer<DM>, _ChatInputCommandInteraction<DMPermTypeToCaching[DMPermType.NeverDM]>,
     _ChatInputCommandInteraction<DMPermTypeToCaching[DMPermType.OnlyDM]>
   >;
 
-  readonly options: TypeSafeOptionResolver<DMPermTypeToCaching[DM], Options>;
+  readonly options: TypeSafeOptionResolver<DMPermTypeToCaching[NoInfer<DM>], Options>;
 }
 export declare class Message<DM extends DMPermType = DMPermType.CanBeDM> {
-  readonly member: Member<DM, _Message>;
+  readonly member: Member<NoInfer<DM>, _Message>;
   readonly channel: InteractionChannel<
-    DM, _Message<DMPermTypeToInGuild[DMPermType.NeverDM]>,
+    NoInfer<DM>, _Message<DMPermTypeToInGuild[DMPermType.NeverDM]>,
     _Message<DMPermTypeToInGuild[DMPermType.OnlyDM]>
   >;
 }
@@ -136,9 +138,9 @@ export declare class MessageComponentInteraction<DM extends DMPermType = DMPermT
 
 /* eslint-enable @typescript-eslint/no-unused-vars, @typescript-eslint/no-extraneous-class, @typescript-eslint/no-unnecessary-type-parameters */
 
-export type commandDoneFn<cmd extends Command<readonly CommandType[], DMPermType> = Command<readonly CommandType[], DMPermType>> = (
-  this: ThisParameterType<cmd['run']>,
-  command: cmd, lang: Translator<false, Locale>
+export type commandDoneFn<CMD extends Command<readonly CommandType[], DMPermType> = Command<readonly CommandType[], DMPermType>> = (
+  this: ThisParameterType<CMD['run']>,
+  command: CMD, lang: Translator<false, Locale>
 ) => Promise<never>;
 
 /**
@@ -146,9 +148,9 @@ export type commandDoneFn<cmd extends Command<readonly CommandType[], DMPermType
  * @returns If a permission error was handled by the function: `true`
  * @returns If no permission error was found: `false` */
 export type customPermissionChecksFn<
-  cmd extends Command<readonly CommandType[], DMPermType> = Command<readonly CommandType[], DMPermType>,
+  CMD extends Command<readonly CommandType[], DMPermType> = Command<readonly CommandType[], DMPermType>,
   RetMsgs extends Parameters<Translator> = Parameters<Translator>
 > = (
-  this: cmd, interaction: ThisParameterType<cmd['run']>,
+  this: CMD, interaction: ThisParameterType<CMD['run']>,
   author: User, translator: Translator<false, Locale>
 ) => RetMsgs | boolean | Promise<RetMsgs | boolean>;
