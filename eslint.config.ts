@@ -21,7 +21,8 @@ export default [
         allow: [
           '__count__' // Object#count
         ]
-      }])
+      }]),
+      'max-lines': 'off' // Class definitions may just be longer.
     }
   },
   {

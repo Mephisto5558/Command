@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
 import { Collection } from 'discord.js';
 import { readdir } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -7,23 +6,28 @@ import capitalize from '../../utils/capitalize.ts';
 import { Command } from '../command/index.ts';
 import { CommandType } from '../utils.ts';
 
-import type { ApplicationCommand, ApplicationCommandDataResolvable, Client } from 'discord.js';
+import type { ApplicationCommand, ApplicationCommandDataResolvable, ChatInputApplicationCommandData, Client } from 'discord.js';
 import type { I18nProvider } from '@mephisto5558/i18n';
 import type { DMPermType, Logger, commandDoneFn, customPermissionChecksFn } from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
 
+function importDefault(obj?: unknown): unknown {
+  return obj && typeof obj == 'object' && 'default' in obj
+    ? obj.default
+    : obj;
+}
+
 type CollectionMember = Command<readonly CommandType[], DMPermType>;
 
-/* eslint-disable-next-line import-x/prefer-default-export */
+/* eslint-disable-next-line import-x/prefer-default-export -- simplifies re-export */
 export class CommandManager {
-  commands = new Collection<CollectionMember['name'], CollectionMember>();
+  commands = new Collection<CollectionMember['name'], { command: CollectionMember; filePath: string }>();
   client!: Client<true>;
   commandsPath!: string;
   doneFn: commandDoneFn | undefined;
   cooldownsManager!: CooldownsManager;
   i18n!: I18nProvider;
 
-  readonly #filePaths = new Collection<CollectionMember['name'], string>();
   #logger: Logger = console;
   #devIds = new Set<Snowflake>();
   #devOnlyCategories = new Set<CollectionMember['category']>();
@@ -40,31 +44,39 @@ export class CommandManager {
       doneFn?: commandDoneFn;
       cooldownsManager?: CooldownsManager;
       devIds?: Set<Snowflake>;
-      devOnlyCategories?: Set<string>;
+      devOnlyCategories?: Set<CollectionMember['category']>;
       runBetaCommandsOnly?: boolean;
       replyOn?: { disabled?: boolean; nonBeta?: boolean };
       customPermissionChecks?: customPermissionChecksFn;
     } = {}
   ): this {
-    this.commandsPath = commandsPath;
-    this.client = client;
-    this.i18n = i18n;
     if (config.logger) this.#logger = config.logger;
-    this.doneFn = config.doneFn;
     if (config.cooldownsManager) this.cooldownsManager = config.cooldownsManager;
     if (config.devIds) this.#devIds = config.devIds;
     if (config.devOnlyCategories) this.#devOnlyCategories = config.devOnlyCategories;
     if (config.runBetaCommandsOnly) this.#runBetaCommandsOnly = config.runBetaCommandsOnly;
     if (config.replyOn) this.#replyOn = { disabled: !!config.replyOn.disabled, nonBeta: !!config.replyOn.nonBeta };
+
+    this.commandsPath = commandsPath;
+    this.client = client;
+    this.i18n = i18n;
+    this.doneFn = config.doneFn;
     this.#customPermissionChecks = config.customPermissionChecks;
+
+    /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- validation */
+    if (!this.client.application) throw new Error('Client#application must exist (Client must be logged in!)');
 
     return this;
   }
 
   /** Get a command by name or alias. */
-  get(query: Lowercase<string>): CollectionMember | undefined {
-    return this.commands.get(query.toLowerCase())
-      ?? this.commands.find(e => e.aliases[CommandType.Slash].includes(query) || e.aliases[CommandType.Prefix].includes(query));
+  get(query: string): CollectionMember | undefined {
+    const commandName = query.toLowerCase();
+
+    return (
+      this.commands.get(commandName)
+      ?? this.commands.find(({ command }) => Object.values(command.aliases).some(e => e.includes(commandName)))
+    )?.command;
   }
 
   async loadAll(): Promise<CommandManager['commands']> {
@@ -78,42 +90,27 @@ export class CommandManager {
         await this.#loadCommand(resolve(file.parentPath, file.name));
       }
     }
-    return this.commands;
-  }
 
-  async reloadAll(): Promise<CommandManager['commands']> {
-    return this.loadAll();
+    return this.commands;
   }
 
   async reload<
     CMD extends CollectionMember | string
   >(query: CMD): Promise<CMD extends CollectionMember ? CMD : CollectionMember | undefined> {
-    const command = query instanceof Command ? query : this.get(query.toLowerCase());
-
-    /* eslint-disable-next-line @typescript-eslint/no-non-null-assertion */
-    return (command ? this.#loadCommand(this.#filePaths.get(command.name)!, command) : undefined) as (
-      Promise<CMD extends CollectionMember ? CMD : CollectionMember | undefined>
-    );
+    const command = this.commands.get(query instanceof Command ? query.name : query.toLowerCase());
+    return (command ? this.#loadCommand(command.filePath, command.command) : undefined) as ReturnType<typeof this.reload<CMD>>;
   }
 
-  /* eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- needed here for some reason */
-  async #loadCommand(filePath: string, oldCommand?: CollectionMember): Promise<CollectionMember | void> {
-    if (!this.client.application) throw new Error('Client#application must exist (Client must be logged in!)');
+  static #isCollectionMember(obj: unknown): obj is CollectionMember {
+    return obj instanceof Command;
+  }
 
-    let commandFileImport = await loadFile(filePath);
-    commandFileImport = commandFileImport && typeof commandFileImport == 'object' && 'default' in commandFileImport
-      ? commandFileImport.default
-      : commandFileImport;
-
-    if (!(commandFileImport instanceof Command)) return;
-
-    const
-      commandFile = commandFileImport as CollectionMember,
-      name = getFilename(filePath) as Lowercase<string>,
-      category = basename(dirname(filePath));
+  async #loadCommand(filePath: string, oldCommand?: CollectionMember): Promise<undefined | CollectionMember> {
+    const commandFile = importDefault(await loadFile(filePath));
+    if (!CommandManager.#isCollectionMember(commandFile)) return;
 
     try {
-      commandFile.init(this.i18n, name, category, {
+      commandFile.init(this.i18n, getFilename(filePath).toLowerCase(), basename(dirname(filePath)), {
         logger: this.#logger,
         doneFn: this.doneFn,
         cooldownsManager: this.cooldownsManager,
@@ -125,7 +122,8 @@ export class CommandManager {
       });
     }
     catch (err) {
-      return this.#logger.error(`Error on initializing command file ${filePath}:\n`, err);
+      this.#logger.error(`Error on initializing command file ${filePath}:\n`, err);
+      return;
     }
 
     try {
@@ -134,48 +132,62 @@ export class CommandManager {
       if (appCommand) commandFile.commandId = appCommand.id;
     }
     catch (err) {
-      return this.#logger.error(`Error on registering command file ${filePath}:\n`, err);
+      this.#logger.error(`Error on registering command file ${filePath}:\n`, err);
+      return;
     }
 
-    this.commands.set(commandFile.name, commandFile);
-    this.#filePaths.set(commandFile.name, filePath);
+    this.commands.set(commandFile.name, { command: commandFile, filePath });
     return commandFile;
   }
 
+  async #createCommand(command: ChatInputApplicationCommandData, action: string, alias?: CollectionMember['name']): Promise<ApplicationCommand> {
+    const appCommand = await this.client.application.commands.create(command);
+    this.#logLoadMsg(action, appCommand.name, alias);
+
+    return appCommand;
+  }
+
+  async #deleteCommand(
+    command: Pick<CollectionMember, 'commandId' | 'name'> | Pick<ApplicationCommand, 'id' | 'name'>,
+    action: string, alias?: CollectionMember['name']
+  ): Promise<void> {
+    await this.client.application.commands.delete('commandId' in command ? command.commandId : command.id);
+    this.#logLoadMsg(action, command.name, alias);
+  }
+
+  async #editCommand(
+    oldCommand: ApplicationCommand, newCommand: ApplicationCommandDataResolvable,
+    action: string, alias?: CollectionMember['name']
+  ): Promise<ApplicationCommand> {
+    const appCommand = await this.client.application.commands.edit(oldCommand.id, newCommand);
+    this.#logLoadMsg(action, appCommand.name, alias);
+
+    return appCommand;
+  }
+
   async registerCommand(newCommand: CollectionMember, oldCommand?: CollectionMember): Promise<ApplicationCommand | undefined> {
-    if (!newCommand.types.includes(CommandType.Slash) || !this.client.application) return;
+    if (!newCommand.types.includes(CommandType.Slash)) return;
 
     const
-      { application } = this.client,
-      existingCommands = await application.commands.fetch(),
+      existingCommands = await this.client.application.commands.fetch(),
       isEqual = !!oldCommand?.isEqualTo(newCommand);
 
     let appCommand;
 
-    if (oldCommand?.types.includes(CommandType.Slash) && !newCommand.types.includes(CommandType.Slash)) {
-      /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
-      if (oldCommand.commandId) await application.commands.delete(oldCommand.commandId);
-      this.#logLoadMsg('Deleted', newCommand.name);
-    }
+    if (oldCommand?.types.includes(CommandType.Slash) && !newCommand.types.includes(CommandType.Slash))
+      await this.#deleteCommand(oldCommand, 'Deleted');
     else if (newCommand.types.includes(CommandType.Slash)) {
       if (newCommand.disabled) {
-        if (oldCommand?.commandId) {
-          await application.commands.delete(oldCommand.commandId);
-          this.#logLoadMsg('Deleted Disabled', newCommand.name);
-        }
+        if (oldCommand?.commandId) await this.#deleteCommand(oldCommand, 'Deleted Disabled');
       }
-      else if (isEqual && oldCommand?.commandId && existingCommands.has(oldCommand.commandId))
+      else if (oldCommand?.commandId && isEqual && existingCommands.has(oldCommand.commandId))
         appCommand = existingCommands.get(oldCommand.commandId);
       else {
-        const existing = existingCommands.find(e => e.name == newCommand.name);
-        if (existing) {
-          appCommand = await application.commands.edit(existing.id, newCommand as unknown as ApplicationCommandDataResolvable);
-          this.#logLoadMsg('Reloaded', newCommand.name);
-        }
-        else {
-          appCommand = await application.commands.create(newCommand as unknown as ApplicationCommandDataResolvable);
-          this.#logLoadMsg('Created', newCommand.name);
-        }
+        const
+          existing = existingCommands.find(e => e.name == newCommand.name),
+          commandData = newCommand as unknown as ChatInputApplicationCommandData;
+
+        appCommand = await (existing ? this.#editCommand(existing, commandData, 'Reloaded') : this.#createCommand(commandData, 'Created'));
       }
     }
 
@@ -186,44 +198,22 @@ export class CommandManager {
   }
 
   async #registerAlias(
-    newCommand: Command<readonly CommandType[], DMPermType>, oldCommand: Command<readonly CommandType[], DMPermType> | undefined,
-    alias: Lowercase<string>, isEqual: boolean, existingCommands: Collection<string, ApplicationCommand>
+    newCommand: CollectionMember, oldCommand: CollectionMember | undefined,
+    alias: CollectionMember['name'], isEqual: boolean, existingCommands: Collection<string, ApplicationCommand>
   ): Promise<void> {
-    if (!this.client.application) throw new Error('Client#application must exist (Client must be logged in!)');
-
     const
-      { application } = this.client,
       inOld = oldCommand?.aliases[CommandType.Slash].includes(alias),
       inNew = newCommand.aliases[CommandType.Slash].includes(alias),
       existing = existingCommands.find(e => e.name == alias);
 
-    if (inOld && !inNew) {
-      if (existing) {
-        await application.commands.delete(existing.id);
-        this.#logLoadMsg('Deleted', newCommand.name, alias);
-      }
+    if (inOld && !inNew || inNew && newCommand.disabled) {
+      if (existing) await this.#deleteCommand(existing, `Deleted ${newCommand.disabled ? 'Disabled' : ''}`, alias);
     }
-    else if (inNew) {
-      if (newCommand.disabled) {
-        if (!existing) return;
-        await application.commands.delete(existing.id);
-        return this.#logLoadMsg('Deleted Disabled', newCommand.name, alias);
-      }
-
-      if (isEqual && inOld && existing) return;
-
-
-      const commandClone = Object.assign(Object.create(Object.getPrototypeOf(newCommand) as CollectionMember), newCommand);
+    else if (inOld && inNew && isEqual) {
+      const commandClone = newCommand.clone() as unknown as ChatInputApplicationCommandData;
       commandClone.name = alias;
 
-      if (existing) {
-        await application.commands.edit(existing.id, commandClone as unknown as ApplicationCommandDataResolvable);
-        this.#logLoadMsg('Reloaded', newCommand.name, alias);
-      }
-      else {
-        await application.commands.create(commandClone as unknown as ApplicationCommandDataResolvable);
-        this.#logLoadMsg('Created', newCommand.name, alias);
-      }
+      await (existing ? this.#editCommand(existing, commandClone, 'Reloaded', alias) : this.#createCommand(commandClone, 'Created', alias));
     }
   }
 

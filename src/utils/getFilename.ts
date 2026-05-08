@@ -1,5 +1,7 @@
 import { basename, extname } from 'node:path';
 
-export default function getFilename(path: string): string {
-  return basename(path, extname(path));
+export default function getFilename<
+  T extends string
+>(path: T): IfExtendsStrict<T, Lowercase<string>, { ifTrue: Lowercase<string>; ifFalse: string }> {
+  return basename(path, extname(path)) as ReturnType<typeof getFilename<T>>;
 }

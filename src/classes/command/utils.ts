@@ -4,15 +4,10 @@
 import type {
   ChatInputCommandInteraction as _ChatInputCommandInteraction, Message as _Message, PermissionFlags, _NonNullableFields
 } from 'discord.js';
-import type { Command, DMPermType, DefaultOptionType, OptionsG, PermissionType, SharedConfig } from '../../index.ts';
-import type { RunnableReturns as OptionRunnableReturns, StrictCommandOption, ValidateOptionsArray } from '../commandOption/utils.ts';
+import type { Command, CommandOption, DMPermType, DefaultOptionType, OptionsG, PermissionType, SharedConfig } from '../../index.ts';
+import type { RunnableReturns as OptionRunnableReturns, ValidateOptionsArray } from '../commandOption/utils.ts';
 import type { CommandType } from '../utils.ts';
 
-
-export type StrictCommand<
-  CT extends readonly CommandType[], DM extends DMPermType, AO = undefined,
-  Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>
-> = Command<NoInfer<CT>, NoInfer<DM>, Options extends OptionsG<NoInfer<CT>, NoInfer<DM>> ? Options : OptionsG<NoInfer<CT>, NoInfer<DM>>>;
 
 export type RunnableReturns = ['nonBeta']
   | ['disabled', string]
@@ -53,4 +48,4 @@ export interface CommandConfig<
 
 export type DeepOptions<T> = T extends { options: readonly (infer U)[] } ? T | DeepOptions<U> : T;
 export type ResolvedOption<CT extends readonly CommandType[], DM extends DMPermType, E>
-  = StrictOmit<StrictCommandOption<CT, DM>, keyof E> & E;
+  = StrictOmit<CommandOption<NoInfer<CT>, NoInfer<DM>>, keyof E & keyof CommandOption> & E;

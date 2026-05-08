@@ -7,8 +7,7 @@ import type {
   CooldownType, Message, MessageComponentInteraction, validTimeString
 } from '../index.ts';
 
-/* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
-const getMilliseconds = getMilliseconds_ as typeof BetterMS.getMilliseconds;
+export const getMilliseconds = getMilliseconds_ as typeof BetterMS.getMilliseconds;
 
 export function equal(a: unknown, b: unknown): boolean {
   if (a === b) return true;

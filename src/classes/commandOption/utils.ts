@@ -12,10 +12,6 @@ import type { CommandType } from '../utils.ts';
 export type autocompleteObject = StrictOmit<ApplicationCommandOptionChoiceData, 'nameLocalizations'>;
 export type autocompleteOptions = autocompleteObject['value'] | autocompleteObject;
 
-export type StrictCommandOption<
-  CT extends readonly CommandType[], DM extends DMPermType, AO = undefined
-> = CommandOption<CT, DM, AO, OptionsG<CT, DM, AO>>;
-
 // #region option resolver
 type GetSubOpts<O>
   = O extends { options?: infer Sub extends readonly unknown[] }
@@ -204,6 +200,8 @@ export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options
       [Extract<Options[number], { name: K }>] extends [{ options: infer O extends readonly unknown[] }] ? O : []
     >
   };
+
+  /* eslint-enable @typescript-eslint/no-unnecessary-type-parameters */
 };
 
 // #endregion option resolver
