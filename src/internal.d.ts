@@ -7,7 +7,8 @@ import type {
 
 // Declaring them this way allows to inherit discord.js's properties without interfering with the lib user's own declaration.
 declare module './index.ts' {
-  /* eslint-disable @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unused-vars */
+  /* eslint-disable @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unused-vars
+    -- Extending from discord.js to have local type information. */
   interface ChatInputCommandInteraction<DM extends DMPermType = DMPermType.CanBeDM, Options extends readonly unknown[] = []>
     extends StrictOmit<_ChatInputCommandInteraction<DMPermTypeToCaching[DM]>, 'options'> {}
 

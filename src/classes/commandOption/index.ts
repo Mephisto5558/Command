@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-type-assertion, sonarjs/cognitive-complexity, custom/cyclomatic-complexity */
-/* eslint-disable max-lines */
-
 import {
   ApplicationCommandOptionType, BaseInteraction, ChannelType, Locale as DLocale, Message as _Message, _NonNullableFields, inlineCode
 } from 'discord.js';
@@ -11,18 +8,17 @@ import { cooldownConverter, equal } from '../utils.ts';
 import type { ApplicationCommandOption, ApplicationCommandOptionChoiceData, Client } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  AutocompleteInteraction, ChatInputCommandInteraction, Command, Logger, Message,
-  MessageComponentInteraction, OptionsG, ResolveContext
+  AutocompleteInteraction, ChatInputCommandInteraction, Command, Logger, Message, MessageComponentInteraction, OptionsG
 } from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
-import type { RunnableReturns, StrictCommand } from '../command/utils.ts';
+import type { RunnableReturns } from '../command/utils.ts';
 import type { CommandType } from '../utils.ts';
 import type {
-  ChannelCommandOptionConfig, CommandOptionConfig, MaybeWithUndefined, NumericCommandOptionConfig, StrictCommandOption, StringCommandOptionConfig,
+  ChannelCommandOptionConfig, CommandOptionConfig, NumericCommandOptionConfig, StringCommandOptionConfig,
   SubcommandConfig, SubcommandGroupConfig, autocompleteObject, autocompleteOptions
 } from './utils.ts';
 
-/* eslint-disable-next-line import-x/prefer-default-export */
+/* eslint-disable-next-line import-x/prefer-default-export -- simplifies re-export */
 export class CommandOption<
   const CT extends readonly CommandType[] = [],
   const DM extends DMPermType = DMPermType.NeverDM,
@@ -56,12 +52,15 @@ export class CommandOption<
     T, ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number,
     {
       ifTrue: autocompleteOptions | autocompleteOptions[] | Fn<
-        ResolveContext<{ [CommandType.Slash]: AutocompleteInteraction<DM>; [CommandType.Prefix]: Message<DM> }, CT>,
+        ExtendsMultiMatch<CT, [
+          [CommandType.Slash, AutocompleteInteraction<NoInfer<DM>>],
+          [CommandType.Prefix, Message<NoInfer<DM>>]
+        ]>,
         [query: string], autocompleteOptions[] | Promise<autocompleteOptions[]>
       >;
       ifFalse: undefined;
     }
-  >;
+  > | undefined;
 
   choices?: IfExtends<T, ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number,
     { ifTrue: readonly ApplicationCommandOptionChoiceData[] }
@@ -88,20 +87,20 @@ export class CommandOption<
   > | undefined;
 
   options?: IfExtends<T, ApplicationCommandOptionType.SubcommandGroup | ApplicationCommandOptionType.Subcommand,
-    { ifTrue: StrictCommandOption<CT, DM, AO>[] }
+    { ifTrue: CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>>[] }
   > | undefined;
 
   run?: (
     this: ExtendsMultiMatch<CT, [
-      [CommandType.Slash, ChatInputCommandInteraction<DM, NoInfer<ChildrenOptions>>],
-      [CommandType.Component, MessageComponentInteraction<DM>],
-      [CommandType.Prefix, Message<DM>]
+      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>],
+      [CommandType.Component, MessageComponentInteraction<NoInfer<DM>>],
+      [CommandType.Prefix, Message<NoInfer<DM>>]
     ]>,
     lang: Translator<false, Locale>, options: AO,
     data: {
       client: Client<true>;
-      command: Command<CT, DM, OptionsG<CT, DM, AO>>;
-      option: CommandOption<CT, DM, AO, ChildrenOptions, T>;
+      command: Command<NoInfer<CT>, NoInfer<DM>>;
+      option: CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>>;
     }
   ) => unknown;
 
@@ -109,58 +108,87 @@ export class CommandOption<
   #cooldownsManager!: CooldownsManager;
   #logger!: Logger;
 
-  constructor(config: CommandOptionConfig<CT, DM, AO, ChildrenOptions> & { type: T }) {
-    this.name = config.name;
-    this.type = config.type;
+  #resolveConfigType(
+    config: CommandOptionConfig<CT, DM, AO, ChildrenOptions> & { type: T }
+  ): ExtendsMatch<T, [
+    [ApplicationCommandOptionType.SubcommandGroup, SubcommandGroupConfig<CT, DM, AO, ChildrenOptions>],
+    [ApplicationCommandOptionType.Subcommand, SubcommandConfig<CT, DM, AO, ChildrenOptions>],
+    [ApplicationCommandOptionType.String, StringCommandOptionConfig<CT, DM, AO>],
+    [ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number, NumericCommandOptionConfig<CT, DM, AO>],
+    [ApplicationCommandOptionType.Channel, ChannelCommandOptionConfig]
+  ]> {
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return -- typeguard method */
+    return config as any;
+  }
 
+  /** @internal */
+  constructor(configData: CommandOption<CT, DM, AO, ChildrenOptions, T>);
+  /* eslint-disable-next-line @typescript-eslint/unified-signatures -- TS disagrees */
+  constructor(configData: CommandOptionConfig<CT, DM, AO, ChildrenOptions> & { type: T });
+  constructor(configData: CommandOptionConfig<CT, DM, AO, ChildrenOptions> & { type: T } | CommandOption<CT, DM, AO, ChildrenOptions, T>) {
+    // need to set these specifically for typing
+    this.type = configData.type;
+    this.name = configData.name;
+
+    if (configData instanceof CommandOption) {
+      for (const key of Object.getOwnPropertyNames(configData) as (keyof typeof this)[]) {
+        const descriptor = Object.getOwnPropertyDescriptor(configData, key)
+          ?? Object.getOwnPropertyDescriptor(Object.getPrototypeOf(configData) as object, key);
+
+        if (!descriptor || descriptor.get || descriptor.writable === false) continue;
+
+        const value = configData[key as keyof typeof configData];
+
+        if (key == 'options') this.options = (value as NonNullable<typeof configData.options>).map(opt => opt.clone()) as typeof this.options;
+        else if (value && typeof value == 'object' && typeof value != 'function')
+          (this as Record<typeof key, unknown>)[key] = Array.isArray(value) ? [...value] : { ...value as Record<string | number | symbol, unknown> };
+        else (this as Record<typeof key, unknown>)[key] = value;
+      }
+
+      return;
+    }
+
+    const config = this.#resolveConfigType(configData);
     if ('required' in config) this.required = config.required;
 
     switch (config.type) {
       case ApplicationCommandOptionType.SubcommandGroup:
-      case ApplicationCommandOptionType.Subcommand: {
-        const subConfig = config as (SubcommandGroupConfig<CT, DM, AO, ChildrenOptions> | SubcommandConfig<CT, DM, AO, ChildrenOptions>);
-        if (subConfig.cooldowns) {
-          const { cooldowns } = subConfig;
-          this.cooldowns = Object.fromEntries(Object.entries(this.cooldowns).map(e => cooldownConverter(cooldowns, ...e)));
+      case ApplicationCommandOptionType.Subcommand:
+        if ('cooldowns' in config)
+          Object.fromEntries(Object.entries(this.cooldowns).map(e => cooldownConverter(config.cooldowns!, ...e)));
+
+        if ('dmPermission' in config) this.dmPermission = config.dmPermission;
+        if (config.options) {
+          this.options = (config.options as (CommandOption<NoInfer<CT>, NoInfer<DM>> | CommandOptionConfig<NoInfer<CT>, NoInfer<DM>>)[])
+            .map(opt => (opt instanceof CommandOption ? opt : new CommandOption<NoInfer<CT>, NoInfer<DM>>(opt)));
         }
 
-        if ('dmPermission' in subConfig) this.dmPermission = subConfig.dmPermission;
-        if (subConfig.options)
-          (this.options as unknown) = subConfig.options.map(e => CommandOption.from(e));
-
-        /* eslint-disable-next-line custom/unbound-method -- safe */
-        if ('run' in subConfig) this.run = subConfig.run as unknown as NonNullable<typeof this.run>;
+        /* eslint-disable-next-line custom/unbound-method -- safe here */
+        if ('run' in config) this.run = config.run as unknown as NonNullable<typeof this.run>;
         break;
-      }
 
-      case ApplicationCommandOptionType.String: {
-        const stringConfig = config as StringCommandOptionConfig<CT, DM, AO>;
-        if (stringConfig.minLength != undefined) this.minLength = stringConfig.minLength as typeof this.minLength;
-        if (stringConfig.maxLength != undefined) this.maxLength = stringConfig.maxLength as typeof this.maxLength;
-      }
+      case ApplicationCommandOptionType.String:
+        if (config.minLength != undefined) this.minLength = config.minLength as typeof this.minLength;
+        if (config.maxLength != undefined) this.maxLength = config.maxLength as typeof this.maxLength;
 
-      // fall through for choices and autocompleteOptions
+        // fall through for choices and autocompleteOptions
       case ApplicationCommandOptionType.Integer:
-      case ApplicationCommandOptionType.Number: {
-        const numericConfig = config as (NumericCommandOptionConfig<CT, DM, AO> | StringCommandOptionConfig<CT, DM, AO>);
-        if (numericConfig.type != ApplicationCommandOptionType.String) {
-          if (numericConfig.minValue != undefined) this.minValue = numericConfig.minValue as typeof this.minValue;
-          if (numericConfig.maxValue != undefined) this.maxValue = numericConfig.maxValue as typeof this.maxValue;
+      case ApplicationCommandOptionType.Number:
+        if (config.type != ApplicationCommandOptionType.String) {
+          if (config.minValue != undefined) this.minValue = config.minValue as typeof this.minValue;
+          if (config.maxValue != undefined) this.maxValue = config.maxValue as typeof this.maxValue;
         }
 
-        if (numericConfig.choices)
-          this.choices = numericConfig.choices.map(e => ({ name: String(e), value: e })) as unknown as NonNullable<this['choices']>;
+        if (config.choices)
+          this.choices = config.choices.map(e => ({ name: String(e), value: e })) as unknown as NonNullable<typeof this.choices>;
 
-        this.autocompleteOptions = numericConfig.autocompleteOptions as typeof this.autocompleteOptions;
-        if (numericConfig.strictAutocomplete) this.strictAutocomplete = numericConfig.strictAutocomplete;
+        this.autocompleteOptions = config.autocompleteOptions as typeof this.autocompleteOptions;
+        if (config.strictAutocomplete) this.strictAutocomplete = config.strictAutocomplete;
         break;
-      }
 
-      case ApplicationCommandOptionType.Channel: {
-        const channelConfig = config as ChannelCommandOptionConfig;
-        if (channelConfig.channelTypes) this.channelTypes = channelConfig.channelTypes as typeof this.channelTypes;
+      case ApplicationCommandOptionType.Channel:
+        if (config.channelTypes) this.channelTypes = config.channelTypes as typeof this.channelTypes;
         break;
-      }
 
       default: // no special handling
     }
@@ -190,8 +218,8 @@ export class CommandOption<
 
   getChannel<RetSelf extends boolean = false>(
     interaction: ExtendsMultiMatch<CT, [
-      [CommandType.Slash, ChatInputCommandInteraction<DM, NoInfer<ChildrenOptions>>],
-      [CommandType.Prefix, Message<DM>]
+      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>],
+      [CommandType.Prefix, Message<NoInfer<DM>>]
     ]>, returnSelf: RetSelf
   ): IfExtends<T, ApplicationCommandOptionType.Channel,
     MaybeWithUndefined<ExtractChannelTypesFromInstance<this, DM>, RetSelf>> {
@@ -205,8 +233,8 @@ export class CommandOption<
     if (!target && interaction instanceof _Message)
       target = interaction.guild?.channels.cache.find(e => [e.id, e.name].some(e => interaction.content.includes(e)));
     if (target) return target;
-    if (returnSelf) return interaction.channel;
-    return undefined;
+
+    return (returnSelf ? interaction.channel : undefined) as ReturnType<typeof this.getChannel<RetSelf>>;
   }
 
   #validate(): void {
@@ -300,10 +328,10 @@ export class CommandOption<
 
   async isRunnable(
     interaction: ExtendsMultiMatch<CT, [
-      [CommandType.Slash, ChatInputCommandInteraction<DM, NoInfer<ChildrenOptions>>],
-      [CommandType.Prefix, Message<DM>]
+      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>],
+      [CommandType.Prefix, Message<NoInfer<DM>>]
     ]>,
-    command: StrictCommand<CT, DM, AO, ChildrenOptions>,
+    command: Command<NoInfer<CT>, NoInfer<DM>>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
     if (
@@ -366,10 +394,10 @@ export class CommandOption<
 
   async #isRunnableSubcommandGroup(
     interaction: ExtendsMultiMatch<CT, [
-      [CommandType.Slash, ChatInputCommandInteraction<DM, NoInfer<ChildrenOptions>>],
-      [CommandType.Prefix, Message<DM>]
+      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>],
+      [CommandType.Prefix, Message<NoInfer<DM>>]
     ]>,
-    command: StrictCommand<CT, DM, AO, ChildrenOptions>,
+    command: Command<NoInfer<CT>, NoInfer<DM>>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
     const
@@ -384,10 +412,10 @@ export class CommandOption<
 
   async #isRunnableSubcommand(
     interaction: ExtendsMultiMatch<CT, [
-      [CommandType.Slash, ChatInputCommandInteraction<DM, NoInfer<ChildrenOptions>>],
-      [CommandType.Prefix, Message<DM>]
+      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>],
+      [CommandType.Prefix, Message<NoInfer<DM>>]
     ]>,
-    command: StrictCommand<CT, DM, AO, ChildrenOptions>,
+    command: Command<NoInfer<CT>, NoInfer<DM>>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
     if (!this.options) return false;
@@ -402,17 +430,17 @@ export class CommandOption<
   /** `translator` and `options` should not be supplied by an external caller. */
   async generateAutocomplete(
     interaction: ExtendsMultiMatch<CT, [
-      [CommandType.Slash, AutocompleteInteraction<DM>],
-      [CommandType.Prefix, Message<DM>]
+      [CommandType.Slash, AutocompleteInteraction<NoInfer<DM>>],
+      [CommandType.Prefix, Message<NoInfer<DM>>]
     ]>,
     query: string, locale: Locale, translator?: Translator<true, Locale>,
-    options: StrictCommandOption<CT, DM>['autocompleteOptions'] = this.autocompleteOptions
+    options: CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>>['autocompleteOptions'] = this.autocompleteOptions
   ): Promise<[] | autocompleteObject[]> {
     if (options == undefined) return [];
 
     translator ??= this.#i18n.getTranslator({ locale, undefinedNotFound: true, backupPaths: [`${this.id}.choices`] });
 
-    if (typeof options == 'function') options = await options.call(interaction, query);
+    if (typeof options == 'function') options = await options.call(interaction, query) as Exclude<this['autocompleteOptions'], GenericFunction>;
     if (typeof options == 'string' || typeof options == 'number')
       return [{ name: translator(options.toString()) ?? options.toString(), value: options }];
 
@@ -425,7 +453,7 @@ export class CommandOption<
       )).flat();
     }
 
-    return [options];
+    return [options as autocompleteObject];
   }
 
   /**
@@ -482,16 +510,7 @@ export class CommandOption<
     return true;
   }
 
-  static from<
-    CT extends readonly CommandType[], DM extends DMPermType, AO,
-    ChildOptions extends OptionsG<CT, DM, AO>,
-    InferredT extends ApplicationCommandOptionType
-  >(
-    commandOption: CommandOptionConfig<CT, DM, AO, ChildOptions> | CommandOption<CT, DM, AO, ChildOptions, InferredT>
-  ): CommandOption<CT, DM, AO, ChildOptions, InferredT> {
-    if (commandOption instanceof CommandOption) return commandOption;
-    return new this(
-      commandOption as CommandOptionConfig<CT, DM, AO, ChildOptions> & { type: InferredT }
-    ) as CommandOption<CT, DM, AO, ChildOptions, InferredT>;
+  clone(): CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>> {
+    return new CommandOption(this);
   }
 }

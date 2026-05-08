@@ -1,36 +1,29 @@
-/* eslint-disable max-lines */
-
 import {
   ApplicationCommandOptionType, ApplicationCommandType, BaseInteraction, ChannelType,
   ChatInputCommandInteraction as _ChatInputCommandInteraction, Colors, EmbedBuilder, Message as _Message,
   MessageComponentInteraction as _MessageComponentInteraction, MessageFlags, PermissionsBitField, _NonNullableFields, inlineCode
 } from 'discord.js';
 
-// @ts-expect-error Cannot augment that module
-import { getMilliseconds as getMilliseconds_ } from 'better-ms';
 import { CommandExecutionError, CommandOption, CooldownType, DMPermType, Permission, PermissionType } from '../../index.ts';
 import { descriptionMaxLength } from '../../utils/constants.ts';
-import { CommandType, cooldownConverter, equal } from '../utils.ts';
+import { CommandType, cooldownConverter, equal, getMilliseconds } from '../utils.ts';
 
 import type { ApplicationCommand, Client, CommandInteraction, PermissionFlags, User } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  BetterMS, ChatInputCommandInteraction, DefaultOptionType, Logger,
-  Message, MessageComponentInteraction, OptionsG, ResolveContext, commandDoneFn, customPermissionChecksFn
+  ChatInputCommandInteraction, DefaultOptionType, Logger, Message,
+  MessageComponentInteraction, OptionsG, commandDoneFn, customPermissionChecksFn
 } from '../../index.ts';
 import type { CooldownsManager } from '../../utils/index.ts';
-import type { StrictCommandOption } from '../commandOption/utils.ts';
-import type { CommandConfig, CommandMention, DeepOptions, ResolvedOption, RunnableReturns, StrictCommand } from './utils.ts';
+import type { CommandOptionConfig } from '../commandOption/utils.ts';
+import type { CommandConfig, CommandMention, DeepOptions, ResolvedOption, RunnableReturns } from './utils.ts';
 
 const
-  /* eslint-disable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-non-null-assertion */
-  getMilliseconds = getMilliseconds_ as typeof BetterMS.getMilliseconds,
+  /* eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- this is never undefined */
   msInSeconds = getMilliseconds('1s')!,
-  /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
-
   CANNOT_SEND_MESSAGE_API_ERR = 50_007;
 
-/* eslint-disable-next-line import-x/prefer-default-export */
+/* eslint-disable-next-line import-x/prefer-default-export -- simplifies re-export */
 export class Command<
   const CT extends readonly CommandType[] = [],
   const DM extends DMPermType = DMPermType.NeverDM,
@@ -50,13 +43,11 @@ export class Command<
 
   readonly type = ApplicationCommandType.ChatInput;
 
-  /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
   readonly types: CT = [] as unknown as CT;
 
   usage: Record<'usage' | 'examples', string | undefined> & {} = { usage: undefined, examples: undefined };
-  usageLocalizations: Partial<Record<Locale, StrictCommand<NoInfer<CT>, NoInfer<DM>>['usage']>> = {};
+  usageLocalizations: Partial<Record<Locale, Command<NoInfer<CT>, NoInfer<DM>>['usage']>> = {};
 
-  /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- get's filled in the constructor */
   aliases: Record<NoInfer<CT>[number], Command['name'][]> = {} as Record<NoInfer<CT>[number], Command['name'][]>;
 
   cooldowns: Record<CooldownType, number> & {} = { [CooldownType.Guild]: 0, [CooldownType.Channel]: 0, [CooldownType.User]: 0 };
@@ -72,7 +63,6 @@ export class Command<
     return new PermissionsBitField(this.permissions[PermissionType.User]).bitfield;
   }
 
-  /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */
   dmPermission: DM = DMPermType.NeverDM as DM;
 
   disabled = false;
@@ -83,32 +73,32 @@ export class Command<
 
   beta = false;
 
-  options: StrictCommandOption<CT, DM>[] = [];
+  options: CommandOption<NoInfer<CT>, NoInfer<DM>>[] = [];
 
   config = {
-    devIds: new Set<Snowflake>(), devOnlyCategories: new Set<string>(),
+    devIds: new Set<User['id']>(), devOnlyCategories: new Set<Command['category']>(),
     runBetaCommandsOnly: false,
     replyOn: { disabled: true, nonBeta: true }
   };
 
-  mention<SubCommandGroupName extends string | undefined = undefined, SubcommandName extends string | undefined = undefined>(
-    subcommandGroup?: SubCommandGroupName, subcommand?: SubcommandName
-  ): CommandMention<SubCommandGroupName, SubcommandName, CT> {
+  mention<
+    SubCommandGroupName extends CommandOption['name'] | undefined = undefined,
+    SubcommandName extends CommandOption['name'] | undefined = undefined
+  >(subcommandGroup?: SubCommandGroupName, subcommand?: SubcommandName): CommandMention<SubCommandGroupName, SubcommandName, CT> {
     const path = [this.name, subcommandGroup, subcommand].filter(Boolean).join(' ');
 
     // using `0` here to not break the mention in Discord
-    /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- fine here */
     return `</${path}:${this.commandId ?? 0}>` as CommandMention<SubCommandGroupName, SubcommandName, CT>;
   }
 
   run: (
     this: ExtendsMultiMatch<CT, [
-      [CommandType.Slash, ChatInputCommandInteraction<DM, NoInfer<Options>>],
-      [CommandType.Component, MessageComponentInteraction<DM> & { commandName: Command['name'] }],
-      [CommandType.Prefix, Message<DM>]
+      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<Options>>],
+      [CommandType.Component, MessageComponentInteraction<NoInfer<DM>> & { commandName: Command['name'] }],
+      [CommandType.Prefix, Message<NoInfer<DM>>]
     ]>,
     lang: Translator<false, Locale>,
-    data: { client: Client<true>; command: Command<CT, DM, Options> }
+    data: { client: Client<true>; command: Command<NoInfer<CT>, NoInfer<DM>, NoInfer<Options>> }
   ) => unknown;
 
   #i18n!: I18nProvider;
@@ -117,7 +107,32 @@ export class Command<
   #cooldownsManager!: CooldownsManager;
   #customPermissionChecks: customPermissionChecksFn | undefined;
 
-  constructor(config: CommandConfig<CT, DM, Options>) {
+  /** @internal */
+  constructor(config: Command<NoInfer<CT>, NoInfer<DM>, NoInfer<Options>>);
+  /* eslint-disable-next-line @typescript-eslint/unified-signatures -- TS disagrees */
+  constructor(config: CommandConfig<NoInfer<CT>, NoInfer<DM>, NoInfer<Options>>);
+  constructor(config: CommandConfig<NoInfer<CT>, NoInfer<DM>, NoInfer<Options>> | Command<NoInfer<CT>, NoInfer<DM>, NoInfer<Options>>) {
+    // need to set these specifically for typing
+    this.run = config.run;
+
+    if (config instanceof Command) {
+      for (const key of Object.getOwnPropertyNames(config) as (keyof typeof this)[]) {
+        const descriptor = Object.getOwnPropertyDescriptor(config, key)
+          ?? Object.getOwnPropertyDescriptor(Object.getPrototypeOf(config) as object, key);
+
+        if (!descriptor || descriptor.get || descriptor.writable === false) continue;
+
+        const value = config[key as keyof typeof config];
+
+        if (key == 'options') this.options = (value as typeof config.options).map(opt => opt.clone());
+        else if (value && typeof value == 'object' && typeof value != 'function')
+          (this as Record<typeof key, unknown>)[key] = Array.isArray(value) ? [...value] : { ...value as Record<string | number | symbol, unknown> };
+        else (this as Record<typeof key, unknown>)[key] = value;
+      }
+
+      return;
+    }
+
     if (config.usage) {
       if (config.usage.usage) this.usage.usage = config.usage.usage;
       if (config.usage.examples) this.usage.examples = config.usage.examples;
@@ -141,38 +156,38 @@ export class Command<
     if (config.noDefer) this.noDefer = config.noDefer;
     if (config.ephemeralDefer) this.ephemeralDefer = config.ephemeralDefer;
 
-    if (config.options)
-      this.options = config.options.map(e => CommandOption.from(e));
+    if (config.options) {
+      this.options = (config.options as (CommandOption<NoInfer<CT>, NoInfer<DM>> | CommandOptionConfig<NoInfer<CT>, NoInfer<DM>>)[])
+        .map(opt => (opt instanceof CommandOption ? opt : new CommandOption<NoInfer<CT>, NoInfer<DM>>(opt)));
+    }
 
     if (config.beta) this.beta = config.beta;
 
-    for (const commandType of config.types as NoInfer<CT>) {
+    for (const commandType of config.types) {
       const type = commandType as NoInfer<CT>[number];
       this.aliases[type] = config.aliases?.[type] ?? [];
     }
 
     this.types = config.types;
     this.disabledReason = config.disabledReason;
-
-    this.run = config.run;
   }
 
-  init(i18n: I18nProvider, name: string, category: string, config: {
+  init(i18n: I18nProvider, name: Command['name'], category: Command['category'], config: {
     logger?: Logger | undefined;
     doneFn?: commandDoneFn | undefined;
     customPermissionChecks?: customPermissionChecksFn | undefined;
 
-    devIds?: Set<Snowflake> | undefined;
-    devOnlyCategories?: Set<string> | undefined;
+    devIds?: Command['config']['devIds'] | undefined;
+    devOnlyCategories?: Command['config']['devOnlyCategories'] | undefined;
     runBetaCommandsOnly?: boolean | undefined;
-    replyOn?: { disabled?: boolean; nonBeta?: boolean } | undefined;
+    replyOn?: Partial<Command['config']['replyOn']> | undefined;
     cooldownsManager?: CooldownsManager | undefined;
   } = {}): this {
     this.#i18n = i18n;
     if (config.logger) this.#logger = config.logger;
     if (config.doneFn) this.#doneFn = config.doneFn;
     if (config.cooldownsManager) this.#cooldownsManager = config.cooldownsManager;
-    this.#customPermissionChecks = config.customPermissionChecks?.bind(this);
+    this.#customPermissionChecks = config.customPermissionChecks?.bind(this as unknown as Command<readonly CommandType[], DMPermType>);
 
     if (config.devIds) this.config.devIds = config.devIds;
     if (config.devOnlyCategories) this.config.devOnlyCategories = config.devOnlyCategories;
@@ -217,12 +232,10 @@ export class Command<
     for (const [locale] of this.#i18n.availableLocales) {
       const
         requiredTranslator = this.#i18n.getTranslator({ locale, errorNotFound: true, backupPaths: [this.id] }),
-        optionalTranslator = this.#i18n.getTranslator({ locale, undefinedNotFound: true, backupPaths: [this.id] });
+        optionalTranslator = this.#i18n.getTranslator({ locale, undefinedNotFound: true, backupPaths: [this.id] }),
 
-      ; /* eslint-disable-line @stylistic/no-extra-semi -- formatting reasons */
-
-      // description
-      const localizedDescription = locale == this.#i18n.config.defaultLocale ? optionalTranslator('description') : requiredTranslator('description');
+        // description
+        localizedDescription = locale == this.#i18n.config.defaultLocale ? optionalTranslator('description') : requiredTranslator('description');
       if (!localizedDescription) {
         if (!this.disabled)
           this.#logger.warn(`Missing "${locale}" description for command "${this.name}" (${this.id}.description)`);
@@ -436,7 +449,7 @@ export class Command<
 
   #resolveActiveOption(
     interaction: CommandInteraction | Message | MessageComponentInteraction, args: string[] | undefined
-  ): StrictCommandOption<CT, DM> | undefined {
+  ): CommandOption<NoInfer<CT>, NoInfer<DM>> | undefined {
     if (interaction instanceof BaseInteraction && interaction.isChatInputCommand()) {
       const group = interaction.options.getSubcommandGroup(false);
       if (group) return this.options.find(e => e.name == group);
@@ -450,21 +463,24 @@ export class Command<
     }
   }
 
-  findOption<O extends { name: CommandOption['name']; type?: CommandOption['type'] } | { name?: string; type: ApplicationCommandOptionType } | undefined>(
+  findOption<
+    O extends { name: CommandOption['name']; type?: CommandOption['type'] }
+    | { name?: CommandOption['name']; type: CommandOption['type'] } | undefined
+  >(
     option?: O,
     interaction?: ThisParameterType<Command<[CommandType.Slash], NoInfer<DM>>['run']>
   ): IfExtendsStrict<O, undefined, {
-    ifTrue: If<IsEmptyArray<Options>, { ifTrue: undefined; ifFalse: StrictCommandOption<CT, DM> }>;
-    ifFalse: Extract<DeepOptions<Options[number]>, O> extends infer E ? IfExtendsStrict<E, never, { 
-        ifTrue: undefined; 
-        ifFalse: ResolvedOption<CT, DM, E> 
-      }> : never;
+    ifTrue: If<IsEmptyArray<Options>, { ifTrue: undefined; ifFalse: CommandOption<NoInfer<CT>, NoInfer<DM>> }>;
+    ifFalse: Extract<DeepOptions<Options[number]>, O> extends infer E ? IfExtendsStrict<E, never, {
+      ifTrue: undefined;
+      ifFalse: ResolvedOption<NoInfer<CT>, NoInfer<DM>, E>;
+    }> : never;
   }> {
     const
       group = interaction?.options.getSubcommandGroup(false),
       subcommand = interaction?.options.getSubcommand(false);
 
-    let options: StrictCommandOption<CT, DM>[] = this.options;
+    let options: CommandOption<NoInfer<CT>, NoInfer<DM>>[] = this.options;
     if (group) options = this.options.find(e => e.name == group)?.options ?? [];
     if (subcommand) options = options.find(e => e.name == subcommand)?.options ?? [];
 
@@ -496,9 +512,7 @@ export class Command<
     return true;
   }
 
-  static from<
-    CT extends readonly CommandType[], DM extends DMPermType, Options extends OptionsG<CT, DM>
-  >(command: CommandConfig<CT, DM, Options> | Command<CT, DM, Options>): Command<CT, DM, Options> {
-    return command instanceof this ? command : new this(command);
+  clone(): Command<NoInfer<CT>, NoInfer<DM>, NoInfer<Options>> {
+    return new Command(this);
   }
 }

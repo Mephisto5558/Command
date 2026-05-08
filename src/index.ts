@@ -1,3 +1,7 @@
+/* eslint-disable-next-line import-x/no-unassigned-import, import-x/no-empty-named-blocks, unicorn/require-module-specifiers -- load global types */
+import type {} from '@mephisto5558/better-types';
+
+/* eslint-disable-next-line import-x/order -- side-effect import first */
 import type {
   APIInteractionGuildMember, AutocompleteInteraction as _AutocompleteInteraction, ChatInputCommandInteraction as _ChatInputCommandInteraction,
   Message as _Message, MessageComponentInteraction as _MessageComponentInteraction, PartialDMChannel, PartialGroupDMChannel, User, _NonNullableFields

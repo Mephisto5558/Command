@@ -14,13 +14,13 @@ export default function getCommands(
   commands: CommandManager['commands'],
   excludeCategories?: Command['category'][]
 ): category[] {
-  const commandList = commands.reduce<category[]>((acc, cmd) => {
-    if (excludeCategories?.includes(cmd.category) || cmd.disabled) return acc;
+  const commandList = commands.reduce<category[]>((acc, { command }) => {
+    if (excludeCategories?.includes(command.category) || command.disabled) return acc;
 
-    let category = acc.find(e => e.category == cmd.category);
+    let category = acc.find(e => e.category == command.category);
     if (!category) {
       category = {
-        category: cmd.category,
+        category: command.category,
         subTitle: '',
         aliasesDisabled: false,
         list: []
@@ -29,16 +29,16 @@ export default function getCommands(
     }
 
     category.list.push({
-      commandName: cmd.name,
+      commandName: command.name,
       commandUsage: (
-        (cmd.types.includes(CommandType.Slash) ? lang('others.getCommands.lookAtOptionDesc') ?? '' : '')
-        + (lang(`${cmd.id}.usage.usage`)?.replaceAll(new RegExp(`${CommandType.Slash} command:`, 'gi'), '') ?? '')
+        (command.types.includes(CommandType.Slash) ? lang('others.getCommands.lookAtOptionDesc') ?? '' : '')
+        + (lang(`${command.id}.usage.usage`)?.replaceAll(new RegExp(`${CommandType.Slash} command:`, 'gi'), '') ?? '')
         || (lang('others.getCommands.noInfo') ?? '')
       ).trim().replaceAll('\n', '<br>&nbsp'),
-      commandDescription: cmd.descriptionLocalizations[lang.config.locale ?? lang.defaultConfig.defaultLocale] ?? cmd.description,
+      commandDescription: command.descriptionLocalizations[lang.config.locale ?? lang.defaultConfig.defaultLocale] ?? command.description,
       commandAlias: (
-        (cmd.aliases[CommandType.Prefix].length ? `${capitalize(CommandType.Prefix)}: ${cmd.aliases[CommandType.Prefix].join(', ')}\n` : '')
-        + (cmd.aliases[CommandType.Slash].length ? `${capitalize(CommandType.Slash)}: ${cmd.aliases[CommandType.Slash].join(', ')}` : '')
+        (command.aliases[CommandType.Prefix].length ? `${capitalize(CommandType.Prefix)}: ${command.aliases[CommandType.Prefix].join(', ')}\n` : '')
+        + (command.aliases[CommandType.Slash].length ? `${capitalize(CommandType.Slash)}: ${command.aliases[CommandType.Slash].join(', ')}` : '')
         || (lang('global.none') ?? '')
       ).trim().replaceAll('\n', '<br>&nbsp')
     });
