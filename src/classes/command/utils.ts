@@ -23,27 +23,27 @@ export type CommandMention<
   Subcommand extends string | undefined,
   CT extends readonly CommandType[] = CommandType[],
   Name extends Command['name'] = Command['name'],
-  Id extends NonNullable<Command<CT>['commandId']> | bigint = NonNullable<Command<CT>['commandId']> | bigint
+  Id extends NonNullable<Command<NoInfer<CT>>['commandId']> | bigint = NonNullable<Command<NoInfer<CT>>['commandId']> | bigint
 > = `</${Name}${Space<Group>}${Space<Subcommand>}:${Id}>`;
 
 /* eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- interface is correct here */
 export interface CommandConfig<
   CT extends readonly CommandType[], DM extends DMPermType,
   Options extends OptionsG<CT, DM> = DefaultOptionType<CT, DM>[]
-> extends SharedConfig<DM> {
+> extends SharedConfig<NoInfer<DM>> {
   types: CT;
   usage?: { usage?: string; examples?: string }; // TODO: support arrays
   aliases?: { [K in NoInfer<CT>[number]]?: Lowercase<string>[] };
   permissions?: Partial<Record<PermissionType, PermissionFlags[keyof PermissionFlags][]>>;
 
-  options?: ValidateOptionsArray<Options, CT, DM>;
+  options?: ValidateOptionsArray<NoInfer<Options>, NoInfer<CT>, NoInfer<DM>>;
 
   noDefer?: boolean;
   ephemeralDefer?: boolean;
 
   beta?: true;
 
-  run: Command<CT, DM, Options>['run'];
+  run: Command<NoInfer<CT>, NoInfer<DM>, NoInfer<Options>>['run'];
 }
 
 export type DeepOptions<T> = T extends { options: readonly (infer U)[] } ? T | DeepOptions<U> : T;

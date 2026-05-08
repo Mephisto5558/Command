@@ -43,7 +43,7 @@ export class Command<
 
   readonly type = ApplicationCommandType.ChatInput;
 
-  readonly types: CT = [] as unknown as CT;
+  types: CT = [] as unknown as CT;
 
   usage: Record<'usage' | 'examples', string | undefined> & {} = { usage: undefined, examples: undefined };
   usageLocalizations: Partial<Record<Locale, Command<NoInfer<CT>, NoInfer<DM>>['usage']>> = {};
@@ -84,11 +84,11 @@ export class Command<
   mention<
     SubCommandGroupName extends CommandOption['name'] | undefined = undefined,
     SubcommandName extends CommandOption['name'] | undefined = undefined
-  >(subcommandGroup?: SubCommandGroupName, subcommand?: SubcommandName): CommandMention<SubCommandGroupName, SubcommandName, CT> {
+  >(subcommandGroup?: SubCommandGroupName, subcommand?: SubcommandName): CommandMention<SubCommandGroupName, SubcommandName, NoInfer<CT>> {
     const path = [this.name, subcommandGroup, subcommand].filter(Boolean).join(' ');
 
     // using `0` here to not break the mention in Discord
-    return `</${path}:${this.commandId ?? 0}>` as CommandMention<SubCommandGroupName, SubcommandName, CT>;
+    return `</${path}:${this.commandId ?? 0}>` as CommandMention<SubCommandGroupName, SubcommandName, NoInfer<CT>>;
   }
 
   run: (

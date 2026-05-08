@@ -10,8 +10,18 @@ import type {
 } from '../../index.ts';
 import type { CommandType } from '../utils.ts';
 
-export type autocompleteObject = StrictOmit<ApplicationCommandOptionChoiceData, 'nameLocalizations'>;
-export type autocompleteOptions = autocompleteObject['value'] | autocompleteObject;
+export type autocompleteObject = Pick<ApplicationCommandOptionChoiceData, 'name' | 'value'>;
+export type autocompleteOption = autocompleteObject['value'] | autocompleteObject;
+export type autocompleteFunction<CT extends readonly CommandType[], DM extends DMPermType> = (
+  this: ExtendsMultiMatch<CT, [
+    [CommandType.Slash, AutocompleteInteraction<NoInfer<DM>>],
+    [CommandType.Prefix, Message<NoInfer<DM>>]
+  ]>,
+  query: string
+) => autocompleteOption[] | Promise<autocompleteOption[]>;
+
+export type autocompleteOptions<CT extends readonly CommandType[], DM extends DMPermType>
+  = autocompleteOption | autocompleteOption[] | autocompleteFunction<NoInfer<CT>, NoInfer<DM>>;
 
 // #region option resolver
 type GetSubOpts<O>
@@ -75,8 +85,10 @@ type ResolveValue<Option, BaseType> = Match<[
     ResolveChoiceValue<Extract<Option, { choices: readonly unknown[] }>['choices'][number]>
   ],
   [
-    Extends<Option, { strictAutocomplete: true; autocompleteOptions: readonly unknown[] }>,
-    ResolveChoiceValue<Extract<Option, { strictAutocomplete: true; autocompleteOptions: readonly unknown[] }>['autocompleteOptions'][number]>
+    Extends<Option, { strictAutocomplete: true; autocompleteOptions: readonly autocompleteOption[] }>,
+    ResolveChoiceValue<
+      Extract<Option, { strictAutocomplete: true; autocompleteOptions: readonly autocompleteOption[] }>['autocompleteOptions'][number]
+    >
   ]
 ], BaseType>;
 
@@ -212,27 +224,27 @@ type MapToConfig<
   O extends { type: ApplicationCommandOptionType },
   CT extends readonly CommandType[], DM extends DMPermType
 > = ExtendsMatch<O['type'], [
-  [ApplicationCommandOptionType.String, StringCommandOptionConfig<CT, DM, never>],
-  [ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number, NumericCommandOptionConfig<CT, DM, never>],
+  [ApplicationCommandOptionType.String, StringCommandOptionConfig<NoInfer<CT>, NoInfer<DM>>],
+  [ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number, NumericCommandOptionConfig<NoInfer<CT>, NoInfer<DM>>],
   [ApplicationCommandOptionType.Boolean, BooleanCommandOptionConfig],
   [ApplicationCommandOptionType.User, UserCommandOptionConfig],
   [ApplicationCommandOptionType.Channel, ChannelCommandOptionConfig],
   [ApplicationCommandOptionType.Role, RoleCommandOptionConfig],
   [ApplicationCommandOptionType.Mentionable, MentionableCommandOptionConfig],
   [ApplicationCommandOptionType.Attachment, AttachmentCommandOptionConfig],
-  [ApplicationCommandOptionType.SubcommandGroup, SubcommandGroupConfig<CT, DM>],
-  [ApplicationCommandOptionType.Subcommand, SubcommandConfig<CT, DM>]
-], PrimitiveCommandOptionConfig<CT, DM>>;
+  [ApplicationCommandOptionType.SubcommandGroup, SubcommandGroupConfig<NoInfer<CT>, NoInfer<DM>>],
+  [ApplicationCommandOptionType.Subcommand, SubcommandConfig<NoInfer<CT>, NoInfer<DM>>]
+], PrimitiveCommandOptionConfig<NoInfer<CT>, NoInfer<DM>>>;
 
 type ValidateOption<O extends { type: ApplicationCommandOptionType }, CT extends readonly CommandType[], DM extends DMPermType>
-  = MapToConfig<O, CT, DM> & StrictPick<O, MapToConfig<O, CT, DM>>;
+  = MapToConfig<NoInfer<O>, NoInfer<CT>, NoInfer<DM>> & StrictPick<O, MapToConfig<NoInfer<O>, NoInfer<CT>, NoInfer<DM>>>;
 
 export type ValidateOptionsArray<
   Arr extends readonly { type: ApplicationCommandOptionType }[],
   CT extends readonly CommandType[], DM extends DMPermType
 > = IfExtends<Arr, readonly unknown[],
   {
-    ifTrue: { [K in keyof Arr]: ValidateOption<Arr[K], CT, DM> };
+    ifTrue: { [K in keyof Arr]: ValidateOption<Arr[K], NoInfer<CT>, NoInfer<DM>> };
     ifFalse: Arr;
   }
 >;
@@ -243,58 +255,65 @@ type BaseOptionConfig = {
   required?: boolean;
 };
 
-type BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends DMPermType, AO> = {
+type BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends DMPermType> = {
   type: ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number;
 
   strictAutocomplete?: boolean;
-  autocompleteOptions?: CommandOption<CT, DM, AO, OptionsG<CT, DM, AO>,
-    ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number
-  >['autocompleteOptions'];
+  autocompleteOptions?: autocompleteOptions<NoInfer<CT>, NoInfer<DM>>;
   choices?: readonly ApplicationCommandOptionChoiceData['value'][];
 } & BaseOptionConfig;
 
 type BaseSubcommandConfig<CT extends readonly CommandType[], DM extends DMPermType, AO, Options extends OptionsG<CT, DM, AO>> = {
   dmPermission?: DM;
-  options?: ValidateOptionsArray<Options, CT, DM>;
+  options?: ValidateOptionsArray<NoInfer<Options>, NoInfer<CT>, NoInfer<DM>>;
 
   run?(
     this: ExtendsMultiMatch<CT, [
-      [CommandType.Slash, ChatInputCommandInteraction<DM, Options>],
-      [CommandType.Component, MessageComponentInteraction<DM>],
-      [CommandType.Prefix, Message<DM>]
+      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<Options>>],
+      [CommandType.Component, MessageComponentInteraction<NoInfer<DM>>],
+      [CommandType.Prefix, Message<NoInfer<DM>>]
     ]>,
-    lang: Translator<false, Locale>, options: AO,
-    data: { client: Client<true>; option: CommandOption<CT, DM, AO, Options> & SubcommandConfig<CT, DM, AO, Options> }
+    lang: Translator<false, Locale>, options: NoInfer<AO>,
+    data: {
+      client: Client<true>;
+      option: CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<Options>>
+        & SubcommandConfig<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<Options>>;
+    }
   ): unknown;
 };
 
 export type SubcommandConfig<
   CT extends readonly CommandType[], DM extends DMPermType, AO = undefined,
   Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>
-> = {
-  type: ApplicationCommandOptionType.Subcommand;
-} & StrictOmit<BaseOptionConfig, 'required'> & BaseSubcommandConfig<CT, DM, AO, Options> & SharedConfig<DM>;
+> = { type: ApplicationCommandOptionType.Subcommand }
+  & StrictOmit<BaseOptionConfig, 'required'>
+  & BaseSubcommandConfig<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<Options>> & SharedConfig<NoInfer<DM>>;
 
 export type SubcommandGroupConfig<
   CT extends readonly CommandType[], DM extends DMPermType, AO = undefined,
   Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>
-> = {
-  type: ApplicationCommandOptionType.SubcommandGroup;
-} & StrictOmit<BaseOptionConfig, 'required'> & BaseSubcommandConfig<CT, DM, AO, Options> & SharedConfig<DM>;
+> = { type: ApplicationCommandOptionType.SubcommandGroup }
+  & StrictOmit<BaseOptionConfig, 'required'>
+  & BaseSubcommandConfig<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<Options>> & SharedConfig<NoInfer<DM>>;
 
-export type StringCommandOptionConfig<CT extends readonly CommandType[], DM extends DMPermType, AO> = {
+export type StringCommandOptionConfig<CT extends readonly CommandType[], DM extends DMPermType> = {
   type: ApplicationCommandOptionType.String;
 
   minLength?: number;
   maxLength?: number;
-} & BasePrimitiveCommandOptionConfig<CT, DM, AO>;
+} & BasePrimitiveCommandOptionConfig<NoInfer<CT>, NoInfer<DM>>;
 
-export type NumericCommandOptionConfig<CT extends readonly CommandType[], DM extends DMPermType, AO> = {
-  type: ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number;
+export type NumericCommandOptionConfig<
+  CT extends readonly CommandType[], DM extends DMPermType,
+  T extends (
+    ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number
+  ) = ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number
+> = {
+  type: T;
 
   minValue?: number;
   maxValue?: number;
-} & BasePrimitiveCommandOptionConfig<CT, DM, AO>;
+} & BasePrimitiveCommandOptionConfig<NoInfer<CT>, NoInfer<DM>>;
 
 export type ChannelCommandOptionConfig = {
   type: ApplicationCommandOptionType.Channel;
@@ -308,9 +327,9 @@ type RoleCommandOptionConfig = { type: ApplicationCommandOptionType.Role } & Bas
 type MentionableCommandOptionConfig = { type: ApplicationCommandOptionType.Mentionable } & BaseOptionConfig;
 type AttachmentCommandOptionConfig = { type: ApplicationCommandOptionType.Attachment } & BaseOptionConfig;
 
-export type PrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends DMPermType, AO = undefined>
-  = | StringCommandOptionConfig<CT, DM, AO>
-    | NumericCommandOptionConfig<CT, DM, AO>
+export type PrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM extends DMPermType>
+  = | StringCommandOptionConfig<NoInfer<CT>, NoInfer<DM>>
+    | NumericCommandOptionConfig<NoInfer<CT>, NoInfer<DM>>
     | BooleanCommandOptionConfig
     | UserCommandOptionConfig
     | ChannelCommandOptionConfig
@@ -321,9 +340,9 @@ export type PrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM e
 export type CommandOptionConfig<
   CT extends readonly CommandType[], DM extends DMPermType, AO = undefined,
   Options extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>
-> = PrimitiveCommandOptionConfig<CT, DM, AO>
-  | SubcommandConfig<CT, DM, AO, Options>
-  | SubcommandGroupConfig<CT, DM, AO, Options>;
+> = PrimitiveCommandOptionConfig<NoInfer<CT>, NoInfer<DM>>
+  | SubcommandConfig<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<Options>>
+  | SubcommandGroupConfig<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<Options>>;
 
 // #endregion option config
 
@@ -333,12 +352,9 @@ export type RunnableReturns = ['guildOnly']
   | ['strictAutocompleteNoMatch', string]
   | ['strictAutocompleteNoMatchWValues', { option: string; availableOptions: string }];
 
-type PrivateAutocompleteGeneratorOptions<
-  CT extends readonly CommandType[], DM extends DMPermType, AO,
-  ChildrenOptions extends OptionsG<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>>
-> = [
-    translator?: Translator<true, Locale>,
-    options?: CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>>['autocompleteOptions']
+type PrivateAutocompleteGeneratorOptions<CT extends readonly CommandType[], DM extends DMPermType> = [
+  translator?: Translator<true, Locale>,
+  options?: autocompleteOptions<NoInfer<CT>, NoInfer<DM>>
 ];
 
 export type PublicAutocompleteGeneratorOptions<CT extends readonly CommandType[], DM extends DMPermType> = [
@@ -349,10 +365,7 @@ export type PublicAutocompleteGeneratorOptions<CT extends readonly CommandType[]
   query: string, locale: Locale
 ];
 
-export type AutocompleteGeneratorOptions<
-  CT extends readonly CommandType[], DM extends DMPermType, AO,
-  ChildrenOptions extends OptionsG<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>>
-> = [
+export type AutocompleteGeneratorOptions<CT extends readonly CommandType[], DM extends DMPermType> = [
   ...PublicAutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>>,
-  ...PrivateAutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>>
+  ...PrivateAutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>>
 ];
