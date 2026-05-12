@@ -7,9 +7,7 @@ import { CommandValidationError, cooldownConverter, equal } from '../utils.ts';
 
 import type { ApplicationCommandOption, ApplicationCommandOptionChoiceData, Client } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
-import type {
-  ChatInputCommandInteraction, Command, Logger, Message, MessageComponentInteraction, OptionsG
-} from '../../index.ts';
+import type { ChatInputCommandInteraction, Command, Logger, Message, MessageComponentInteraction } from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
 import type { RunnableReturns } from '../command/utils.ts';
 import type { CommandType } from '../utils.ts';
@@ -24,7 +22,7 @@ export class CommandOption<
   const CT extends readonly CommandType[] = [],
   const DM extends DMPermType = DMPermType.NeverDM,
   AO = undefined,
-  const ChildrenOptions extends OptionsG<CT, DM, AO> = OptionsG<CT, DM, AO>,
+  const ChildrenOptions extends readonly CommandOptionConfig<CT, DM>[] = readonly CommandOptionConfig<CT, DM>[],
   T extends ApplicationCommandOptionType = ApplicationCommandOptionType
 > {
   name: Lowercase<string>;

@@ -74,11 +74,7 @@ export type Logger = {
 };
 
 export type OptionsG<CT extends readonly CommandType[], DM extends DMPermType, AO = undefined>
-  = readonly (CommandOptionConfig<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>> | CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>>)[];
-export type DefaultOptionType<CT extends readonly CommandType[], DM extends DMPermType, AO = undefined> = CommandOptionConfig<
-  NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, OptionsG<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>>>
-  | CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, OptionsG<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>>
-  >;
+  = readonly (CommandOptionConfig<CT, DM, AO> | CommandOption<CT, DM, AO>)[];
 
 export enum CooldownType {
   Guild = 'guild',

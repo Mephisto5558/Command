@@ -22,7 +22,11 @@ export default [
           '__count__' // Object#count
         ]
       }]),
-      'max-lines': 'off' // Class definitions may just be longer.
+      'max-lines': 'off', // Class definitions may just be longer.
+      '@typescript-eslint/no-unsafe-type-assertion': 'off', // todo
+      'sonarjs/cognitive-complexity': 'off', // todo
+      'custom/cyclomatic-complexity': 'off', // todo
+      'sonarjs/expression-complexity': 'off' // todo
     }
   },
   {

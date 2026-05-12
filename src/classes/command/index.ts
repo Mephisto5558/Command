@@ -11,7 +11,7 @@ import { CommandType, CommandValidationError, cooldownConverter, equal, getMilli
 import type { ApplicationCommand, Client, CommandInteraction, PermissionFlags, User } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  ChatInputCommandInteraction, DefaultOptionType, Logger, Message,
+  ChatInputCommandInteraction, Logger, Message,
   MessageComponentInteraction, OptionsG, commandDoneFn, customPermissionChecksFn
 } from '../../index.ts';
 import type { CooldownsManager } from '../../utils/index.ts';
@@ -27,7 +27,7 @@ const
 export class Command<
   const CT extends readonly CommandType[] = [],
   const DM extends DMPermType = DMPermType.NeverDM,
-  const Options extends OptionsG<CT, DM> = DefaultOptionType<CT, DM>[]
+  const Options extends OptionsG<CT, DM> = readonly CommandOptionConfig<CT, DM>[]
 > /* implements ChatInputApplicationCommandData */ {
   name!: Lowercase<string>;
   id!: `commands.${Command['category']}.${Command['name']}`;
