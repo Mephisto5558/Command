@@ -227,7 +227,7 @@ interface BaseOptionConfig {
 
 interface BaseSubcommandConfig<
   CT extends readonly CommandType[], DM extends DMPermType, AO,
-  ChildrenOptions
+  ChildrenOptions extends CommandOptionConfig<CT, DM>[]
 > extends SharedConfig<DM>, BaseOptionConfig {
   run?(
     this: ExtendsMultiMatch<CT, [
@@ -253,7 +253,7 @@ interface BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], DM
 
 export interface SubcommandGroupConfig<
   CT extends readonly CommandType[], DM extends DMPermType, AO = never,
-  ChildrenOptions extends readonly SubcommandConfig<CT, DM, AO>[] | readonly CommandOption<CT, DM, AO>[] = readonly SubcommandConfig<CT, DM, AO>[] | readonly CommandOption<CT, DM, AO>[];
+  ChildrenOptions extends readonly SubcommandConfig<CT, DM, AO>[] | readonly CommandOption<CT, DM, AO>[] = readonly SubcommandConfig<CT, DM, AO>[] | readonly CommandOption<CT, DM, AO>[]
 > extends SharedConfig<DM>, BaseSubcommandConfig<CT, DM, AO, ChildrenOptions> {
   type: ApplicationCommandOptionType.SubcommandGroup;
   options: ChildrenOptions;
