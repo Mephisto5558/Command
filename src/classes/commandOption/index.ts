@@ -5,7 +5,7 @@ import { CooldownType, DMPermType } from '../../index.ts';
 import { autocompleteOptionsMaxAmt, choiceValueMaxLength, choiceValueMinLength, choicesMaxAmt, descriptionMaxLength } from '../../utils/constants.ts';
 import { CommandValidationError, cooldownConverter, equal } from '../utils.ts';
 
-import type { ApplicationCommandOption, ApplicationCommandOptionChoiceData, Client } from 'discord.js';
+import type { ApplicationCommandOption, ApplicationCommandOptionChoiceData, BaseChannel, Client } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type { ChatInputCommandInteraction, Command, Logger, Message, MessageComponentInteraction } from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
@@ -80,9 +80,9 @@ export class CommandOption<
   > | undefined;
 
   run?: (
-    this: ExtendsMultiMatch<CT, [
+    this: ExtendsMultiMatch<CommandType, CT, [
       [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>],
-      [CommandType.Component, MessageComponentInteraction<NoInfer<DM>>],
+      [CommandType.Component, MessageComponentInteraction<NoInfer<DM>> & { commandName: Command['name'] }],
       [CommandType.Prefix, Message<NoInfer<DM>>]
     ]>,
     lang: Translator<false, Locale>, options: NoInfer<AO>,
@@ -212,14 +212,14 @@ export class CommandOption<
   }
 
   getChannel<RetSelf extends boolean = false>(
-    interaction: ExtendsMultiMatch<CT, [
+    interaction: ExtendsMultiMatch<CommandType, CT, [
       [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>],
       [CommandType.Prefix, Message<NoInfer<DM>>]
     ]>, returnSelf: RetSelf
   ): /* IfExtends<T, ApplicationCommandOptionType.Channel,
     AddIf<ExtractChannelTypesFromInstance<this, DM>, RetSelf, { ifFalse: undefined }>
-    > { */
-  unknown {
+    > { */ // TODO
+  BaseChannel | (RetSelf extends true ? never : undefined) {
     if (this.type != ApplicationCommandOptionType.Channel)
       throw new Error(`This method does not run on ${ApplicationCommandOptionType[this.type]} options!`);
 
@@ -325,7 +325,7 @@ export class CommandOption<
   }
 
   async isRunnable(
-    interaction: ExtendsMultiMatch<CT, [
+    interaction: ExtendsMultiMatch<CommandType, CT, [
       [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>],
       [CommandType.Prefix, Message<NoInfer<DM>>]
     ]>,
@@ -393,7 +393,7 @@ export class CommandOption<
   }
 
   async #isRunnableSubcommandGroup(
-    interaction: ExtendsMultiMatch<CT, [
+    interaction: ExtendsMultiMatch<CommandType, CT, [
       [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>],
       [CommandType.Prefix, Message<NoInfer<DM>>]
     ]>,
@@ -413,7 +413,7 @@ export class CommandOption<
   }
 
   async #isRunnableSubcommand(
-    interaction: ExtendsMultiMatch<CT, [
+    interaction: ExtendsMultiMatch<CommandType, CT, [
       [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>],
       [CommandType.Prefix, Message<NoInfer<DM>>]
     ]>,
