@@ -8,7 +8,7 @@ import { CommandType } from '../utils.ts';
 
 import type { ApplicationCommand, ApplicationCommandDataResolvable, ChatInputApplicationCommandData, Client } from 'discord.js';
 import type { I18nProvider } from '@mephisto5558/i18n';
-import type { DMPermType, Logger, commandDoneFn, customPermissionChecksFn } from '../../index.ts';
+import type { AllContexts, Logger, commandDoneFn, customPermissionChecksFn } from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
 
 function importDefault(obj?: unknown): unknown {
@@ -17,7 +17,7 @@ function importDefault(obj?: unknown): unknown {
     : obj;
 }
 
-type CollectionMember = Command<readonly CommandType[], DMPermType>;
+type CollectionMember = Command<readonly CommandType[], AllContexts>;
 
 /* eslint-disable-next-line import-x/prefer-default-export -- simplifies re-export */
 export class CommandManager {
