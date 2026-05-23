@@ -3,8 +3,8 @@ import { getMilliseconds as getMilliseconds_ } from 'better-ms';
 
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  AutocompleteInteraction, BetterMS, ChatInputCommandInteraction, Command,
-  CooldownType, DMPermType, Message, MessageComponentInteraction, validTimeString
+  AllContexts, AutocompleteInteraction, BetterMS, ChatInputCommandInteraction, Command,
+  CooldownType, Message, MessageComponentInteraction, validTimeString
 } from '../index.ts';
 import type { CommandOption } from './commandOption/index.ts';
 
@@ -58,15 +58,15 @@ export class CommandExecutionError extends Error {
   }
 }
 
-export class CommandValidationError<CT extends readonly CommandType[], DM extends DMPermType> extends Error {
+export class CommandValidationError<CT extends readonly CommandType[], CTX extends AllContexts> extends Error {
   override readonly name = 'CommandValidationError';
-  readonly command?: Command<NoInfer<CT>, NoInfer<DM>>;
-  readonly commandOption?: CommandOption<NoInfer<CT>, NoInfer<DM>>;
+  readonly command?: Command<NoInfer<CT>, NoInfer<CTX>>;
+  readonly commandOption?: CommandOption<NoInfer<CT>, NoInfer<CTX>>;
 
   constructor(
     message: string | undefined,
-    command?: Command<NoInfer<CT>, NoInfer<DM>>,
-    commandOption?: CommandOption<NoInfer<CT>, NoInfer<DM>>,
+    command?: Command<NoInfer<CT>, NoInfer<CTX>>,
+    commandOption?: CommandOption<NoInfer<CT>, NoInfer<CTX>>,
     options?: ErrorOptions
   ) {
     super(message, options);

@@ -4,7 +4,7 @@ import { Message as _Message } from 'discord.js';
 import { CooldownType } from '../index.ts';
 
 import type { CommandType } from '../classes/utils.ts';
-import type { ChatInputCommandInteraction, Command, DMPermType, Message, MessageComponentInteraction } from '../index.ts';
+import type { AllContexts, ChatInputCommandInteraction, Command, Message, MessageComponentInteraction } from '../index.ts';
 
 export default class CooldownsManager {
   cache = new Map<string, Map<CooldownType, Map<Snowflake, number>>>();
@@ -12,7 +12,7 @@ export default class CooldownsManager {
   /** @returns milliseconds until the cooldown ends */
   update(
     name: string, context: ChatInputCommandInteraction | MessageComponentInteraction | Message,
-    cooldowns: Partial<Command<CommandType[], DMPermType>['cooldowns']>
+    cooldowns: Partial<Command<CommandType[], AllContexts>['cooldowns']>
   ): number {
     const
       createdAt = context.createdAt.getTime(),

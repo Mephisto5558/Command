@@ -3,7 +3,7 @@
 import type {
   ChatInputCommandInteraction as _ChatInputCommandInteraction, Message as _Message, PermissionFlags, _NonNullableFields
 } from 'discord.js';
-import type { Command, CommandOption, DMPermType, OptionsG, PermissionType, SharedConfig } from '../../index.ts';
+import type { AllContexts, Command, CommandOption, OptionsG, PermissionType, SharedConfig } from '../../index.ts';
 import type { PrimitiveCommandOptionConfig, RunnableReturns as OptionRunnableReturns } from '../commandOption/utils.ts';
 import type { CommandType } from '../utils.ts';
 
@@ -28,9 +28,9 @@ export type CommandMention<
 
 /* eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- interface is correct here */
 export interface CommandConfig<
-  CT extends readonly CommandType[], DM extends DMPermType,
-  Options extends OptionsG<CT, DM> = readonly PrimitiveCommandOptionConfig<CT, DM>[]
-> extends SharedConfig<NoInfer<DM>> {
+  CT extends readonly CommandType[], CTX extends AllContexts,
+  Options extends OptionsG<CT, CTX> = readonly PrimitiveCommandOptionConfig<CT, CTX>[]
+> extends SharedConfig<NoInfer<CTX>> {
   types: CT;
   usage?: { usage?: string; examples?: string }; // TODO: support arrays
   aliases?: { [K in NoInfer<CT>[number]]?: Lowercase<string>[] };
@@ -43,9 +43,9 @@ export interface CommandConfig<
 
   beta?: true;
 
-  run: Command<NoInfer<CT>, NoInfer<DM>, NoInfer<Options>>['run'];
+  run: Command<NoInfer<CT>, NoInfer<CTX>, NoInfer<Options>>['run'];
 }
 
 export type DeepOptions<T> = T extends { options: readonly (infer U)[] } ? T | DeepOptions<U> : T;
-export type ResolvedOption<CT extends readonly CommandType[], DM extends DMPermType, E>
-  = StrictOmit<CommandOption<NoInfer<CT>, NoInfer<DM>>, keyof E & keyof CommandOption> & E;
+export type ResolvedOption<CT extends readonly CommandType[], CTX extends AllContexts, E>
+  = StrictOmit<CommandOption<NoInfer<CT>, NoInfer<CTX>>, keyof E & keyof CommandOption> & E;

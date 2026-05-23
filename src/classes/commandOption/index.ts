@@ -1,13 +1,13 @@
 import {
   ApplicationCommandOptionType, ChannelType, Locale as DLocale, Message as _Message, _NonNullableFields, inlineCode
 } from 'discord.js';
-import { CooldownType, DMPermType } from '../../index.ts';
+import { ContextType, CooldownType } from '../../index.ts';
 import { autocompleteOptionsMaxAmt, choiceValueMaxLength, choiceValueMinLength, choicesMaxAmt, descriptionMaxLength } from '../../utils/constants.ts';
 import { CommandValidationError, cooldownConverter, equal } from '../utils.ts';
 
 import type { ApplicationCommandOption, ApplicationCommandOptionChoiceData, BaseChannel, Client } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
-import type { ChatInputCommandInteraction, Command, Logger, Message, MessageComponentInteraction } from '../../index.ts';
+import type { AllContexts, ChatInputCommandInteraction, Command, Logger, Message, MessageComponentInteraction } from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
 import type { RunnableReturns } from '../command/utils.ts';
 import type { CommandType } from '../utils.ts';
@@ -19,10 +19,10 @@ import type {
 
 /* eslint-disable-next-line import-x/prefer-default-export -- simplifies re-export */
 export class CommandOption<
-  const CT extends readonly CommandType[] = [],
-  const DM extends DMPermType = DMPermType.NeverDM,
+  const CT extends readonly CommandType[] = readonly [],
+  const CTX extends AllContexts = readonly [ContextType.Guild],
   AO = undefined,
-  const ChildrenOptions extends readonly CommandOptionConfig<CT, DM>[] = readonly CommandOptionConfig<CT, DM>[],
+  const ChildrenOptions extends readonly CommandOptionConfig<CT, CTX>[] = readonly CommandOptionConfig<CT, CTX>[],
   T extends ApplicationCommandOptionType = ApplicationCommandOptionType
 > {
   name: Lowercase<string>;
@@ -40,7 +40,7 @@ export class CommandOption<
 
   cooldowns: Record<CooldownType, number> = { [CooldownType.Guild]: 0, [CooldownType.Channel]: 0, [CooldownType.User]: 0 };
 
-  dmPermission: DM = DMPermType.NeverDM as DM;
+  contexts: CTX = [ContextType.Guild] as unknown as CTX;
 
   disabled!: boolean;
   disabledReason: string | undefined;
@@ -48,7 +48,7 @@ export class CommandOption<
   get autocomplete(): boolean { return !!this.autocompleteOptions; }
   strictAutocomplete = false;
   autocompleteOptions?: T extends ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number
-    ? autocompleteOptions<NoInfer<CT>, NoInfer<DM>> | undefined
+    ? autocompleteOptions<NoInfer<CT>, NoInfer<CTX>> | undefined
     : undefined;
 
   choices?: IfExtends<T, ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number,
@@ -76,20 +76,20 @@ export class CommandOption<
   > | undefined;
 
   options?: IfExtends<T, ApplicationCommandOptionType.SubcommandGroup | ApplicationCommandOptionType.Subcommand,
-    { ifTrue: CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>>[] }
+    { ifTrue: CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>>[] }
   > | undefined;
 
   run?: (
     this: ExtendsMultiMatch<CommandType, CT, [
-      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>],
-      [CommandType.Component, MessageComponentInteraction<NoInfer<DM>> & { commandName: Command['name'] }],
-      [CommandType.Prefix, Message<NoInfer<DM>>]
+      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>],
+      [CommandType.Component, MessageComponentInteraction<NoInfer<CTX>> & { commandName: Command['name'] }],
+      [CommandType.Prefix, Message<NoInfer<CTX>>]
     ]>,
     lang: Translator<false, Locale>, options: NoInfer<AO>,
     data: {
       client: Client<true>;
-      command: Command<NoInfer<CT>, NoInfer<DM>>;
-      option: CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>>;
+      command: Command<NoInfer<CT>, NoInfer<CTX>>;
+      option: CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>>;
     }
   ) => unknown;
 
@@ -99,12 +99,12 @@ export class CommandOption<
 
   /* eslint-disable-next-line @typescript-eslint/class-methods-use-this -- typing-only method */
   #resolveConfigType(
-    config: CommandOptionConfig<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>> & { type: NoInfer<T> }
+    config: CommandOptionConfig<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>> & { type: NoInfer<T> }
   ): ExtendsMatch<T, [
-    [ApplicationCommandOptionType.SubcommandGroup, SubcommandGroupConfig<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>>],
-    [ApplicationCommandOptionType.Subcommand, SubcommandConfig<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>>],
-    [ApplicationCommandOptionType.String, StringCommandOptionConfig<NoInfer<CT>, NoInfer<DM>>],
-    [ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number, NumericCommandOptionConfig<NoInfer<CT>, NoInfer<DM>>],
+    [ApplicationCommandOptionType.SubcommandGroup, SubcommandGroupConfig<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>>],
+    [ApplicationCommandOptionType.Subcommand, SubcommandConfig<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>>],
+    [ApplicationCommandOptionType.String, StringCommandOptionConfig<NoInfer<CT>, NoInfer<CTX>>],
+    [ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number, NumericCommandOptionConfig<NoInfer<CT>, NoInfer<CTX>>],
     [ApplicationCommandOptionType.Channel, ChannelCommandOptionConfig]
   ]> {
     /* eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return -- typeguard method */
@@ -112,10 +112,10 @@ export class CommandOption<
   }
 
   /** @internal */
-  constructor(configData: CommandOption<CT, DM, AO, ChildrenOptions, T>);
+  constructor(configData: CommandOption<CT, CTX, AO, ChildrenOptions, T>);
   /* eslint-disable-next-line @typescript-eslint/unified-signatures -- TS disagrees */
-  constructor(configData: CommandOptionConfig<CT, DM, AO, ChildrenOptions> & { type: T });
-  constructor(configData: CommandOptionConfig<CT, DM, AO, ChildrenOptions> & { type: T } | CommandOption<CT, DM, AO, ChildrenOptions, T>) {
+  constructor(configData: CommandOptionConfig<CT, CTX, AO, ChildrenOptions> & { type: T });
+  constructor(configData: CommandOptionConfig<CT, CTX, AO, ChildrenOptions> & { type: T } | CommandOption<CT, CTX, AO, ChildrenOptions, T>) {
     // need to set these specifically for typing
     this.type = configData.type;
     this.name = configData.name;
@@ -148,14 +148,14 @@ export class CommandOption<
         if ('cooldowns' in config)
           Object.fromEntries(Object.entries(this.cooldowns).map(e => cooldownConverter(config.cooldowns!, ...e)));
 
-        if ('dmPermission' in config) this.dmPermission = config.dmPermission;
+        if ('contexts' in config) this.contexts = config.contexts;
         if ('options' in config) {
           this.options = (config.options as (
-            CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>> | CommandOptionConfig<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>>)[])
-            .map(opt => (opt instanceof CommandOption ? opt : new CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>>(opt))) as unknown as typeof this.options;
+            CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>> | CommandOptionConfig<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>>)[])
+            .map(opt => (opt instanceof CommandOption ? opt : new CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>>(opt))) as unknown as typeof this.options;
         }
 
-        /* eslint-disable-next-line custom/unbound-method -- safe here */
+
         if ('run' in config) this.run = config.run as unknown as NonNullable<typeof this.run>;
         break;
 
@@ -213,11 +213,11 @@ export class CommandOption<
 
   getChannel<RetSelf extends boolean = false>(
     interaction: ExtendsMultiMatch<CommandType, CT, [
-      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>],
-      [CommandType.Prefix, Message<NoInfer<DM>>]
+      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>],
+      [CommandType.Prefix, Message<NoInfer<CTX>>]
     ]>, returnSelf: RetSelf
   ): /* IfExtends<T, ApplicationCommandOptionType.Channel,
-    AddIf<ExtractChannelTypesFromInstance<this, DM>, RetSelf, { ifFalse: undefined }>
+    AddIf<ExtractChannelTypesFromInstance<this, CTX>, RetSelf, { ifFalse: undefined }>
     > { */ // TODO
   BaseChannel | (RetSelf extends true ? never : undefined) {
     if (this.type != ApplicationCommandOptionType.Channel)
@@ -225,7 +225,7 @@ export class CommandOption<
 
     let target = interaction instanceof _Message
       ? interaction.mentions.channels.first()
-      : (interaction as ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>).options.getChannel(this.name, false, this.channelTypes);
+      : (interaction as ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>).options.getChannel(this.name, false, this.channelTypes);
 
     if (!target && interaction instanceof _Message)
       target = interaction.guild?.channels.cache.find(e => [e.id, e.name].some(e => interaction.content.includes(e)));
@@ -326,15 +326,15 @@ export class CommandOption<
 
   async isRunnable(
     interaction: ExtendsMultiMatch<CommandType, CT, [
-      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>],
-      [CommandType.Prefix, Message<NoInfer<DM>>]
+      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>],
+      [CommandType.Prefix, Message<NoInfer<CTX>>]
     ]>,
-    command: Command<NoInfer<CT>, NoInfer<DM>>,
+    command: Command<NoInfer<CT>, NoInfer<CTX>>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
     if (
       [ApplicationCommandOptionType.SubcommandGroup, ApplicationCommandOptionType.Subcommand].includes(this.type)
-      && this.dmPermission == DMPermType.NeverDM && interaction.channel.type == ChannelType.DM
+      && !this.contexts.includes(ContextType.BotDM) && interaction.channel.type == ChannelType.DM
     ) return ['guildOnly'];
 
     if (this.type == ApplicationCommandOptionType.SubcommandGroup)
@@ -345,7 +345,7 @@ export class CommandOption<
     const
       option = interaction instanceof _Message
         ? undefined
-        : (interaction as ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>).options.get(this.name)?.value,
+        : (interaction as ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>).options.get(this.name)?.value,
       arg = args?.[this.position];
 
     if (this.required && option === undefined && !arg) {
@@ -375,6 +375,7 @@ export class CommandOption<
         if (!this.autocompleteOptions) availableOptions = '';
         else if (Array.isArray(this.autocompleteOptions))
           availableOptions = this.autocompleteOptions.map(e => (typeof e == 'object' ? e.value : e).toString()).map(inlineCode).join(', ');
+        /* eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TS disagrees */
         else if (typeof this.autocompleteOptions == 'object') availableOptions = (this.autocompleteOptions as autocompleteObject).value;
         else availableOptions = this.autocompleteOptions;
 
@@ -394,16 +395,16 @@ export class CommandOption<
 
   async #isRunnableSubcommandGroup(
     interaction: ExtendsMultiMatch<CommandType, CT, [
-      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>],
-      [CommandType.Prefix, Message<NoInfer<DM>>]
+      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>],
+      [CommandType.Prefix, Message<NoInfer<CTX>>]
     ]>,
-    command: Command<NoInfer<CT>, NoInfer<DM>>,
+    command: Command<NoInfer<CT>, NoInfer<CTX>>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
     const
       subcommandName = interaction instanceof _Message
         ? args?.[this.position]
-        : (interaction as ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>).options.getSubcommand(true),
+        : (interaction as ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>).options.getSubcommand(true),
       subcommand = this.options?.find(e => e.name == subcommandName);
 
     return subcommand?.isRunnable(
@@ -414,10 +415,10 @@ export class CommandOption<
 
   async #isRunnableSubcommand(
     interaction: ExtendsMultiMatch<CommandType, CT, [
-      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>],
-      [CommandType.Prefix, Message<NoInfer<DM>>]
+      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>],
+      [CommandType.Prefix, Message<NoInfer<CTX>>]
     ]>,
-    command: Command<NoInfer<CT>, NoInfer<DM>>,
+    command: Command<NoInfer<CT>, NoInfer<CTX>>,
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
     if (!this.options) return false;
@@ -433,16 +434,16 @@ export class CommandOption<
    * `translator` and `options` should not be supplied by an external caller.
    * @internal */
   async generateAutocomplete(
-    ...args: AutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>>
+    ...args: AutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<CTX>>
   ): Promise<[] | autocompleteObject[]>;
-  async generateAutocomplete(...args: PublicAutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>>): Promise<[] | autocompleteObject[]>;
+  async generateAutocomplete(...args: PublicAutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<CTX>>): Promise<[] | autocompleteObject[]>;
   async generateAutocomplete(
     /* eslint-disable @typescript-eslint/no-magic-numbers -- simple number order */
-    interaction: AutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>>[0],
-    query: AutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>>[1],
-    locale: AutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>>[2],
-    translator?: AutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>>[3],
-    options: AutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<DM>>[4] = this.autocompleteOptions
+    interaction: AutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<CTX>>[0],
+    query: AutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<CTX>>[1],
+    locale: AutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<CTX>>[2],
+    translator?: AutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<CTX>>[3],
+    options: AutocompleteGeneratorOptions<NoInfer<CT>, NoInfer<CTX>>[4] = this.autocompleteOptions
     /* eslint-enable @typescript-eslint/no-magic-numbers */
   ): Promise<[] | autocompleteObject[]> {
     if (options == undefined) return [];
@@ -473,7 +474,7 @@ export class CommandOption<
     return this.#cooldownsManager.update(this.id, interaction, this.cooldowns);
   }
 
-  isEqualTo(opt: CommandOption<CommandType[], DMPermType> | ApplicationCommandOption): boolean {
+  isEqualTo(opt: CommandOption<CommandType[], AllContexts> | ApplicationCommandOption): boolean {
     for (const prop of ['name', 'description', 'type', 'autocomplete', 'required', 'minValue', 'maxValue', 'minLength', 'maxLength'] as const) {
       const optProp = prop in opt ? opt[prop as keyof typeof opt] : undefined;
       if (this[prop] != (typeof this[prop] == 'boolean' ? !!optProp : optProp)) return false;
@@ -518,7 +519,7 @@ export class CommandOption<
     return true;
   }
 
-  clone(): CommandOption<NoInfer<CT>, NoInfer<DM>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>> {
+  clone(): CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>> {
     return new CommandOption(this);
   }
 }

@@ -1,10 +1,15 @@
-/* eslint-disable-next-line import-x/no-unassigned-import, import-x/no-empty-named-blocks, unicorn/require-module-specifiers -- load global types */
+/* eslint-disable-next-line import-x/no-unassigned-import, import-x/no-empty-named-blocks, unicorn/require-module-specifiers, import-x/order
+  -- load global types */
 import type {} from '@mephisto5558/better-types';
 
-/* eslint-disable-next-line import-x/order -- side-effect import first */
+import {
+  AutocompleteInteraction as _AutocompleteInteraction,
+  InteractionContextType, MessageComponentInteraction as _MessageComponentInteraction, _NonNullableFields
+} from 'discord.js';
+
 import type {
-  APIInteractionGuildMember, AutocompleteInteraction as _AutocompleteInteraction, ChatInputCommandInteraction as _ChatInputCommandInteraction,
-  Message as _Message, MessageComponentInteraction as _MessageComponentInteraction, PartialDMChannel, PartialGroupDMChannel, User, _NonNullableFields
+  APIInteractionGuildMember, ChatInputCommandInteraction as _ChatInputCommandInteraction,
+  Message as _Message, PartialDMChannel, PartialGroupDMChannel, User
 } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type { Command } from './classes/command/index.ts';
@@ -19,7 +24,8 @@ export { CommandManager } from './classes/commandManager/index.ts';
 export { CommandExecutionError, CommandType } from './classes/utils.ts';
 export {
   PermissionFlagsBits as Permission,
-  ApplicationCommandOptionType as OptionType
+  ApplicationCommandOptionType as OptionType,
+  InteractionContextType as ContextType
 } from 'discord.js';
 
 export enum PermissionType {
@@ -29,25 +35,24 @@ export enum PermissionType {
   Channel = 3
 }
 
-export enum DMPermType {
-  CanBeDM = 0,
-  NeverDM = 1,
-  OnlyDM = 2
-}
+export const AllContexts = [InteractionContextType.Guild, InteractionContextType.BotDM] as const;
+/* eslint-disable-next-line @typescript-eslint/no-redeclare -- type vs const */
+export type AllContexts = readonly typeof AllContexts[number][];
 
-export type DMPermTypeToCaching = {
-  /* This is the real behavior, but CacheType "raw" is an edge case which is not implemented for simplicity sake.
-     [DMPermType.CanBeDM]: CacheType; */
+type HasGuild<CTX extends AllContexts> = Extends<InteractionContextType.Guild, CTX[number]>;
+type HasDM<CTX extends AllContexts>
+  = Not<ExtendsStrict<CTX[number] & (InteractionContextType.BotDM | InteractionContextType.PrivateChannel), never>>;
 
-  [DMPermType.CanBeDM]: 'cached' | undefined;
-  [DMPermType.NeverDM]: 'cached';
-  [DMPermType.OnlyDM]: undefined;
-};
-export type DMPermTypeToInGuild = {
-  [DMPermType.CanBeDM]: boolean;
-  [DMPermType.NeverDM]: true;
-  [DMPermType.OnlyDM]: false;
-};
+export type ContextToInGuild<CTX extends AllContexts>
+  = If<HasGuild<CTX>, {
+    ifTrue: If<HasDM<CTX>, { ifTrue: boolean; ifFalse: true }>;
+    ifFalse: false;
+  }>;
+export type ContextToCaching<CTX extends AllContexts>
+  = If<HasGuild<CTX>, {
+    ifTrue: If<HasDM<CTX>, { ifTrue: 'cached' | undefined; ifFalse: 'cached' }>;
+    ifFalse: undefined;
+  }>;
 
 export declare namespace BetterMS {
   function getMilliseconds<
@@ -73,8 +78,8 @@ export type Logger = {
   error: typeof console.error;
 };
 
-export type OptionsG<CT extends readonly CommandType[], DM extends DMPermType, AO = undefined>
-  = readonly (CommandOptionConfig<CT, DM, AO> | CommandOption<CT, DM, AO>)[];
+export type OptionsG<CT extends readonly CommandType[], CTX extends AllContexts, AO = undefined>
+  = readonly (CommandOptionConfig<CT, CTX, AO> | CommandOption<CT, CTX, AO>)[];
 
 export enum CooldownType {
   Guild = 'guild',
@@ -84,57 +89,73 @@ export enum CooldownType {
 type Cooldowns = Record<CooldownType, validTimeString>;
 
 /* eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- extending from it */
-export interface SharedConfig<DM extends DMPermType> {
+export interface SharedConfig<CTX extends AllContexts> {
   cooldowns?: Partial<Cooldowns>;
 
-  dmPermission?: DM;
+  contexts?: CTX;
 
   disabled?: boolean;
   disabledReason?: string;
 }
 
 // Excluding APIInteractionGuildMember because it's an edge case and annoying for now.
-type Member<DM extends DMPermType, T extends _Message | _ChatInputCommandInteraction> = ExtendsMatch<DM, [
-  [DMPermType.CanBeDM, NonNullable<Exclude<T['member'], APIInteractionGuildMember>> | null],
-  [DMPermType.NeverDM, NonNullable<Exclude<T['member'], APIInteractionGuildMember>>],
-  [DMPermType.OnlyDM, null]
-], unknown>;
+type Member<
+  CTX extends AllContexts,
+  T extends _Message | _ChatInputCommandInteraction
+> = If<HasGuild<CTX>, {
+  ifTrue: If<HasDM<CTX>, {
+    ifTrue: NonNullable<Exclude<T['member'], APIInteractionGuildMember>> | null;
+    ifFalse: NonNullable<Exclude<T['member'], APIInteractionGuildMember>>;
+  }>;
+  ifFalse: null;
+}>;
 
 // Channel may be null or partial in reality, but with the right Partials and Intents it won't.
 type InteractionChannel<
-  DM extends DMPermType, T1 extends _Message | _ChatInputCommandInteraction, T2 extends _Message | _ChatInputCommandInteraction
-> = Exclude<NonNullable<ExtendsMatch<DM, [
-  [DMPermType.NeverDM, T1['channel']],
-  [DMPermType.OnlyDM, T2['channel']],
-  [DMPermType.CanBeDM, (T1 | T2)['channel']]
-], unknown>>, PartialDMChannel | PartialGroupDMChannel>;
+  CTX extends AllContexts,
+  T1 extends _Message | _ChatInputCommandInteraction,
+  T2 extends _Message | _ChatInputCommandInteraction
+> = Exclude<
+  NonNullable<If<HasGuild<CTX>, {
+    ifTrue: If<HasDM<CTX>, {
+      ifTrue: T1['channel'] | T2['channel'];
+      ifFalse: T1['channel'];
+    }>;
+    ifFalse: T2['channel'];
+  }>>,
+  PartialDMChannel | PartialGroupDMChannel
+>;
 
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-extraneous-class, @typescript-eslint/no-unnecessary-type-parameters
   -- Intended for cross-package augmentation by the consumer. */
-export declare class ChatInputCommandInteraction<DM extends DMPermType = DMPermType.CanBeDM, Options extends readonly unknown[] = []> {
-  readonly member: Member<NoInfer<DM>, _ChatInputCommandInteraction<'cached'>>;
-  readonly channel: InteractionChannel<
-    NoInfer<DM>, _ChatInputCommandInteraction<DMPermTypeToCaching[DMPermType.NeverDM]>,
-    _ChatInputCommandInteraction<DMPermTypeToCaching[DMPermType.OnlyDM]>
-  >;
+export declare class ChatInputCommandInteraction<
+  CTX extends AllContexts = AllContexts,
+  Options extends readonly unknown[] = []
+> {
+  readonly member: Member<NoInfer<CTX>, _ChatInputCommandInteraction<ContextToCaching<[InteractionContextType.Guild]>>>;
 
-  readonly options: TypeSafeOptionResolver<DMPermTypeToCaching[NoInfer<DM>], Options>;
-}
-export declare class Message<DM extends DMPermType = DMPermType.CanBeDM> {
-  readonly member: Member<NoInfer<DM>, _Message>;
   readonly channel: InteractionChannel<
-    NoInfer<DM>, _Message<DMPermTypeToInGuild[DMPermType.NeverDM]>,
-    _Message<DMPermTypeToInGuild[DMPermType.OnlyDM]>
+    NoInfer<CTX>,
+    _ChatInputCommandInteraction<ContextToCaching<[InteractionContextType.Guild]>>,
+    _ChatInputCommandInteraction<ContextToCaching<[InteractionContextType.BotDM]>>>;
+
+  readonly options: TypeSafeOptionResolver<ContextToCaching<NoInfer<CTX>>, Options>;
+}
+export declare class Message<CTX extends AllContexts = AllContexts> {
+  readonly member: Member<NoInfer<CTX>, _Message>;
+  readonly channel: InteractionChannel<
+    NoInfer<CTX>, _Message<ContextToInGuild<[InteractionContextType.Guild]>>,
+    _Message<ContextToInGuild<[InteractionContextType.BotDM]>>
   >;
 }
 
-export declare class AutocompleteInteraction<DM extends DMPermType = DMPermType.CanBeDM> {}
-export declare class MessageComponentInteraction<DM extends DMPermType = DMPermType.CanBeDM> {}
+export declare class AutocompleteInteraction<CTX extends AllContexts = AllContexts> {}
+export declare class MessageComponentInteraction<CTX extends AllContexts = AllContexts> {}
 
 /* eslint-enable @typescript-eslint/no-unused-vars, @typescript-eslint/no-extraneous-class, @typescript-eslint/no-unnecessary-type-parameters */
 
-export type commandDoneFn<CMD extends Command<readonly CommandType[], DMPermType> = Command<readonly CommandType[], DMPermType>> = (
+export type commandDoneFn<CMD extends Command<readonly CommandType[], AllContexts> = Command<readonly CommandType[], AllContexts>> = (
   this: ThisParameterType<CMD['run']>,
   command: CMD, lang: Translator<false, Locale>
 ) => Promise<never>;
@@ -144,7 +165,7 @@ export type commandDoneFn<CMD extends Command<readonly CommandType[], DMPermType
  * @returns If a permission error was handled by the function: `true`
  * @returns If no permission error was found: `false` */
 export type customPermissionChecksFn<
-  CMD extends Command<readonly CommandType[], DMPermType> = Command<readonly CommandType[], DMPermType>,
+  CMD extends Command<readonly CommandType[], AllContexts> = Command<readonly CommandType[], AllContexts>,
   RetMsgs extends Parameters<Translator> = Parameters<Translator>
 > = (
   this: CMD, interaction: ThisParameterType<CMD['run']>,

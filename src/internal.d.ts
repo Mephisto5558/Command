@@ -9,17 +9,19 @@ import type {
 declare module './index.ts' {
   /* eslint-disable @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unused-vars
     -- Extending from discord.js to have local type information. */
-  interface ChatInputCommandInteraction<DM extends DMPermType = DMPermType.CanBeDM, Options extends readonly unknown[] = []>
-    extends StrictOmit<_ChatInputCommandInteraction<DMPermTypeToCaching[DM]>, 'options'> {}
+  interface ChatInputCommandInteraction<
+    CTX extends AllContexts = AllContexts,
+    Options extends readonly unknown[] = []
+  > extends StrictOmit<_ChatInputCommandInteraction<ContextToCaching<CTX>>, 'options'> {}
 
-  interface Message<DM extends DMPermType = DMPermType.CanBeDM>
-    extends _Message<DMPermTypeToInGuild[DM]> {}
+  interface Message<CTX extends AllContexts = AllContexts>
+    extends _Message<ContextToInGuild<CTX>> {}
 
-  interface AutocompleteInteraction<DM extends DMPermType = DMPermType.CanBeDM>
-    extends _AutocompleteInteraction<DMPermTypeToCaching[DM]> {}
+  interface AutocompleteInteraction<CTX extends AllContexts = AllContexts>
+    extends _AutocompleteInteraction<ContextToCaching<CTX>> {}
 
-  interface MessageComponentInteraction<DM extends DMPermType = DMPermType.CanBeDM>
-    extends _MessageComponentInteraction<DMPermTypeToCaching[DM]> {}
+  interface MessageComponentInteraction<CTX extends AllContexts = AllContexts>
+    extends _MessageComponentInteraction<ContextToCaching<CTX>> {}
 
   /* eslint-enable @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unused-vars */
 }
