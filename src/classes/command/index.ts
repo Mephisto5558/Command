@@ -92,7 +92,7 @@ export class Command<
   }
 
   run: (
-    this: ExtendsMultiMatch<CT, [
+    this: ExtendsMultiMatch<CommandType, CT, [
       [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<Options>>],
       [CommandType.Component, MessageComponentInteraction<NoInfer<DM>> & { commandName: Command['name'] }],
       [CommandType.Prefix, Message<NoInfer<DM>>]

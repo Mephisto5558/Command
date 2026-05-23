@@ -6,7 +6,7 @@ import type {
 } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  AutocompleteInteraction, ChatInputCommandInteraction, CommandOption, DMPermType, Message, MessageComponentInteraction,
+  AutocompleteInteraction, ChatInputCommandInteraction, Command, CommandOption, DMPermType, Message, MessageComponentInteraction,
   OptionsG, SharedConfig
 } from '../../index.ts';
 import type { CommandType } from '../utils.ts';
@@ -14,7 +14,7 @@ import type { CommandType } from '../utils.ts';
 export type autocompleteObject = Pick<ApplicationCommandOptionChoiceData, 'name' | 'value'>;
 export type autocompleteOption = autocompleteObject['value'] | autocompleteObject;
 export type autocompleteFunction<CT extends readonly CommandType[], DM extends DMPermType> = (
-  this: ExtendsMultiMatch<CT, [
+  this: ExtendsMultiMatch<CommandType, CT, [
     [CommandType.Slash, AutocompleteInteraction<NoInfer<DM>>],
     [CommandType.Prefix, Message<NoInfer<DM>>]
   ]>,
@@ -230,9 +230,9 @@ interface BaseSubcommandConfig<
   ChildrenOptions extends CommandOptionConfig<CT, DM>[]
 > extends SharedConfig<DM>, BaseOptionConfig {
   run?(
-    this: ExtendsMultiMatch<CT, [
+    this: ExtendsMultiMatch<CommandType, CT, [
       [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>],
-      [CommandType.Component, MessageComponentInteraction<NoInfer<DM>> & { commandName: string }],
+      [CommandType.Component, MessageComponentInteraction<NoInfer<DM>> & { commandName: Command['name'] }],
       [CommandType.Prefix, Message<NoInfer<DM>>]
     ]>,
     lang: Translator<false, Locale>, options: NoInfer<AO>,
@@ -271,7 +271,7 @@ export interface SubcommandConfig<
   options?: ChildrenOptions;
 
   run?(
-    this: ExtendsMultiMatch<CT, [
+    this: ExtendsMultiMatch<CommandType, CT, [
       [CommandType.Slash, ChatInputCommandInteraction<NoInfer<DM>, NoInfer<ChildrenOptions>>],
       [CommandType.Component, MessageComponentInteraction<NoInfer<DM>> & { commandName: string }],
       [CommandType.Prefix, Message<NoInfer<DM>>]
@@ -354,7 +354,7 @@ type PrivateAutocompleteGeneratorOptions<CT extends readonly CommandType[], DM e
 ];
 
 export type PublicAutocompleteGeneratorOptions<CT extends readonly CommandType[], DM extends DMPermType> = [
-  interaction: ExtendsMultiMatch<CT, [
+  interaction: ExtendsMultiMatch<CommandType, CT, [
     [CommandType.Slash, AutocompleteInteraction<NoInfer<DM>>],
     [CommandType.Prefix, Message<NoInfer<DM>>]
   ]>,
