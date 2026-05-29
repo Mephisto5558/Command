@@ -30,7 +30,7 @@ export type CommandMention<
 export interface CommandConfig<
   CT extends readonly CommandType[], CTX extends AllContexts,
   Options extends OptionsG<CT, CTX> = readonly PrimitiveCommandOptionConfig<CT, CTX>[]
-> extends SharedConfig<NoInfer<CTX>> {
+> extends SharedConfig<CTX> {
   types: CT;
   usage?: { usage?: string; examples?: string }; // TODO: support arrays
   aliases?: { [K in NoInfer<CT>[number]]?: Lowercase<string>[] };
