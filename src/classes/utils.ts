@@ -58,7 +58,10 @@ export class CommandExecutionError extends Error {
   }
 }
 
-export class CommandValidationError<CT extends readonly CommandType[], CTX extends AllContexts> extends Error {
+export class CommandValidationError<
+  const CT extends readonly CommandType[],
+  const CTX extends AllContexts
+> extends Error {
   override readonly name = 'CommandValidationError';
   readonly command?: Command<NoInfer<CT>, NoInfer<CTX>>;
   readonly commandOption?: CommandOption<NoInfer<CT>, NoInfer<CTX>>;

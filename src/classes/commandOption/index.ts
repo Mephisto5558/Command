@@ -5,15 +5,15 @@ import { ContextType, CooldownType } from '../../index.ts';
 import { autocompleteOptionsMaxAmt, choiceValueMaxLength, choiceValueMinLength, choicesMaxAmt, descriptionMaxLength } from '../../utils/constants.ts';
 import { CommandValidationError, cooldownConverter, equal } from '../utils.ts';
 
-import type { ApplicationCommandOption, ApplicationCommandOptionChoiceData, BaseChannel, Client } from 'discord.js';
+import type { ApplicationCommandOption, ApplicationCommandOptionChoiceData, Client } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type { AllContexts, ChatInputCommandInteraction, Command, Logger, Message, MessageComponentInteraction } from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
 import type { RunnableReturns } from '../command/utils.ts';
 import type { CommandType } from '../utils.ts';
 import type {
-  AutocompleteGeneratorOptions, ChannelCommandOptionConfig, CommandOptionConfig, NumericCommandOptionConfig,
-  PublicAutocompleteGeneratorOptions, StringCommandOptionConfig, SubcommandConfig, SubcommandGroupConfig,
+  AutocompleteGeneratorOptions, ChannelCommandOptionConfig, CommandOptionConfig, FallbackChannels, NumericCommandOptionConfig,
+  PublicAutocompleteGeneratorOptions, ResolvedChannelType, StringCommandOptionConfig, SubcommandConfig, SubcommandGroupConfig,
   autocompleteObject, autocompleteOptions
 } from './utils.ts';
 
@@ -216,10 +216,13 @@ export class CommandOption<
       [CommandType.Slash, ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>],
       [CommandType.Prefix, Message<NoInfer<CTX>>]
     ]>, returnSelf: RetSelf
-  ): /* IfExtends<T, ApplicationCommandOptionType.Channel,
-    AddIf<ExtractChannelTypesFromInstance<this, CTX>, RetSelf, { ifFalse: undefined }>
-    > { */ // TODO
-  BaseChannel | (RetSelf extends true ? never : undefined) {
+  ): IfExtendsD<this['channelTypes'], readonly ChannelType[],
+    IfExtendsD<ChannelType, NonNullable<this['channelTypes']>[number],
+      FallbackChannels<NoInfer<CT>, NoInfer<CTX>>,
+      ResolvedChannelType<NonNullable<this['channelTypes']>[number]>
+    >,
+    FallbackChannels<NoInfer<CT>, NoInfer<CTX>>
+  > | IfD<RetSelf, ThisParameterType<NonNullable<this['run']>>['channel'], undefined> {
     if (this.type != ApplicationCommandOptionType.Channel)
       throw new Error(`This method does not run on ${ApplicationCommandOptionType[this.type]} options!`);
 
@@ -229,9 +232,9 @@ export class CommandOption<
 
     if (!target && interaction instanceof _Message)
       target = interaction.guild?.channels.cache.find(e => [e.id, e.name].some(e => interaction.content.includes(e)));
-    if (target) return target;
+    if (target) return target as ReturnType<typeof this.getChannel<RetSelf>>;
 
-    return returnSelf ? interaction.channel : undefined;
+    return (returnSelf ? interaction.channel : undefined) as ReturnType<typeof this.getChannel<RetSelf>>;
   }
 
   #validate(): void {

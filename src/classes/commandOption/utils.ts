@@ -51,7 +51,7 @@ type GetOption<Options extends readonly unknown[], Name extends string, Type ext
     | ExtractGetOption<GetSubOpts<Options[number]>, Name, Type>
     | ExtractGetOption<GetSubOpts<GetSubOpts<Options[number]>>, Name, Type>;
 
-type ResolvedChannelType<T extends ChannelType> = ExtendsMatch<T, [
+export type ResolvedChannelType<T extends ChannelType> = ExtendsMatch<T, [
   [ChannelType.GuildText, TextChannel],
   [ChannelType.GuildVoice, VoiceChannel],
   [ChannelType.GuildCategory, CategoryChannel],
@@ -99,6 +99,13 @@ type ResolvedValue<Options extends readonly unknown[], Name extends string, Type
     ifFalse: ResolveValue<GetOption<Options, Name, Type>, BaseType>;
   }
 >;
+
+export type FallbackChannels<CT extends readonly CommandType[], CTX extends AllContexts>
+  = ExtendsMultiMatch<CommandType, CT, [
+    [CommandType.Slash, ChatInputCommandInteraction<NoInfer<CTX>>],
+    [CommandType.Component, MessageComponentInteraction<NoInfer<CTX>> & { commandName: Command['name'] }],
+    [CommandType.Prefix, Message<NoInfer<CTX>>]
+  ]>['channel'];
 
 type IsRequired<Options extends readonly unknown[], Name extends string, Type extends ApplicationCommandOptionType>
   = Not<Extends<Extract<Options[number], { name: Name; type: Type; required: true }>, never>>;
@@ -226,22 +233,8 @@ interface BaseOptionConfig {
 }
 
 interface BaseSubcommandConfig<
-  CT extends readonly CommandType[], CTX extends AllContexts, AO,
-  ChildrenOptions extends CommandOptionConfig<CT, CTX>[]
-> extends SharedConfig<CTX>, BaseOptionConfig {
-  run?(
-    this: ExtendsMultiMatch<CommandType, CT, [
-      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>],
-      [CommandType.Component, MessageComponentInteraction<NoInfer<CTX>> & { commandName: Command['name'] }],
-      [CommandType.Prefix, Message<NoInfer<CTX>>]
-    ]>,
-    lang: Translator<false, Locale>, options: NoInfer<AO>,
-    data: {
-      client: Client<true>;
-      option: CommandOption<CT, CTX, AO, ChildrenOptions, ApplicationCommandOptionType.Subcommand | ApplicationCommandOptionType.SubcommandGroup>;
-    }
-  ): unknown;
-}
+  CTX extends AllContexts
+> extends SharedConfig<CTX>, BaseOptionConfig {}
 
 interface BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], CTX extends AllContexts>
   extends BaseOptionConfig {
@@ -253,28 +246,42 @@ interface BasePrimitiveCommandOptionConfig<CT extends readonly CommandType[], CT
 
 export interface SubcommandGroupConfig<
   CT extends readonly CommandType[], CTX extends AllContexts, AO = never,
-  ChildrenOptions extends readonly SubcommandConfig<CT, CTX, AO>[]
-  | readonly CommandOption<CT, CTX, AO>[] = readonly SubcommandConfig<CT, CTX, AO>[] | readonly CommandOption<CT, CTX, AO>[]
-> extends SharedConfig<CTX>, BaseSubcommandConfig<CT, CTX, AO, ChildrenOptions> {
+  ChildrenOptions extends readonly SubcommandConfig<CT, CTX, unknown>[]
+  /* | readonly CommandOption<CT, CTX, AO>[] */ = readonly SubcommandConfig<CT, CTX, unknown>[]
+  // | readonly CommandOption<CT, CTX, AO>[]
+> extends BaseSubcommandConfig<CTX> {
   type: ApplicationCommandOptionType.SubcommandGroup;
   options: ChildrenOptions;
+
+  run?(
+    this: ExtendsMultiMatch<CommandType, CT, [
+      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>],
+      [CommandType.Component, MessageComponentInteraction<NoInfer<CTX>> & { commandName: Command['name'] }],
+      [CommandType.Prefix, Message<NoInfer<CTX>>]
+    ]>,
+    lang: Translator<false, Locale>, options: NoInfer<AO>,
+    data: {
+      client: Client<true>;
+      option: CommandOption<CT, CTX, AO, ChildrenOptions, ApplicationCommandOptionType.SubcommandGroup>;
+    }
+  ): unknown;
 }
 
 export interface SubcommandConfig<
   CT extends readonly CommandType[], CTX extends AllContexts, AO = undefined,
   ChildrenOptions extends (
-    readonly PrimitiveCommandOptionConfig<CT, CTX>[] | readonly CommandOption<CT, CTX, AO, never, PrimitiveCommandOptionConfig<CT, CTX>['type']>[]
+    readonly PrimitiveCommandOptionConfig<CT, CTX>[] // | readonly CommandOption<CT, CTX, AO, never, PrimitiveCommandOptionConfig<CT, CTX>['type']>[]
   ) = (
-    readonly PrimitiveCommandOptionConfig<CT, CTX>[] | readonly CommandOption<CT, CTX, AO, never, PrimitiveCommandOptionConfig<CT, CTX>['type']>[]
+    readonly PrimitiveCommandOptionConfig<CT, CTX>[] // | readonly CommandOption<CT, CTX, AO, never, PrimitiveCommandOptionConfig<CT, CTX>['type']>[]
   )
-> extends SharedConfig<CTX>, BaseSubcommandConfig<CT, CTX, AO, ChildrenOptions> {
+> extends BaseSubcommandConfig<CTX> {
   type: ApplicationCommandOptionType.Subcommand;
   options?: ChildrenOptions;
 
   run?(
     this: ExtendsMultiMatch<CommandType, CT, [
       [CommandType.Slash, ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>],
-      [CommandType.Component, MessageComponentInteraction<NoInfer<CTX>> & { commandName: string }],
+      [CommandType.Component, MessageComponentInteraction<NoInfer<CTX>> & { commandName: Command['name'] }],
       [CommandType.Prefix, Message<NoInfer<CTX>>]
     ]>,
     lang: Translator<false, Locale>, options: NoInfer<AO>,
