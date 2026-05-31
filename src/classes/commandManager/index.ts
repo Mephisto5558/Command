@@ -10,6 +10,7 @@ import type { ApplicationCommand, ApplicationCommandDataResolvable, ChatInputApp
 import type { I18nProvider } from '@mephisto5558/i18n';
 import type { AllContexts, Logger, commandDoneFn, customPermissionChecksFn } from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
+import type { CommandOptionConfig } from '../commandOption/utils.ts';
 
 function importDefault(obj?: unknown): unknown {
   return obj && typeof obj == 'object' && 'default' in obj
@@ -17,8 +18,10 @@ function importDefault(obj?: unknown): unknown {
     : obj;
 }
 
-type CollectionMember = Command<readonly CommandType[], AllContexts>;
-
+type CollectionMember = Command<
+  readonly CommandType[], AllContexts,
+  readonly [] | readonly [CommandOptionConfig<readonly CommandType[], AllContexts>, ...CommandOptionConfig<readonly CommandType[], AllContexts>[]]
+>;
 /* eslint-disable-next-line import-x/prefer-default-export -- simplifies re-export */
 export class CommandManager {
   commands = new Collection<CollectionMember['name'], { command: CollectionMember; filePath: string }>();

@@ -41,7 +41,7 @@ export type AllContexts = readonly typeof AllContexts[number][];
 
 type HasGuild<CTX extends AllContexts> = Extends<InteractionContextType.Guild, CTX[number]>;
 type HasDM<CTX extends AllContexts>
-  = Not<ExtendsStrict<CTX[number] & (InteractionContextType.BotDM | InteractionContextType.PrivateChannel), never>>;
+  = Not<ExtendsNever<CTX[number] & (InteractionContextType.BotDM | InteractionContextType.PrivateChannel)>>;
 
 export type ContextToInGuild<CTX extends AllContexts>
   = If<HasGuild<CTX>, {
@@ -160,14 +160,20 @@ export type commandDoneFn<CMD extends Command<readonly CommandType[], AllContext
   command: CMD, lang: Translator<false, Locale>
 ) => Promise<never>;
 
+
+type customPermissionCheckFnParams<CT extends readonly CommandType[], CTX extends AllContexts> = [
+  interaction: ThisParameterType<Command<NoInfer<CT>, NoInfer<CTX>>['run']>,
+  author: User, translator: Translator<false, Locale>
+];
+
 /**
  * @returns If a permsision error was found: Parameters for `Translator`
  * @returns If a permission error was handled by the function: `true`
  * @returns If no permission error was found: `false` */
 export type customPermissionChecksFn<
-  CMD extends Command<readonly CommandType[], AllContexts> = Command<readonly CommandType[], AllContexts>,
+  CT extends readonly CommandType[] = readonly CommandType[], CTX extends AllContexts = AllContexts,
   RetMsgs extends Parameters<Translator> = Parameters<Translator>
-> = (
-  this: CMD, interaction: ThisParameterType<CMD['run']>,
-  author: User, translator: Translator<false, Locale>
-) => RetMsgs | boolean | Promise<RetMsgs | boolean>;
+
+  // Split because TS otherwise ignores non-promise return
+> = ((this: Command<NoInfer<CT>, NoInfer<CTX>>, ...args: customPermissionCheckFnParams<NoInfer<CT>, NoInfer<CTX>>) => RetMsgs | boolean)
+  | ((this: Command<NoInfer<CT>, NoInfer<CTX>>, ...args: customPermissionCheckFnParams<NoInfer<CT>, NoInfer<CTX>>) => Promise<RetMsgs | boolean>);
