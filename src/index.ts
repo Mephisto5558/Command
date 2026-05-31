@@ -13,6 +13,7 @@ import type { CommandType } from './classes/utils.ts';
 
 export * from './utils/index.ts';
 export * from './discord.js.ts';
+export type * from './db.ts';
 
 export { CommandUninitialized as Command } from './classes/command/index.ts';
 export type { Command as CommandInitialized } from './classes/command/index.ts';

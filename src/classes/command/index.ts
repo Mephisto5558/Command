@@ -31,7 +31,7 @@ export class Command<
   commandId?: [CommandType.Slash] extends NoInfer<CT> ? Snowflake : never;
 
   /** Currently not used */
-  nameLocalizations?: Partial<Record<Locale, Lowercase<string>>>;
+  nameLocalizations?: Partial<Record<Locale, Command['name']>>;
 
   description!: string;
   descriptionLocalizations: Partial<Record<Locale, string>> = {};
