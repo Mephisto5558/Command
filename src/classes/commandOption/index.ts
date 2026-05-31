@@ -28,7 +28,7 @@ export class CommandOption<
   position = 0;
 
   /** Currently not used */
-  nameLocalizations?: Partial<Record<Locale, Lowercase<string>>>;
+  nameLocalizations?: Partial<Record<Locale, CommandOption['name']>>;
   description!: string;
   descriptionLocalizations!: Partial<Record<Locale, string>>;
 

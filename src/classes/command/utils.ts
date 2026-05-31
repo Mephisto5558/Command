@@ -34,7 +34,7 @@ export interface CommandConfig<
 > extends SharedConfig<CTX> {
   types: CT;
   usage?: { usage?: string; examples?: string }; // TODO: support arrays
-  aliases?: { [K in NoInfer<CT>[number]]?: Lowercase<string>[] };
+  aliases?: { [K in NoInfer<CT>[number]]?: Command['name'][] };
   permissions?: Partial<Record<PermissionType, Discord.PermissionFlags[keyof Discord.PermissionFlags][]>>;
 
   options?: Options;

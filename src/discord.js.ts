@@ -118,7 +118,7 @@ type InteractionChannel<
 export type ChatInputCommandInteraction<
   CTX extends AllContexts = AllContexts,
   Options extends readonly unknown[] = []
-> = StrictOmit<Discord.ChatInputCommandInteraction<ContextToCaching<CTX>>, 'member' | 'channel' | 'options'> & {
+> = StrictOmit<Discord.ChatInputCommandInteraction<ContextToCaching<CTX>>, 'member' | 'channel' | 'options' | 'inGuild'> & {
   readonly member: Member<CTX, Discord.ChatInputCommandInteraction<ContextToCaching<[Discord.InteractionContextType.Guild]>>>;
 
   readonly channel: InteractionChannel<
@@ -128,21 +128,35 @@ export type ChatInputCommandInteraction<
   >;
 
   readonly options: TypeSafeOptionResolver<ContextToCaching<CTX>, Options>;
+
+  inGuild(): this is ChatInputCommandInteraction<readonly [ContextType.Guild], Options>;
 };
 
 export type Message<
   CTX extends AllContexts = AllContexts
-> = StrictOmit<Discord.Message<ContextToInGuild<CTX>>, 'member' | 'channel'> & {
+> = StrictOmit<Discord.Message<ContextToInGuild<CTX>>, 'member' | 'channel' | 'inGuild'> & {
   readonly member: Member<CTX, Discord.Message>;
+
   readonly channel: InteractionChannel<
     CTX,
     Discord.Message<ContextToInGuild<[Discord.InteractionContextType.Guild]>>,
     Discord.Message<ContextToInGuild<[Discord.InteractionContextType.BotDM]>>
   >;
+
+  inGuild(): this is Message<readonly [ContextType.Guild]> | Discord.Message<ContextToInGuild<readonly [ContextType.Guild]>>;
 };
 
-export type AutocompleteInteraction<CTX extends AllContexts = AllContexts> = Discord.AutocompleteInteraction<ContextToCaching<CTX>>;
-export type MessageComponentInteraction<CTX extends AllContexts = AllContexts> = Discord.MessageComponentInteraction<ContextToCaching<CTX>>;
+export type AutocompleteInteraction<
+  CTX extends AllContexts = AllContexts
+> = StrictOmit<Discord.AutocompleteInteraction<ContextToCaching<CTX>>, 'inGuild'> & {
+  inGuild(): this is AutocompleteInteraction<readonly [ContextType.Guild]>;
+};
+
+export type MessageComponentInteraction<
+  CTX extends AllContexts = AllContexts
+> = StrictOmit<Discord.MessageComponentInteraction<ContextToCaching<CTX>>, 'inGuild'> & {
+  inGuild(): this is MessageComponentInteraction<readonly [ContextType.Guild]>;
+};
 
 type DefaultReturnType<T extends Extract<keyof Discord.CommandInteractionOptionResolver, `get${string}${string}`>>
   = NonNullable<ReturnType<Discord.CommandInteractionOptionResolver[T]>>;
