@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style -- using index signature to improve readability for lib user */
 
+import type * as Discord from 'discord.js';
 import type {
-  ChatInputCommandInteraction as _ChatInputCommandInteraction, Message as _Message, PermissionFlags, _NonNullableFields
-} from 'discord.js';
-import type { AllContexts, Command, CommandOption, OptionsG, PermissionType, SharedConfig } from '../../index.ts';
+  AllContexts,
+  CommandInitialized as Command, CommandOptionInitialized as CommandOption,
+  OptionsG, PermissionType, SharedConfig
+} from '../../index.ts';
 import type { PrimitiveCommandOptionConfig, RunnableReturns as OptionRunnableReturns } from '../commandOption/utils.ts';
 import type { CommandType } from '../utils.ts';
 
@@ -26,7 +28,6 @@ export type CommandMention<
   Id extends NonNullable<Command<NoInfer<CT>>['commandId']> | bigint = NonNullable<Command<NoInfer<CT>>['commandId']> | bigint
 > = `</${Name}${Space<Group>}${Space<Subcommand>}:${Id}>`;
 
-/* eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- interface is correct here */
 export interface CommandConfig<
   CT extends readonly CommandType[], CTX extends AllContexts,
   Options extends OptionsG<CT, CTX> = readonly PrimitiveCommandOptionConfig<CT, CTX>[]
@@ -34,7 +35,7 @@ export interface CommandConfig<
   types: CT;
   usage?: { usage?: string; examples?: string }; // TODO: support arrays
   aliases?: { [K in NoInfer<CT>[number]]?: Lowercase<string>[] };
-  permissions?: Partial<Record<PermissionType, PermissionFlags[keyof PermissionFlags][]>>;
+  permissions?: Partial<Record<PermissionType, Discord.PermissionFlags[keyof Discord.PermissionFlags][]>>;
 
   options?: Options;
 

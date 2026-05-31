@@ -1,20 +1,15 @@
-import {
-  ApplicationCommandOptionType, ApplicationCommandType, BaseInteraction, ChannelType,
-  ChatInputCommandInteraction as _ChatInputCommandInteraction, Colors, EmbedBuilder, Message as _Message,
-  MessageComponentInteraction as _MessageComponentInteraction, MessageFlags, PermissionsBitField, _NonNullableFields, inlineCode
-} from 'discord.js';
-
-import { CommandExecutionError, CommandOption, ContextType, CooldownType, Permission, PermissionType } from '../../index.ts';
+import * as Discord from 'discord.js';
+import { CommandExecutionError, ContextType, CooldownType, Permission, PermissionType } from '../../index.ts';
 import { descriptionMaxLength } from '../../utils/constants.ts';
+import { CooldownsManager } from '../../utils/index.ts';
+import { CommandOption, CommandOptionUninitialized } from '../commandOption/index.ts';
 import { CommandType, CommandValidationError, cooldownConverter, equal, getMilliseconds } from '../utils.ts';
 
-import type { ApplicationCommand, Client, CommandInteraction, PermissionFlags, User } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  AllContexts, ChatInputCommandInteraction, Logger, Message,
+  AllContexts, ChatInputCommandInteraction, CommandInteraction, Logger, Message,
   MessageComponentInteraction, OptionsG, commandDoneFn, customPermissionChecksFn
 } from '../../index.ts';
-import type { CooldownsManager } from '../../utils/index.ts';
 import type { CommandOptionConfig } from '../commandOption/utils.ts';
 import type { CommandConfig, CommandMention, DeepOptions, ResolvedOption, RunnableReturns } from './utils.ts';
 
@@ -23,15 +18,17 @@ const
   msInSeconds = getMilliseconds('1s')!,
   CANNOT_SEND_MESSAGE_API_ERR = 50_007;
 
-/* eslint-disable-next-line import-x/prefer-default-export -- simplifies re-export */
+
 export class Command<
   const CT extends readonly CommandType[] = readonly [],
   const CTX extends AllContexts = readonly [ContextType.Guild],
   const Options extends OptionsG<CT, CTX> = readonly CommandOptionConfig<CT, CTX>[]
 > /* implements ChatInputApplicationCommandData */ {
-  name!: Lowercase<string>;
-  id!: `commands.${Command['category']}.${Command['name']}`;
-  commandId!: [CommandType.Slash] extends NoInfer<CT> ? Snowflake : undefined;
+  name: Lowercase<string>;
+  id: `commands.${Command['category']}.${Command['name']}`;
+
+  /* set in `CommandManager` */
+  commandId?: [CommandType.Slash] extends NoInfer<CT> ? Snowflake : never;
 
   /** Currently not used */
   nameLocalizations?: Partial<Record<Locale, Lowercase<string>>>;
@@ -39,44 +36,39 @@ export class Command<
   description!: string;
   descriptionLocalizations: Partial<Record<Locale, string>> = {};
 
-  category!: Lowercase<string>;
+  category: Lowercase<string>;
 
-  readonly type = ApplicationCommandType.ChatInput;
+  readonly type = Discord.ApplicationCommandType.ChatInput;
 
-  types: CT = [] as unknown as CT;
+  types: CT;
 
-  usage: Record<'usage' | 'examples', string | undefined> & {} = { usage: undefined, examples: undefined };
+  usage: Record<'usage' | 'examples', string | undefined> & {};
   usageLocalizations: Partial<Record<Locale, Command<NoInfer<CT>, NoInfer<CTX>>['usage']>> = {};
 
-  aliases: Record<NoInfer<CT>[number], Command['name'][]> = {} as Record<NoInfer<CT>[number], Command['name'][]>;
+  aliases: Record<NoInfer<CT>[number], Command['name'][]>;
 
-  cooldowns: Record<CooldownType, number> & {} = { [CooldownType.Guild]: 0, [CooldownType.Channel]: 0, [CooldownType.User]: 0 };
+  cooldowns: Record<CooldownType, number>;
 
-  permissions: Record<PermissionType, PermissionFlags[keyof PermissionFlags][]> = {
-    [PermissionType.Client]: [Permission.ViewChannel, Permission.SendMessages],
-    [PermissionType.Role]: [],
-    [PermissionType.User]: [Permission.SendMessages],
-    [PermissionType.Channel]: []
-  };
+  permissions: Record<PermissionType, Discord.PermissionFlags[keyof Discord.PermissionFlags][]>;
 
-  get defaultMemberPermissions(): PermissionsBitField['bitfield'] {
-    return new PermissionsBitField(this.permissions[PermissionType.User]).bitfield;
+  get defaultMemberPermissions(): Discord.PermissionsBitField['bitfield'] {
+    return new Discord.PermissionsBitField(this.permissions[PermissionType.User]).bitfield;
   }
 
-  contexts: CTX = [ContextType.Guild] as unknown as CTX;
+  contexts: CTX;
 
-  disabled = false;
+  disabled: boolean;
   disabledReason: string | undefined;
 
-  noDefer = false;
-  ephemeralDefer = false;
+  noDefer: boolean;
+  ephemeralDefer: boolean;
 
-  beta = false;
+  beta: boolean;
 
-  options: CommandOption<NoInfer<CT>, NoInfer<CTX>>[] = [];
+  options: CommandOption<NoInfer<CT>, NoInfer<CTX>>[];
 
   config = {
-    devIds: new Set<User['id']>(), devOnlyCategories: new Set<Command['category']>(),
+    devIds: new Set<Discord.User['id']>(), devOnlyCategories: new Set<Command['category']>(),
     runBetaCommandsOnly: false,
     replyOn: { disabled: true, nonBeta: true }
   };
@@ -98,92 +90,50 @@ export class Command<
       [CommandType.Prefix, Message<NoInfer<CTX>>]
     ]>,
     lang: Translator<false, Locale>,
-    data: { client: Client<true>; command: Command<NoInfer<CT>, NoInfer<CTX>, NoInfer<Options>> }
+    data: { client: Discord.Client<true>; command: Command<NoInfer<CT>, NoInfer<CTX>, NoInfer<Options>> }
   ) => unknown;
 
-  #i18n!: I18nProvider;
-  #logger!: Logger;
-  #doneFn!: commandDoneFn;
-  #cooldownsManager!: CooldownsManager;
-  #customPermissionChecks: customPermissionChecksFn | undefined;
+  readonly #i18n: I18nProvider;
+  readonly #logger: Logger = console;
+  readonly #doneFn: commandDoneFn | undefined;
+  readonly #cooldownsManager: CooldownsManager;
+  readonly #customPermissionChecks: customPermissionChecksFn | undefined;
 
   /** @internal */
-  constructor(config: Command<CT, CTX, Options>);
-  /* eslint-disable-next-line @typescript-eslint/unified-signatures -- TS disagrees */
-  constructor(config: CommandConfig<CT, CTX, Options>);
-  constructor(config: CommandConfig<CT, CTX, Options> | Command<CT, CTX, Options>) {
-    // need to set these specifically for typing
-    this.run = config.run;
+  constructor(
+    base: CommandUninitialized<CT, CTX, Options>, i18n: I18nProvider,
+    name: Command['name'], category: Command['category'],
+    config: {
+      logger?: Logger | undefined;
+      doneFn?: commandDoneFn | undefined;
+      customPermissionChecks?: customPermissionChecksFn | undefined;
 
-    if (config instanceof Command) {
-      for (const key of Object.getOwnPropertyNames(config) as (keyof typeof this)[]) {
-        const descriptor = Object.getOwnPropertyDescriptor(config, key)
-          ?? Object.getOwnPropertyDescriptor(Object.getPrototypeOf(config) as object, key);
+      devIds?: Command['config']['devIds'] | undefined;
+      devOnlyCategories?: Command['config']['devOnlyCategories'] | undefined;
+      runBetaCommandsOnly?: boolean | undefined;
+      replyOn?: Partial<Command['config']['replyOn']> | undefined;
+      cooldownsManager?: CooldownsManager | undefined;
+    } = {}
+  ) {
+    this.#cooldownsManager = config.cooldownsManager ?? new CooldownsManager();
 
-        if (!descriptor || descriptor.get || descriptor.writable === false) continue;
-
-        const value = config[key as keyof typeof config];
-
-        if (key == 'options') this.options = (value as typeof config.options).map(opt => opt.clone());
-        else if (value && typeof value == 'object' && typeof value != 'function')
-          (this as Record<typeof key, unknown>)[key] = Array.isArray(value) ? [...value] : { ...value as Record<string | number | symbol, unknown> };
-        else (this as Record<typeof key, unknown>)[key] = value;
-      }
-
-      return;
-    }
-
-    if ('usage' in config) {
-      if (config.usage.usage) this.usage.usage = config.usage.usage;
-      if (config.usage.examples) this.usage.examples = config.usage.examples;
-    }
+    this.run = base.run;
+    this.usage = base.usage;
+    this.cooldowns = base.cooldowns;
+    this.permissions = base.permissions;
+    this.contexts = base.contexts;
+    this.disabled = base.disabled;
+    this.disabledReason = base.disabledReason;
+    this.noDefer = base.noDefer;
+    this.ephemeralDefer = base.ephemeralDefer;
+    this.beta = base.beta;
+    this.aliases = base.aliases;
+    this.types = base.types;
 
 
-    if ('cooldowns' in config)
-      this.cooldowns = Object.fromEntries(Object.entries(this.cooldowns).map(([k, v]) => cooldownConverter(config.cooldowns!, k, v)));
-
-    if ('permissions' in config) {
-      for (const permissionType of Object.values(PermissionType))
-        if (config.permissions[permissionType]) this.permissions[permissionType].push(...config.permissions[permissionType]);
-    }
-
-    if ('contexts' in config) this.contexts = config.contexts;
-    if ('disabled' in config) this.disabled = config.disabled;
-
-    if ('noDefer' in config) this.noDefer = config.noDefer;
-    if ('ephemeralDefer' in config) this.ephemeralDefer = config.ephemeralDefer;
-
-    if ('options' in config) {
-      this.options = (config.options as (CommandOption<NoInfer<CT>, NoInfer<CTX>> | CommandOptionConfig<NoInfer<CT>, NoInfer<CTX>>)[])
-        .map(opt => (opt instanceof CommandOption ? opt : new CommandOption<NoInfer<CT>, NoInfer<CTX>>(opt)));
-    }
-
-    if (config.beta) this.beta = config.beta;
-
-    for (const commandType of config.types) {
-      const type = commandType as NoInfer<CT>[number];
-      this.aliases[type] = config.aliases?.[type] ?? [];
-    }
-
-    this.types = config.types;
-    this.disabledReason = config.disabledReason;
-  }
-
-  init(i18n: I18nProvider, name: Command['name'], category: Command['category'], config: {
-    logger?: Logger | undefined;
-    doneFn?: commandDoneFn | undefined;
-    customPermissionChecks?: customPermissionChecksFn | undefined;
-
-    devIds?: Command['config']['devIds'] | undefined;
-    devOnlyCategories?: Command['config']['devOnlyCategories'] | undefined;
-    runBetaCommandsOnly?: boolean | undefined;
-    replyOn?: Partial<Command['config']['replyOn']> | undefined;
-    cooldownsManager?: CooldownsManager | undefined;
-  } = {}): this {
     this.#i18n = i18n;
     if (config.logger) this.#logger = config.logger;
     if (config.doneFn) this.#doneFn = config.doneFn;
-    if (config.cooldownsManager) this.#cooldownsManager = config.cooldownsManager;
     this.#customPermissionChecks = config.customPermissionChecks?.bind(this as unknown as Command<readonly CommandType[], AllContexts>);
 
     if (config.devIds) this.config.devIds = config.devIds;
@@ -197,13 +147,10 @@ export class Command<
     this.category = category.toLowerCase();
     this.id = `commands.${this.category}.${this.name}`;
 
+    this.options = base.options.map((e, i) => e.init(i18n, this.id, this.#cooldownsManager, this.#logger, i));
+
     this.#validate();
     this.#localize();
-
-    for (const [i, option] of this.options.entries())
-      option.init(this.#i18n, this.id, this.#cooldownsManager, this.#logger, i);
-
-    return this;
   }
 
   #validate(): void {
@@ -283,28 +230,29 @@ export class Command<
     if (errorKey === true) return; // already handled by the function
     if (errorKey !== false) {
       return interaction.reply({
-        embeds: [new EmbedBuilder({ description: wrapperTranslator(...errorKey), color: Colors.Red })],
-        flags: MessageFlags.Ephemeral
+        embeds: [new Discord.EmbedBuilder({ description: wrapperTranslator(...errorKey), color: Discord.Colors.Red })],
+        flags: Discord.MessageFlags.Ephemeral
       });
     }
 
-    interaction.commandName ??= this.name; // Is undefined on `MessageComponentInteraction`s
+    if (interaction instanceof Discord.MessageComponentInteraction)
+      interaction.commandName = this.name;
 
     let commandType;
-    if (interaction instanceof _ChatInputCommandInteraction) commandType = CommandType.Slash;
-    else if (interaction instanceof _MessageComponentInteraction) commandType = CommandType.Component;
+    if (interaction instanceof Discord.ChatInputCommandInteraction) commandType = CommandType.Slash;
+    else if (interaction instanceof Discord.MessageComponentInteraction) commandType = CommandType.Component;
     else commandType = CommandType.Prefix;
 
     this.#logger.debug(`Executing ${commandType} command ${this.name}`);
 
     if (
-      commandType == CommandType.Slash && !(interaction instanceof _Message)
-      && interaction.isChatInputCommand() && !this.noDefer && !interaction.replied
-    ) await interaction.deferReply({ flags: this.ephemeralDefer ? MessageFlags.Ephemeral : undefined });
+      commandType == CommandType.Slash && interaction instanceof Discord.ChatInputCommandInteraction
+      && !this.noDefer && !interaction.replied
+    ) await interaction.deferReply({ flags: this.ephemeralDefer ? Discord.MessageFlags.Ephemeral : undefined });
 
     try {
       await this.run.call(interaction, commandTranslator, { client: interaction.client, command: this });
-      await this.#doneFn.call(interaction, this, commandTranslator);
+      await this.#doneFn?.call(interaction, this, commandTranslator);
     }
     catch (err) {
       throw new CommandExecutionError(err instanceof Error ? err.message : JSON.stringify(err), interaction, wrapperTranslator, { cause: err });
@@ -320,20 +268,20 @@ export class Command<
       { group, subcommand } = this.#getSubcommandNames(interaction) ?? {};
 
     if (group) {
-      const groupOption = this.options.find(e => e.name == group && e.type == ApplicationCommandOptionType.SubcommandGroup);
+      const groupOption = this.options.find(e => e.name == group && e.type == Discord.ApplicationCommandOptionType.SubcommandGroup);
       if (groupOption) {
         if (Object.values(groupOption.cooldowns).some(Boolean))
           currentCooldowns.push(groupOption.updateCooldowns(interaction));
 
         if (subcommand) {
-          const subOption = groupOption.options?.find(e => e.name == subcommand && e.type == ApplicationCommandOptionType.Subcommand);
+          const subOption = groupOption.options?.find(e => e.name == subcommand && e.type == Discord.ApplicationCommandOptionType.Subcommand);
           if (subOption && Object.values(subOption.cooldowns).some(Boolean))
             currentCooldowns.push(subOption.updateCooldowns(interaction));
         }
       }
     }
     else if (subcommand) {
-      const subOption = this.options.find(e => e.name == subcommand && e.type == ApplicationCommandOptionType.Subcommand);
+      const subOption = this.options.find(e => e.name == subcommand && e.type == Discord.ApplicationCommandOptionType.Subcommand);
       if (subOption && Object.values(subOption.cooldowns).some(Boolean))
         currentCooldowns.push(subOption.updateCooldowns(interaction));
     }
@@ -342,29 +290,28 @@ export class Command<
   }
 
   #getSubcommandNames(interaction: ThisParameterType<this['run']>): { group: string | undefined; subcommand: string } | undefined {
-    if (interaction instanceof BaseInteraction && interaction.isChatInputCommand()) {
-      const commandInteraction = interaction as ChatInputCommandInteraction;
-      if (!commandInteraction.options.getSubcommand(false)) return;
-      return { group: commandInteraction.options.getSubcommandGroup(false) ?? undefined, subcommand: commandInteraction.options.getSubcommand(true) };
+    if (interaction instanceof Discord.ChatInputCommandInteraction) {
+      if (!interaction.options.getSubcommand(false)) return;
+      return { group: interaction.options.getSubcommandGroup(false) ?? undefined, subcommand: interaction.options.getSubcommand(true) };
     }
 
-    if (interaction instanceof _MessageComponentInteraction) return; // todo
+    if (interaction instanceof Discord.MessageComponentInteraction) return; // todo
 
-    const
-      args = (interaction as _Message).content.split(/\s+/).slice(1),
-      option1 = this.options.find(e => e.name == args[0]);
+    if (interaction instanceof Discord.Message) {
+      const
+        args = interaction.content.split(/\s+/).slice(1),
+        option1 = this.options.find(e => e.name == args[0]);
 
-    if (option1?.type == ApplicationCommandOptionType.Subcommand) return { group: undefined, subcommand: option1.name };
-    if (option1?.type == ApplicationCommandOptionType.SubcommandGroup) {
-      const subcommand = option1.options?.find(e => e.name == args[1] && e.type == ApplicationCommandOptionType.Subcommand);
-      if (subcommand) return { group: option1.name, subcommand: subcommand.name };
+      if (option1?.type == Discord.ApplicationCommandOptionType.Subcommand) return { group: undefined, subcommand: option1.name };
+      if (option1?.type == Discord.ApplicationCommandOptionType.SubcommandGroup) {
+        const subcommand = option1.options?.find(e => e.name == args[1] && e.type == Discord.ApplicationCommandOptionType.Subcommand);
+        if (subcommand) return { group: option1.name, subcommand: subcommand.name };
+      }
     }
   }
 
   async #permissionChecks(
-    interaction: CommandInteraction | Message | MessageComponentInteraction,
-    author: User,
-    wrapperTranslator: Translator<false, Locale>
+    interaction: CommandInteraction, author: Discord.User, wrapperTranslator: Translator<false, Locale>
   ): Promise<boolean | RunnableReturns> {
     if (!(interaction.inGuild() && interaction.guild && interaction.channel)) return false;
 
@@ -375,27 +322,27 @@ export class Command<
 
     if (!botPermsMissing?.length && !userPermsMissing.length) return false;
 
-    const embed = new EmbedBuilder({
+    const embed = new Discord.EmbedBuilder({
       title: wrapperTranslator('permissionDenied.embedTitle'),
       description: wrapperTranslator(`permissionDenied.embedDescription${botPermsMissing?.length ? 'Bot' : 'User'}`, {
-        permissions: (botPermsMissing?.length ? botPermsMissing : userPermsMissing).map(perm => inlineCode(this.#i18n.__(
+        permissions: (botPermsMissing?.length ? botPermsMissing : userPermsMissing).map(perm => Discord.inlineCode(this.#i18n.__(
           { locale: wrapperTranslator.config.locale ?? wrapperTranslator.defaultConfig.defaultLocale, undefinedNotFound: true },
           `others.Perms.${perm}`
         ) ?? perm)).join(', ')
       }),
-      color: Colors.Red
+      color: Discord.Colors.Red
     });
 
     if (botChannelPerms?.missing([Permission.SendMessages, Permission.ViewChannel]).length) {
-      if (interaction instanceof _Message && botChannelPerms.has(Permission.AddReactions))
+      if (interaction instanceof Discord.Message && botChannelPerms.has(Permission.AddReactions))
         void interaction.react('\u274C').then(() => void interaction.react('\u270D\uFE0F'));
 
-      try { await author.send({ content: interaction instanceof _Message ? interaction.url : '', embeds: [embed] }); }
+      try { await author.send({ content: interaction instanceof Discord.Message ? interaction.url : '', embeds: [embed] }); }
       catch (err) {
         if (!(err instanceof Error && 'code' in err) || err.code != CANNOT_SEND_MESSAGE_API_ERR) throw err;
       }
     }
-    else if (interaction instanceof BaseInteraction)
+    else if (interaction instanceof Discord.BaseInteraction)
       await (interaction.isRepliable() ? interaction.reply({ embeds: [embed], ephemeral: true }) : interaction.channel.send({ embeds: [embed] }));
     else await interaction.reply({ embeds: [embed] });
 
@@ -403,12 +350,11 @@ export class Command<
   }
 
   async #isRunnable(
-    interaction: CommandInteraction | Message | MessageComponentInteraction,
-    wrapperTranslator: Translator<false, Locale>
+    interaction: CommandInteraction, wrapperTranslator: Translator<false, Locale>
   ): Promise<RunnableReturns | boolean> {
     const
-      author = interaction instanceof BaseInteraction ? interaction.user : interaction.author,
-      args = interaction instanceof _Message ? interaction.content.split(/\s+/).slice(1) : undefined,
+      author = interaction instanceof Discord.BaseInteraction ? interaction.user : interaction.author,
+      args = interaction instanceof Discord.Message ? interaction.content.split(/\s+/).slice(1) : undefined,
       staticErr = this.#staticRunnableChecks(interaction, author);
 
     if (staticErr) return staticErr;
@@ -425,41 +371,41 @@ export class Command<
 
     const activeOption = this.#resolveActiveOption(interaction, args);
     for (const option of activeOption ? [activeOption] : this.options) {
-      const err = await option.isRunnable(interaction, this, wrapperTranslator, args?.slice(activeOption && interaction instanceof _Message ? 1 : 0));
+      const err = await option.isRunnable(interaction, this, wrapperTranslator, args?.slice(activeOption && interaction instanceof Discord.Message ? 1 : 0));
       if (err) return err;
     }
 
     if (!this.config.runBetaCommandsOnly) {
       const cooldown = this.#updateCooldowns(interaction);
-      if (cooldown) return ['cooldown', inlineCode(Math.round(cooldown / msInSeconds).toString())];
+      if (cooldown) return ['cooldown', Discord.inlineCode(Math.round(cooldown / msInSeconds).toString())];
     }
 
     return false;
   }
 
   #staticRunnableChecks(
-    interaction: CommandInteraction | Message | MessageComponentInteraction, author: User
+    interaction: CommandInteraction, author: Discord.User
   ): RunnableReturns | boolean {
     if (
       this.config.devOnlyCategories.has(this.category) && !this.config.devIds.has(author.id)
-      || (interaction instanceof _Message && interaction.guild?.members.me?.communicationDisabledUntil)
+      || (interaction instanceof Discord.Message && interaction.guild?.members.me?.communicationDisabledUntil)
     ) return true;
     if (this.config.runBetaCommandsOnly && !this.beta) return this.config.replyOn.nonBeta ? ['nonBeta'] : true;
     if (this.disabled) return this.config.replyOn.disabled ? ['disabled', this.disabledReason ?? 'Not provided'] : true;
 
     // TODO: remove hardcoded "Not provided"
 
-    if (interaction instanceof _Message && !this.types.includes(CommandType.Prefix)) return ['slashOnly', this.mention()];
+    if (interaction instanceof Discord.Message && !this.types.includes(CommandType.Prefix)) return ['slashOnly', this.mention()];
 
-    if (!this.contexts.includes(ContextType.BotDM) && interaction.channel?.type == ChannelType.DM) return ['guildOnly'];
+    if (!this.contexts.includes(ContextType.BotDM) && interaction.channel?.type == Discord.ChannelType.DM) return ['guildOnly'];
     if (this.category == 'nsfw' && interaction.channel && (!('nsfw' in interaction.channel) || !interaction.channel.nsfw)) return ['nsfw'];
     return false;
   }
 
   #resolveActiveOption(
-    interaction: CommandInteraction | Message | MessageComponentInteraction, args: string[] | undefined
+    interaction: CommandInteraction, args: string[] | undefined
   ): CommandOption<NoInfer<CT>, NoInfer<CTX>> | undefined {
-    if (interaction instanceof BaseInteraction && interaction.isChatInputCommand()) {
+    if (interaction instanceof Discord.BaseInteraction && interaction.isChatInputCommand()) {
       const group = interaction.options.getSubcommandGroup(false);
       if (group) return this.options.find(e => e.name == group);
 
@@ -468,7 +414,7 @@ export class Command<
     }
     else {
       return this.options.find(e => (!args || e.name == args[0])
-        && [ApplicationCommandOptionType.Subcommand, ApplicationCommandOptionType.SubcommandGroup].includes(e.type));
+        && [Discord.ApplicationCommandOptionType.Subcommand, Discord.ApplicationCommandOptionType.SubcommandGroup].includes(e.type));
     }
   }
 
@@ -498,13 +444,13 @@ export class Command<
     return options.find(e => (!option?.name || e.name == option.name) && (!option?.type || e.type == option.type));
   }
 
-  isEqualTo(cmd?: Command<readonly CommandType[], AllContexts> | ApplicationCommand): boolean {
+  isEqualTo(cmd?: Command<readonly CommandType[], AllContexts> | Discord.ApplicationCommand): boolean {
     if (!cmd) return false;
     if (
 
       this.name != cmd.name || this.description != cmd.description || this.type != cmd.type
       || this.defaultMemberPermissions != (
-        cmd.defaultMemberPermissions instanceof PermissionsBitField ? cmd.defaultMemberPermissions.bitfield : cmd.defaultMemberPermissions
+        cmd.defaultMemberPermissions instanceof Discord.PermissionsBitField ? cmd.defaultMemberPermissions.bitfield : cmd.defaultMemberPermissions
       )
       || !equal(this.contexts, cmd.contexts)
       || !equal(this.nameLocalizations, cmd.nameLocalizations)
@@ -523,7 +469,97 @@ export class Command<
   }
 
   /** @internal */
-  clone(): Command<NoInfer<CT>, NoInfer<CTX>, NoInfer<Options>> {
-    return new Command(this);
+  clone(): CommandUninitialized<NoInfer<CT>, NoInfer<CTX>, NoInfer<Options>> {
+    /* eslint-disable-next-line @typescript-eslint/no-use-before-define -- fine with classes */
+    return new CommandUninitialized(this);
+  }
+}
+
+export class CommandUninitialized<
+  const CT extends readonly CommandType[] = readonly [],
+  const CTX extends AllContexts = readonly [ContextType.Guild],
+  const Options extends OptionsG<CT, CTX> = readonly CommandOptionConfig<CT, CTX>[]
+> {
+  run: Command<NoInfer<CT>, NoInfer<CTX>, NoInfer<Options>>['run'];
+  options: CommandOptionUninitialized<NoInfer<CT>, NoInfer<CTX>>[] = [];
+  usage: Command<NoInfer<CT>, NoInfer<CTX>, NoInfer<Options>>['usage'] = { usage: undefined, examples: undefined };
+  cooldowns: Command<NoInfer<CT>, NoInfer<CTX>, NoInfer<Options>>['cooldowns'] = Object.fromEntries(Object.values(CooldownType).map(e => [e, 0]));
+  permissions: Command<NoInfer<CT>, NoInfer<CTX>, NoInfer<Options>>['permissions'] = {
+    ...Object.fromEntries(Object.values(PermissionType).map(e => [e, []])),
+    [PermissionType.Client]: [Permission.ViewChannel, Permission.SendMessages],
+    [PermissionType.User]: [Permission.SendMessages]
+  };
+
+  contexts: Command<NoInfer<CT>, NoInfer<CTX>, NoInfer<Options>>['contexts'] = [ContextType.Guild] as unknown as CTX;
+  disabled: Command<NoInfer<CT>, NoInfer<CTX>, NoInfer<Options>>['disabled'] = false;
+  noDefer: Command<NoInfer<CT>, NoInfer<CTX>, NoInfer<Options>>['noDefer'] = false;
+  ephemeralDefer: Command<NoInfer<CT>, NoInfer<CTX>, NoInfer<Options>>['ephemeralDefer'] = false;
+  beta: Command<NoInfer<CT>, NoInfer<CTX>, NoInfer<Options>>['beta'] = false;
+  aliases!: Command<NoInfer<CT>, NoInfer<CTX>, NoInfer<Options>>['aliases'];
+  types: Command<NoInfer<CT>, NoInfer<CTX>, NoInfer<Options>>['types'] = [] as unknown as CT;
+  disabledReason: Command<NoInfer<CT>, NoInfer<CTX>, NoInfer<Options>>['disabledReason'];
+
+  /** @internal */
+  constructor(config: Command<CT, CTX, Options>);
+  /* eslint-disable-next-line @typescript-eslint/unified-signatures -- TS disagrees */
+  constructor(config: CommandConfig<CT, CTX, Options>);
+  constructor(config: CommandConfig<CT, CTX, Options> | Command<CT, CTX, Options>) {
+    // need to set these specifically for typing
+    this.run = config.run;
+
+    if (config instanceof Command) {
+      for (const key of Object.getOwnPropertyNames(config) as (keyof typeof this)[]) {
+        const descriptor = Object.getOwnPropertyDescriptor(config, key)
+          ?? Object.getOwnPropertyDescriptor(Object.getPrototypeOf(config) as object, key);
+
+        if (!descriptor || descriptor.get || descriptor.writable === false) continue;
+
+        const value = config[key as keyof typeof config];
+
+        if (key == 'options') this.options = (value as typeof config.options).map(opt => opt.clone());
+        else if (value && typeof value == 'object' && typeof value != 'function')
+          (this as Record<typeof key, unknown>)[key] = Array.isArray(value) ? [...value] : { ...value as Record<string | number | symbol, unknown> };
+        else (this as Record<typeof key, unknown>)[key] = value;
+      }
+
+      return;
+    }
+
+    if ('usage' in config) {
+      if (config.usage.usage) this.usage.usage = config.usage.usage;
+      if (config.usage.examples) this.usage.examples = config.usage.examples;
+    }
+
+    if ('cooldowns' in config) {
+      /* eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- TS false positive */
+      this.cooldowns = Object.fromEntries(Object.entries(this.cooldowns).map(([k, v]) => cooldownConverter(config.cooldowns!, k, v)));
+    }
+
+    if ('permissions' in config) {
+      for (const permissionType of Object.values(PermissionType))
+        if (config.permissions[permissionType]) this.permissions[permissionType].push(...config.permissions[permissionType]);
+    }
+
+    if ('contexts' in config) this.contexts = config.contexts;
+    if ('disabled' in config) this.disabled = config.disabled;
+
+    if ('noDefer' in config) this.noDefer = config.noDefer;
+    if ('ephemeralDefer' in config) this.ephemeralDefer = config.ephemeralDefer;
+
+    if ('options' in config) {
+      this.options = (config.options as unknown as (CommandOption<NoInfer<CT>, NoInfer<CTX>> | CommandOptionConfig<NoInfer<CT>, NoInfer<CTX>>)[])
+        .map(opt => (opt instanceof CommandOption ? opt : new CommandOptionUninitialized<NoInfer<CT>, NoInfer<CTX>>(opt)));
+    }
+
+    if (config.beta) this.beta = config.beta;
+
+    this.aliases = Object.fromEntries(config.types.map((e: NoInfer<CT>[number]) => [e, config.aliases?.[e] ?? []]));
+
+    this.types = config.types;
+    this.disabledReason = config.disabledReason;
+  }
+
+  init(...args: ConstructorParameters<typeof Command<CT, CTX, Options>> extends [unknown, ...infer R] ? R : never): Command<CT, CTX, Options> {
+    return new Command<CT, CTX, Options>(this, ...args);
   }
 }
