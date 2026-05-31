@@ -24,6 +24,9 @@ export default [
       }]),
       'max-lines': 'off', // Class definitions may just be longer.
       [`${pluginNames.typescript}/consistent-type-definitions`]: 'off', // Using interfaces where needed
+      ...getModifiedRule(config, `${pluginNames.import}/no-namespace`, [{
+        ignore: ['discord.js'] // prevent ugly renaming
+      }]),
       '@typescript-eslint/no-unsafe-type-assertion': 'off', // todo
       'sonarjs/cognitive-complexity': 'off', // todo
       'custom/cyclomatic-complexity': 'off', // todo

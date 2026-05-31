@@ -1,31 +1,30 @@
-import {
-  ApplicationCommandOptionType, ChannelType, Locale as DLocale, Message as _Message, _NonNullableFields, inlineCode
-} from 'discord.js';
-import { ContextType, CooldownType } from '../../index.ts';
+import * as Discord from 'discord.js';
+import { ContextType, CooldownType, isSnowflake } from '../../index.ts';
 import { autocompleteOptionsMaxAmt, choiceValueMaxLength, choiceValueMinLength, choicesMaxAmt, descriptionMaxLength } from '../../utils/constants.ts';
 import { CommandValidationError, cooldownConverter, equal } from '../utils.ts';
 
-import type { ApplicationCommandOption, ApplicationCommandOptionChoiceData, Client } from 'discord.js';
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
-import type { AllContexts, ChatInputCommandInteraction, Command, Logger, Message, MessageComponentInteraction } from '../../index.ts';
+import type {
+  AllContexts, ChatInputCommandInteraction, CommandInitialized as Command, CommandInteraction,
+  Logger, Message, MessageComponentInteraction
+} from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
 import type { RunnableReturns } from '../command/utils.ts';
 import type { CommandType } from '../utils.ts';
 import type {
-  AutocompleteGeneratorOptions, ChannelCommandOptionConfig, CommandOptionConfig, FallbackChannels, MapChannelTypes, NumericCommandOptionConfig,
-  PublicAutocompleteGeneratorOptions, StringCommandOptionConfig, SubcommandConfig, SubcommandGroupConfig, autocompleteObject, autocompleteOptions
+  AutocompleteGeneratorOptions, CommandOptionConfig, DefaultContext, FallbackChannels,
+  MapChannelTypes, PublicAutocompleteGeneratorOptions, autocompleteObject
 } from './utils.ts';
 
-/* eslint-disable-next-line import-x/prefer-default-export -- simplifies re-export */
 export class CommandOption<
   const CT extends readonly CommandType[] = readonly [],
-  const CTX extends AllContexts = readonly [ContextType.Guild],
+  const CTX extends AllContexts = DefaultContext,
   AO = undefined,
   const ChildrenOptions extends readonly CommandOptionConfig<CT, CTX>[] = readonly CommandOptionConfig<CT, CTX>[],
-  T extends ApplicationCommandOptionType = ApplicationCommandOptionType
+  T extends Discord.ApplicationCommandOptionType = Discord.ApplicationCommandOptionType
 > {
   name: Lowercase<string>;
-  id!: `${string}.options.${CommandOption['name']}`;
+  id: `${string}.options.${CommandOption['name']}`;
   position = 0;
 
   /** Currently not used */
@@ -35,163 +34,91 @@ export class CommandOption<
 
   type: T;
 
-  required = false;
+  required: boolean;
 
-  cooldowns: Record<CooldownType, number> = { [CooldownType.Guild]: 0, [CooldownType.Channel]: 0, [CooldownType.User]: 0 };
+  cooldowns: Record<CooldownType, number>;
 
-  contexts: CTX = [ContextType.Guild] as unknown as CTX;
+  contexts: CTX;
 
   disabled!: boolean;
   disabledReason: string | undefined;
 
   get autocomplete(): boolean { return !!this.autocompleteOptions; }
-  strictAutocomplete = false;
-  autocompleteOptions?: T extends ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number
-    ? autocompleteOptions<NoInfer<CT>, NoInfer<CTX>> | undefined
-    : undefined;
+  strictAutocomplete: boolean;
+  autocompleteOptions?: NonNullable<GetAll<Extract<
+    CommandOptionConfig<NoInfer<CT>, NoInfer<CTX>>, { type: T }
+  >, 'autocompleteOptions'>['autocompleteOptions']> | undefined;
 
-  choices?: IfExtends<T, ApplicationCommandOptionType.String | ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number,
-    { ifTrue: readonly ApplicationCommandOptionChoiceData[] }
+  choices?: IfExtends<T, GetAll<Discord.ApplicationCommandOption, 'choices'>['type'],
+    { ifTrue: readonly Discord.ApplicationCommandOptionChoiceData[] }
   > | undefined;
 
-  channelTypes?: IfExtends<T, ApplicationCommandOptionType.Channel,
-    { ifTrue: readonly ChannelType[] }
-  > | undefined;
+  channelTypes?: NonNullable<GetAll<Extract<
+    CommandOptionConfig<NoInfer<CT>, NoInfer<CTX>>, { type: T }
+  >, 'channelTypes'>['channelTypes']> | undefined;
 
-  minValue?: IfExtends<T, ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number,
-    { ifTrue: number }
-  > | undefined;
+  minValue?: NonNullable<GetAll<Extract<
+    CommandOptionConfig<NoInfer<CT>, NoInfer<CTX>>, { type: T }
+  >, 'minValue'>['minValue']> | undefined;
 
-  maxValue?: IfExtends<T, ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number,
-    { ifTrue: number }
-  > | undefined;
+  maxValue?: NonNullable<GetAll<Extract<
+    CommandOptionConfig<NoInfer<CT>, NoInfer<CTX>>, { type: T }
+  >, 'maxValue'>['maxValue']> | undefined;
 
-  minLength?: IfExtends<T, ApplicationCommandOptionType.String,
-    { ifTrue: number }
-  > | undefined;
+  minLength?: NonNullable<GetAll<Extract<
+    CommandOptionConfig<NoInfer<CT>, NoInfer<CTX>>, { type: T }
+  >, 'minLength'>['minLength']> | undefined;
 
-  maxLength?: IfExtends<T, ApplicationCommandOptionType.String,
-    { ifTrue: number }
-  > | undefined;
+  maxLength?: NonNullable<GetAll<Extract<
+    CommandOptionConfig<NoInfer<CT>, NoInfer<CTX>>, { type: T }
+  >, 'maxLength'>['maxLength']> | undefined;
 
-  options?: IfExtends<T, ApplicationCommandOptionType.SubcommandGroup | ApplicationCommandOptionType.Subcommand,
+  options?: IfExtends<T, GetAll<Discord.ApplicationCommandOption, 'options'>['type'],
     { ifTrue: CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>>[] }
   > | undefined;
 
   run?: (
     this: ExtendsMultiMatch<CommandType, CT, [
       [CommandType.Slash, ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>],
-      [CommandType.Component, MessageComponentInteraction<NoInfer<CTX>> & { commandName: Command['name'] }],
+      [CommandType.Component, MessageComponentInteraction<NoInfer<CTX>>],
       [CommandType.Prefix, Message<NoInfer<CTX>>]
     ]>,
     lang: Translator<false, Locale>, options: NoInfer<AO>,
     data: {
-      client: Client<true>;
+      client: Discord.Client<true>;
       command: Command<NoInfer<CT>, NoInfer<CTX>>;
       option: CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>>;
     }
   ) => unknown;
 
-  #i18n!: I18nProvider;
-  #cooldownsManager!: CooldownsManager;
-  #logger!: Logger;
-
-  /* eslint-disable-next-line @typescript-eslint/class-methods-use-this -- typing-only method */
-  #resolveConfigType(
-    config: CommandOptionConfig<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>> & { type: NoInfer<T> }
-  ): ExtendsMatch<T, [
-    [ApplicationCommandOptionType.SubcommandGroup, SubcommandGroupConfig<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>>],
-    [ApplicationCommandOptionType.Subcommand, SubcommandConfig<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>>],
-    [ApplicationCommandOptionType.String, StringCommandOptionConfig<NoInfer<CT>, NoInfer<CTX>>],
-    [ApplicationCommandOptionType.Integer | ApplicationCommandOptionType.Number, NumericCommandOptionConfig<NoInfer<CT>, NoInfer<CTX>>],
-    [ApplicationCommandOptionType.Channel, ChannelCommandOptionConfig]
-  ]> {
-    /* eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return -- typeguard method */
-    return config as any;
-  }
-
-  /** @internal */
-  constructor(configData: CommandOption<CT, CTX, AO, ChildrenOptions, T>);
-  /* eslint-disable-next-line @typescript-eslint/unified-signatures -- TS disagrees */
-  constructor(configData: CommandOptionConfig<CT, CTX, AO, ChildrenOptions> & { type: T });
-  constructor(configData: CommandOptionConfig<CT, CTX, AO, ChildrenOptions> & { type: T } | CommandOption<CT, CTX, AO, ChildrenOptions, T>) {
-    // need to set these specifically for typing
-    this.type = configData.type;
-    this.name = configData.name;
-
-    if (configData instanceof CommandOption) {
-      for (const key of Object.getOwnPropertyNames(configData) as (keyof typeof this)[]) {
-        const descriptor = Object.getOwnPropertyDescriptor(configData, key)
-          ?? Object.getOwnPropertyDescriptor(Object.getPrototypeOf(configData) as object, key);
-
-        if (!descriptor || descriptor.get || descriptor.writable === false) continue;
-
-        const value = configData[key as keyof typeof configData];
-
-        if (key == 'options')
-          this.options = (value as NonNullable<typeof configData.options>).map(opt => opt.clone()) as unknown as typeof this.options;
-        else if (value && typeof value == 'object' && typeof value != 'function')
-          (this as Record<typeof key, unknown>)[key] = Array.isArray(value) ? [...value] : { ...value as Record<string | number | symbol, unknown> };
-        else (this as Record<typeof key, unknown>)[key] = value;
-      }
-
-      return;
-    }
-
-    const config = this.#resolveConfigType(configData);
-    if ('required' in config) this.required = config.required;
-
-    switch (config.type) {
-      case ApplicationCommandOptionType.SubcommandGroup:
-      case ApplicationCommandOptionType.Subcommand:
-        if ('cooldowns' in config)
-          Object.fromEntries(Object.entries(this.cooldowns).map(e => cooldownConverter(config.cooldowns!, ...e)));
-
-        if ('contexts' in config) this.contexts = config.contexts;
-        if ('options' in config) {
-          this.options = (config.options as (
-            CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>> | CommandOptionConfig<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>>)[])
-            .map(opt => (opt instanceof CommandOption ? opt : new CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>>(opt))) as unknown as typeof this.options;
-        }
-
-
-        if ('run' in config) this.run = config.run as unknown as NonNullable<typeof this.run>;
-        break;
-
-      case ApplicationCommandOptionType.String:
-        if ('minLength' in config) this.minLength = config.minLength as typeof this.minLength;
-        if ('maxLength' in config) this.maxLength = config.maxLength as typeof this.maxLength;
-
-        // fall through for choices and autocompleteOptions
-      case ApplicationCommandOptionType.Integer:
-      case ApplicationCommandOptionType.Number:
-        if (config.type != ApplicationCommandOptionType.String) {
-          if ('minValue' in config) this.minValue = config.minValue as typeof this.minValue;
-          if ('maxValue' in config) this.maxValue = config.maxValue as typeof this.maxValue;
-        }
-
-        if ('choices' in config)
-          this.choices = config.choices.map(e => ({ name: String(e), value: e })) as unknown as NonNullable<typeof this.choices>;
-
-        this.autocompleteOptions = config.autocompleteOptions as typeof this.autocompleteOptions;
-        if ('strictAutocomplete' in config) this.strictAutocomplete = config.strictAutocomplete;
-        break;
-
-      case ApplicationCommandOptionType.Channel:
-        if ('channelTypes' in config) this.channelTypes = config.channelTypes as typeof this.channelTypes;
-        break;
-
-      default: // no special handling
-    }
-  }
+  readonly #i18n: I18nProvider;
+  readonly #cooldownsManager: CooldownsManager;
+  readonly #logger: Logger;
 
   /**
    * {@link Command.init Commands} and not the user should initialize `CommandOption`s.
    * @internal */
-  init(
+  constructor(
+    base: CommandOptionUninitialized<CT, CTX, AO, ChildrenOptions, T>,
     i18n: I18nProvider, parentId: Command['id'] | CommandOption['id'],
     cooldownsManager: CooldownsManager, logger: Logger = console, position = 0
-  ): this {
+  ) {
+    this.type = base.type;
+    this.name = base.name;
+    this.required = base.required;
+    this.contexts = base.contexts;
+    this.run = base.run;
+    this.minLength = base.minLength;
+    this.maxLength = base.maxLength;
+    this.minValue = base.minValue;
+    this.maxValue = base.maxValue;
+    this.choices = base.choices;
+    this.autocompleteOptions = base.autocompleteOptions;
+    this.strictAutocomplete = base.strictAutocomplete;
+    this.channelTypes = base.channelTypes;
+    this.cooldowns = base.cooldowns;
+
+
     this.#i18n = i18n;
     this.#logger = logger;
     this.#cooldownsManager = cooldownsManager;
@@ -199,15 +126,10 @@ export class CommandOption<
     this.id = `${parentId}.options.${this.name}`;
     this.position = position;
 
+    if (base.options) this.options = base.options.map((e, i) => e.init(i18n, this.id, cooldownsManager, logger, i)) as typeof this.options;
+
     this.#validate();
     this.#localize();
-
-    if (this.options) {
-      for (const [i, option] of this.options.entries())
-        option.init(i18n, this.id, cooldownsManager, logger, i);
-    }
-
-    return this;
   }
 
   getChannel<This, RetSelf extends boolean = false>(
@@ -217,9 +139,9 @@ export class CommandOption<
       [CommandType.Prefix, Message<NoInfer<CTX>>]
     ]>, returnSelf: RetSelf
   ): (
-  [ChannelType[]] extends [This extends { channelTypes: infer CHT } ? CHT : never]
+  [Discord.ChannelType[]] extends [This extends { channelTypes: infer CHT } ? CHT : never]
     ? FallbackChannels<NoInfer<CT>, NoInfer<CTX>>
-    : This extends { channelTypes: infer CHT extends readonly ChannelType[] }
+    : This extends { channelTypes: infer CHT extends readonly Discord.ChannelType[] }
       ? MapChannelTypes<CHT>
       : FallbackChannels<NoInfer<CT>, NoInfer<CTX>>
   ) | IfD<RetSelf,
@@ -236,14 +158,14 @@ export class CommandOption<
     ]>,
     returnSelf = false
   ): unknown {
-    if (this.type != ApplicationCommandOptionType.Channel)
-      throw new Error(`This method does not run on ${ApplicationCommandOptionType[this.type]} options!`);
+    if (this.type != Discord.ApplicationCommandOptionType.Channel)
+      throw new Error(`This method does not run on ${Discord.ApplicationCommandOptionType[this.type]} options!`);
 
-    let target = interaction instanceof _Message
+    let target = interaction instanceof Discord.Message
       ? interaction.mentions.channels.first()
       : (interaction as ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>).options.getChannel(this.name, false, this.channelTypes);
 
-    if (!target && interaction instanceof _Message)
+    if (!target && interaction instanceof Discord.Message)
       target = interaction.guild?.channels.cache.find(e => [e.id, e.name].some(e => interaction.content.includes(e)));
     if (target) return target;
 
@@ -327,8 +249,8 @@ export class CommandOption<
 
         if (locale == this.#i18n.config.defaultLocale) choice.name = localizedChoice;
         else if (locale == 'en') {
-          choice.nameLocalizations[DLocale.EnglishGB] = localizedChoice;
-          choice.nameLocalizations[DLocale.EnglishUS] = localizedChoice;
+          choice.nameLocalizations[Discord.Locale.EnglishGB] = localizedChoice;
+          choice.nameLocalizations[Discord.Locale.EnglishUS] = localizedChoice;
         }
         else choice.nameLocalizations[locale] = localizedChoice;
       }
@@ -349,17 +271,17 @@ export class CommandOption<
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
     if (
-      [ApplicationCommandOptionType.SubcommandGroup, ApplicationCommandOptionType.Subcommand].includes(this.type)
-      && !this.contexts.includes(ContextType.BotDM) && interaction.channel.type == ChannelType.DM
+      [Discord.ApplicationCommandOptionType.SubcommandGroup, Discord.ApplicationCommandOptionType.Subcommand].includes(this.type)
+      && !this.contexts.includes(ContextType.BotDM) && interaction.channel.type == Discord.ChannelType.DM
     ) return ['guildOnly'];
 
-    if (this.type == ApplicationCommandOptionType.SubcommandGroup)
+    if (this.type == Discord.ApplicationCommandOptionType.SubcommandGroup)
       return this.#isRunnableSubcommandGroup(interaction, command, wrapperTranslator, args);
-    if (this.type == ApplicationCommandOptionType.Subcommand)
+    if (this.type == Discord.ApplicationCommandOptionType.Subcommand)
       return this.#isRunnableSubcommand(interaction, command, wrapperTranslator, args);
 
     const
-      option = interaction instanceof _Message
+      option = interaction instanceof Discord.Message
         ? undefined
         : (interaction as ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>).options.get(this.name)?.value,
       arg = args?.[this.position];
@@ -372,9 +294,10 @@ export class CommandOption<
       }];
     }
 
-    if (interaction instanceof _Message && arg) { // if it's an interaction then these checks will be done by Discord
-      if (this.type == ApplicationCommandOptionType.Channel && this.channelTypes) {
-        const channel = interaction.guild?.channels.cache.get(arg as Snowflake);
+    if (interaction instanceof Discord.Message && arg) { // if it's an interaction then these checks will be done by Discord
+      if (this.type == Discord.ApplicationCommandOptionType.Channel && this.channelTypes) {
+        let channel;
+        if (isSnowflake(arg)) channel = interaction.guild?.channels.cache.get(arg);
         if (channel && !this.channelTypes.includes(channel.type)) return ['invalidChannelType', this.name];
       }
 
@@ -390,8 +313,8 @@ export class CommandOption<
         let availableOptions: string | number;
         if (!this.autocompleteOptions) availableOptions = '';
         else if (Array.isArray(this.autocompleteOptions))
-          availableOptions = this.autocompleteOptions.map(e => (typeof e == 'object' ? e.value : e).toString()).map(inlineCode).join(', ');
-        /* eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TS disagrees */
+          availableOptions = this.autocompleteOptions.map(e => (typeof e == 'object' ? e.value : e).toString()).map(Discord.inlineCode).join(', ');
+
         else if (typeof this.autocompleteOptions == 'object') availableOptions = (this.autocompleteOptions as autocompleteObject).value;
         else availableOptions = this.autocompleteOptions;
 
@@ -401,7 +324,7 @@ export class CommandOption<
       if (this.choices && !this.choices.some(e => e.value.toString().toLowerCase() == arg.toLowerCase())) {
         return ['strictAutocompleteNoMatchWValues', {
           option: this.name,
-          availableOptions: this.choices.map(e => inlineCode(e.value.toString())).join(', ')
+          availableOptions: this.choices.map(e => Discord.inlineCode(e.value.toString())).join(', ')
         }];
       }
     }
@@ -418,14 +341,14 @@ export class CommandOption<
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
     const
-      subcommandName = interaction instanceof _Message
+      subcommandName = interaction instanceof Discord.Message
         ? args?.[this.position]
         : (interaction as ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>).options.getSubcommand(true),
       subcommand = this.options?.find(e => e.name == subcommandName);
 
     return subcommand?.isRunnable(
       interaction, command, wrapperTranslator,
-      interaction instanceof _Message ? args?.slice(1) : args
+      interaction instanceof Discord.Message ? args?.slice(1) : args
     ) ?? false;
   }
 
@@ -486,11 +409,11 @@ export class CommandOption<
    * Resets it if it's `0`.
    * @returns the currect cooldown for this subcommand(group) in ms.
    * @internal */
-  updateCooldowns(interaction: ChatInputCommandInteraction | Message | MessageComponentInteraction): number {
+  updateCooldowns(interaction: CommandInteraction): number {
     return this.#cooldownsManager.update(this.id, interaction, this.cooldowns);
   }
 
-  isEqualTo(opt: CommandOption<CommandType[], AllContexts> | ApplicationCommandOption): boolean {
+  isEqualTo(opt: CommandOption<CommandType[], AllContexts> | Discord.ApplicationCommandOption): boolean {
     for (const prop of ['name', 'description', 'type', 'autocomplete', 'required', 'minValue', 'maxValue', 'minLength', 'maxLength'] as const) {
       const optProp = prop in opt ? opt[prop as keyof typeof opt] : undefined;
       if (this[prop] != (typeof this[prop] == 'boolean' ? !!optProp : optProp)) return false;
@@ -535,7 +458,116 @@ export class CommandOption<
     return true;
   }
 
-  clone(): CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>> {
-    return new CommandOption(this);
+  clone(): CommandOptionUninitialized<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>> {
+    /* eslint-disable-next-line @typescript-eslint/no-use-before-define -- fine with classes */
+    return new CommandOptionUninitialized(this);
+  }
+}
+
+export class CommandOptionUninitialized<
+  const CT extends readonly CommandType[] = readonly [],
+  const CTX extends AllContexts = DefaultContext,
+  AO = undefined,
+  const ChildrenOptions extends readonly CommandOptionConfig<CT, CTX>[] = readonly CommandOptionConfig<CT, CTX>[],
+  T extends Discord.ApplicationCommandOptionType = Discord.ApplicationCommandOptionType
+> {
+  type: CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>>['type'];
+  name: CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>>['name'];
+  options?: IfExtends<T, GetAll<Discord.ApplicationCommandOption, 'options'>['type'],
+    { ifTrue: CommandOptionUninitialized<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>>[] }
+  > | undefined;
+
+  required: CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>>['required'] = false;
+  contexts: CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>>['contexts'] = DefaultContext as unknown as CTX;
+  run: CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>>['run'];
+  minLength: CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>>['minLength'];
+  maxLength: CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>>['maxLength'];
+  minValue: CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>>['minValue'];
+  maxValue: CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>>['maxValue'];
+  choices: CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>>['choices'];
+  autocompleteOptions: CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>>['autocompleteOptions'];
+  strictAutocomplete: CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>>['strictAutocomplete'] = false;
+  channelTypes: CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>>['channelTypes'];
+  cooldowns: CommandOption<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>>['cooldowns'] = Object.fromEntries(Object.values(CooldownType).map(e => [e, 0]));
+
+  /** @internal */
+  constructor(config: CommandOption<CT, CTX, AO, ChildrenOptions, T>);
+  /* eslint-disable-next-line @typescript-eslint/unified-signatures -- TS disagrees */
+  constructor(config: ShallowPrettify<Extract<CommandOptionConfig<CT, CTX, AO, ChildrenOptions>, { type: T }>>);
+  constructor(config: ShallowPrettify<Extract<CommandOptionConfig<CT, CTX, AO, ChildrenOptions>, { type: T }>> | CommandOption<CT, CTX, AO, ChildrenOptions, T>) {
+    // need to set these specifically for typing
+    this.type = config.type;
+    this.name = config.name;
+
+    if (config instanceof CommandOption) {
+      for (const key of Object.getOwnPropertyNames(config) as (keyof typeof this)[]) {
+        const descriptor = Object.getOwnPropertyDescriptor(config, key)
+          ?? Object.getOwnPropertyDescriptor(Object.getPrototypeOf(config) as object, key);
+
+        if (!descriptor || descriptor.get || descriptor.writable === false) continue;
+
+        const value = config[key as keyof typeof config];
+
+        if (key == 'options')
+          this.options = (value as NonNullable<typeof config.options>).map(opt => opt.clone()) as unknown as typeof this.options;
+        else if (value && typeof value == 'object' && typeof value != 'function')
+          (this as Record<typeof key, unknown>)[key] = Array.isArray(value) ? [...value] : { ...value as Record<string | number | symbol, unknown> };
+        else (this as Record<typeof key, unknown>)[key] = value;
+      }
+
+      return;
+    }
+
+    if ('required' in config) this.required = config.required;
+
+    switch (config.type) {
+      case Discord.ApplicationCommandOptionType.SubcommandGroup:
+      case Discord.ApplicationCommandOptionType.Subcommand:
+        if ('cooldowns' in config)
+          Object.fromEntries(Object.entries(this.cooldowns).map(e => cooldownConverter(config.cooldowns!, ...e)));
+
+        if ('contexts' in config) this.contexts = config.contexts as typeof this.contexts;
+        if ('options' in config) {
+          this.options = (config.options as (
+            CommandOptionUninitialized<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>> | CommandOptionConfig<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>>)[])
+            .map(opt => (
+              opt instanceof CommandOptionUninitialized ? opt : new CommandOptionUninitialized<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>>(opt)
+            )) as unknown as typeof this.options;
+        }
+
+        if ('run' in config) this.run = config.run as unknown as NonNullable<typeof this.run>;
+        break;
+
+      case Discord.ApplicationCommandOptionType.String:
+        if ('minLength' in config) this.minLength = config.minLength;
+        if ('maxLength' in config) this.maxLength = config.maxLength;
+
+        // fall through for choices and autocompleteOptions
+      case Discord.ApplicationCommandOptionType.Integer:
+      case Discord.ApplicationCommandOptionType.Number:
+        if (config.type != Discord.ApplicationCommandOptionType.String) {
+          if ('minValue' in config) this.minValue = config.minValue;
+          if ('maxValue' in config) this.maxValue = config.maxValue;
+        }
+
+        if ('choices' in config)
+          this.choices = config.choices.map(e => ({ name: String(e), value: e })) as unknown as NonNullable<typeof this.choices>;
+
+        if ('autocompleteOptions' in config) this.autocompleteOptions = config.autocompleteOptions;
+        if ('strictAutocomplete' in config) this.strictAutocomplete = config.strictAutocomplete;
+        break;
+
+      case Discord.ApplicationCommandOptionType.Channel:
+        if ('channelTypes' in config) this.channelTypes = config.channelTypes;
+        break;
+
+      default: // no special handling
+    }
+  }
+
+  init(
+    ...args: ConstructorParameters<typeof CommandOption<CT, CTX, AO, ChildrenOptions, T>> extends [unknown, ...infer R] ? R : never
+  ): CommandOption<CT, CTX, AO, ChildrenOptions, T> {
+    return new CommandOption<CT, CTX, AO, ChildrenOptions, T>(this, ...args);
   }
 }

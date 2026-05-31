@@ -3,8 +3,8 @@ import { getMilliseconds as getMilliseconds_ } from 'better-ms';
 
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  AllContexts, AutocompleteInteraction, BetterMS, ChatInputCommandInteraction, Command,
-  CooldownType, Message, MessageComponentInteraction, validTimeString
+  AllContexts, AutocompleteInteraction, BetterMS, CommandInitialized as Command,
+  CommandInteraction, CooldownType, validTimeString
 } from '../index.ts';
 import type { CommandOption } from './commandOption/index.ts';
 
@@ -44,7 +44,7 @@ export function cooldownConverter(
 
 export class CommandExecutionError extends Error {
   override readonly name = 'CommandExecutionError';
-  interaction: ChatInputCommandInteraction | Message | MessageComponentInteraction | AutocompleteInteraction;
+  interaction: CommandInteraction | AutocompleteInteraction;
   translator: Translator<boolean, Locale>;
 
   constructor(

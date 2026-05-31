@@ -1,3 +1,5 @@
+/* eslint-disable nounsanitized/method, security/detect-non-literal-require -- should be handled by the lib's user */
+
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { init, isSupported } from 'import-without-cache';

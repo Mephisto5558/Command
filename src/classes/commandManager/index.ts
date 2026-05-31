@@ -1,12 +1,12 @@
-import { Collection } from 'discord.js';
+import * as Discord from 'discord.js';
 import { readdir } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
+
 import { getDirectories, getFilename, loadFile } from '../../index.ts';
 import capitalize from '../../utils/capitalize.ts';
 import { Command } from '../command/index.ts';
 import { CommandType } from '../utils.ts';
 
-import type { ApplicationCommand, ApplicationCommandDataResolvable, ChatInputApplicationCommandData, Client } from 'discord.js';
 import type { I18nProvider } from '@mephisto5558/i18n';
 import type { AllContexts, Logger, commandDoneFn, customPermissionChecksFn } from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
@@ -24,8 +24,8 @@ type CollectionMember = Command<
 >;
 /* eslint-disable-next-line import-x/prefer-default-export -- simplifies re-export */
 export class CommandManager {
-  commands = new Collection<CollectionMember['name'], { command: CollectionMember; filePath: string }>();
-  client!: Client<true>;
+  commands = new Discord.Collection<CollectionMember['name'], { command: CollectionMember; filePath: string }>();
+  client!: Discord.Client<true>;
   commandsPath!: string;
   doneFn: commandDoneFn | undefined;
   cooldownsManager!: CooldownsManager;
@@ -40,7 +40,7 @@ export class CommandManager {
 
   init(
     commandsPath: string,
-    client: Client<true>,
+    client: Discord.Client<true>,
     i18n: I18nProvider,
     config: {
       logger?: Logger;
@@ -143,7 +143,10 @@ export class CommandManager {
     return commandFile;
   }
 
-  async #createCommand(command: ChatInputApplicationCommandData, action: string, alias?: CollectionMember['name']): Promise<ApplicationCommand> {
+  async #createCommand(
+    command: Discord.ChatInputApplicationCommandData,
+    action: string, alias?: CollectionMember['name']
+  ): Promise<Discord.ApplicationCommand> {
     const appCommand = await this.client.application.commands.create(command);
     this.#logLoadMsg(action, appCommand.name, alias);
 
@@ -151,7 +154,7 @@ export class CommandManager {
   }
 
   async #deleteCommand(
-    command: Pick<CollectionMember, 'commandId' | 'name'> | Pick<ApplicationCommand, 'id' | 'name'>,
+    command: Pick<CollectionMember, 'commandId' | 'name'> | Pick<Discord.ApplicationCommand, 'id' | 'name'>,
     action: string, alias?: CollectionMember['name']
   ): Promise<void> {
     await this.client.application.commands.delete('commandId' in command ? command.commandId : command.id);
@@ -159,16 +162,16 @@ export class CommandManager {
   }
 
   async #editCommand(
-    oldCommand: ApplicationCommand, newCommand: ApplicationCommandDataResolvable,
+    oldCommand: Discord.ApplicationCommand, newCommand: Discord.ApplicationCommandDataResolvable,
     action: string, alias?: CollectionMember['name']
-  ): Promise<ApplicationCommand> {
+  ): Promise<Discord.ApplicationCommand> {
     const appCommand = await this.client.application.commands.edit(oldCommand.id, newCommand);
     this.#logLoadMsg(action, appCommand.name, alias);
 
     return appCommand;
   }
 
-  async registerCommand(newCommand: CollectionMember, oldCommand?: CollectionMember): Promise<ApplicationCommand | undefined> {
+  async registerCommand(newCommand: CollectionMember, oldCommand?: CollectionMember): Promise<Discord.ApplicationCommand | undefined> {
     if (!newCommand.types.includes(CommandType.Slash)) return;
 
     const
@@ -188,7 +191,7 @@ export class CommandManager {
       else {
         const
           existing = existingCommands.find(e => e.name == newCommand.name),
-          commandData = newCommand as unknown as ChatInputApplicationCommandData;
+          commandData = newCommand as unknown as Discord.ChatInputApplicationCommandData;
 
         appCommand = await (existing ? this.#editCommand(existing, commandData, 'Reloaded') : this.#createCommand(commandData, 'Created'));
       }
@@ -202,7 +205,7 @@ export class CommandManager {
 
   async #registerAlias(
     newCommand: CollectionMember, oldCommand: CollectionMember | undefined,
-    alias: CollectionMember['name'], isEqual: boolean, existingCommands: Collection<string, ApplicationCommand>
+    alias: CollectionMember['name'], isEqual: boolean, existingCommands: Discord.Collection<string, Discord.ApplicationCommand>
   ): Promise<void> {
     const
       inOld = oldCommand?.aliases[CommandType.Slash].includes(alias),
@@ -213,7 +216,7 @@ export class CommandManager {
       if (existing) await this.#deleteCommand(existing, `Deleted ${newCommand.disabled ? 'Disabled' : ''}`, alias);
     }
     else if (inOld && inNew && isEqual) {
-      const commandClone = newCommand.clone() as unknown as ChatInputApplicationCommandData;
+      const commandClone = newCommand.clone() as unknown as Discord.ChatInputApplicationCommandData;
       commandClone.name = alias;
 
       await (existing ? this.#editCommand(existing, commandClone, 'Reloaded', alias) : this.#createCommand(commandClone, 'Created', alias));

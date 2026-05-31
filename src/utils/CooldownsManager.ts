@@ -1,17 +1,17 @@
 /* eslint-disable unicorn/filename-case -- class export */
 
-import { Message as _Message } from 'discord.js';
+import * as Discord from 'discord.js';
 import { CooldownType } from '../index.ts';
 
 import type { CommandType } from '../classes/utils.ts';
-import type { AllContexts, ChatInputCommandInteraction, Command, Message, MessageComponentInteraction } from '../index.ts';
+import type { AllContexts, CommandInitialized as Command, CommandInteraction } from '../index.ts';
 
 export default class CooldownsManager {
   cache = new Map<string, Map<CooldownType, Map<Snowflake, number>>>();
 
   /** @returns milliseconds until the cooldown ends */
   update(
-    name: string, context: ChatInputCommandInteraction | MessageComponentInteraction | Message,
+    name: string, context: CommandInteraction,
     cooldowns: Partial<Command<CommandType[], AllContexts>['cooldowns']>
   ): number {
     const
@@ -26,7 +26,7 @@ export default class CooldownsManager {
       let areaId: Snowflake | undefined;
       switch (cdName) {
         case CooldownType.User:
-          areaId = context instanceof _Message ? context.author.id : context.user.id;
+          areaId = context instanceof Discord.Message ? context.author.id : context.user.id;
           break;
         case CooldownType.Guild:
           areaId = context.guildId ?? undefined;
