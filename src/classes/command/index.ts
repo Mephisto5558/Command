@@ -477,13 +477,15 @@ export class Command<
     | { name?: CommandOption['name']; type: CommandOption['type'] } | undefined
   >(
     option?: O,
-    interaction?: ThisParameterType<Command<[CommandType.Slash], NoInfer<CTX>>['run']>
+    interaction?: ThisParameterType<Command<readonly [CommandType.Slash], NoInfer<CTX>>['run']>
   ): IfExtendsStrict<O, undefined, {
     ifTrue: If<IsEmptyArray<Options>, { ifTrue: undefined; ifFalse: CommandOption<NoInfer<CT>, NoInfer<CTX>> }>;
-    ifFalse: Extract<DeepOptions<Options[number]>, O> extends infer E ? IfExtendsStrict<E, never, {
-      ifTrue: undefined;
-      ifFalse: ResolvedOption<NoInfer<CT>, NoInfer<CTX>, E>;
-    }> : never;
+    ifFalse: number extends Options['length']
+      ? ResolvedOption<NoInfer<CT>, NoInfer<CTX>, O> | undefined
+      : Extract<DeepOptions<Options[number]>, O> extends infer E ? IfExtendsNever<E, {
+        ifTrue: undefined;
+        ifFalse: ResolvedOption<NoInfer<CT>, NoInfer<CTX>, E>;
+      }> : never;
   }> {
     const
       group = interaction?.options.getSubcommandGroup(false),

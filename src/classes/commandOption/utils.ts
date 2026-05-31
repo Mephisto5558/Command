@@ -1,8 +1,7 @@
-/* eslint-disable @typescript-eslint/consistent-type-definitions */
 import type {
   APIInteractionDataResolvedChannel, APIRole, ApplicationCommandOptionChoiceData, ApplicationCommandOptionType,
-  Attachment, CacheType, CategoryChannel, ChannelType, Client, CommandInteractionOptionResolver, GuildBasedChannel,
-  GuildMember, Message as _Message, NewsChannel, Role, StageChannel, TextChannel, ThreadChannel, User, VoiceChannel
+  Attachment, CacheType, Channel, ChannelType, Client, CommandInteractionOptionResolver, GuildBasedChannel,
+  GuildMember, Message as _Message, Role, User
 } from 'discord.js';
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type {
@@ -36,45 +35,47 @@ type ExtractOptionName<O, Type extends ApplicationCommandOptionType>
     : never;
 
 type ExtractGetOption<O, Name extends string, Type extends ApplicationCommandOptionType>
-  = Extract<O, { name: Name; type: Type }>;
+  = O extends { name: infer ON; type: infer T }
+    ? IfExtendsStrict<Type, T, {
+      ifTrue: IfExtends<string, ON, {
+        ifTrue: O; // Handles JS broad string inference
+        ifFalse: IfExtends<ON, Name, { ifTrue: O }>;
+      }>;
+    }>
+    : never;
 
 type GetNamesAtLevel<Opts extends readonly unknown[], TargetType extends ApplicationCommandOptionType>
   = ExtractOptionName<Opts[number], TargetType>;
 
 type OptionName<Options extends readonly unknown[], Type extends ApplicationCommandOptionType>
-  = ExtractOptionName<Options[number], Type>
+  = | ExtractOptionName<Options[number], Type>
     | ExtractOptionName<GetSubOpts<Options[number]>, Type>
     | ExtractOptionName<GetSubOpts<GetSubOpts<Options[number]>>, Type>;
 
 type GetOption<Options extends readonly unknown[], Name extends string, Type extends ApplicationCommandOptionType>
-  = ExtractGetOption<Options[number], Name, Type>
+  = | ExtractGetOption<Options[number], Name, Type>
     | ExtractGetOption<GetSubOpts<Options[number]>, Name, Type>
     | ExtractGetOption<GetSubOpts<GetSubOpts<Options[number]>>, Name, Type>;
 
-export type ResolvedChannelType<T extends ChannelType> = ExtendsMatch<T, [
-  [ChannelType.GuildText, TextChannel],
-  [ChannelType.GuildVoice, VoiceChannel],
-  [ChannelType.GuildCategory, CategoryChannel],
-  [ChannelType.GuildAnnouncement, NewsChannel],
-  [ChannelType.GuildStageVoice, StageChannel],
-  [ChannelType.PublicThread | ChannelType.PrivateThread | ChannelType.AnnouncementThread, ThreadChannel]
-], GuildBasedChannel | APIInteractionDataResolvedChannel>;
+export type MapChannelTypes<CT extends readonly ChannelType[]> = ShallowPrettify<Extract<Channel, { type: CT[number] }>>;
 
-type MapChannelTypes<Types extends readonly ChannelType[]> = ResolvedChannelType<Types[number]>;
+type ResolvedDefaultChannel = GuildBasedChannel | APIInteractionDataResolvedChannel;
+type ResolvedChannel<Options extends readonly unknown[], Name extends string>
+  = [GetOption<Options, Name, ApplicationCommandOptionType.Channel>] extends [never]
+    ? ResolvedDefaultChannel
+    : GetOption<Options, Name, ApplicationCommandOptionType.Channel> extends { channelTypes: infer CT extends readonly ChannelType[] }
+      ? [CT[number]] extends [never]
+          ? ResolvedDefaultChannel
+          : MapChannelTypes<CT>
+      : ResolvedDefaultChannel;
 
-type ResolvedChannel<Options extends readonly unknown[], Name extends string> = IfExtendsStrict<
-  GetOption<Options, Name, ApplicationCommandOptionType.Channel>, { channelTypes: readonly ChannelType[] }, {
-    ifTrue: MapChannelTypes<
-      Extract<GetOption<Options, Name, ApplicationCommandOptionType.Channel>, { channelTypes: readonly ChannelType[] }>['channelTypes']
-    >; ifFalse: GuildBasedChannel | APIInteractionDataResolvedChannel;
-  }
->;
-
-type ResolvedSubcommand<Options extends readonly unknown[]> = IfExtends<OptionName<Options, ApplicationCommandOptionType.Subcommand>, never,
+type ResolvedSubcommand<Options extends readonly unknown[]> = IfExtendsNever<
+  OptionName<Options, ApplicationCommandOptionType.Subcommand>,
   { ifTrue: string; ifFalse: OptionName<Options, ApplicationCommandOptionType.Subcommand> }
 >;
 
-type ResolvedSubcommandGroup<Options extends readonly unknown[]> = IfExtends<OptionName<Options, ApplicationCommandOptionType.SubcommandGroup>, never,
+type ResolvedSubcommandGroup<Options extends readonly unknown[]> = IfExtendsNever<
+  OptionName<Options, ApplicationCommandOptionType.SubcommandGroup>,
   { ifTrue: string; ifFalse: OptionName<Options, ApplicationCommandOptionType.SubcommandGroup> }
 >;
 
@@ -93,12 +94,12 @@ type ResolveValue<Option, BaseType> = Match<[
   ]
 ], BaseType>;
 
-type ResolvedValue<Options extends readonly unknown[], Name extends string, Type extends ApplicationCommandOptionType, BaseType> = IfExtends<
-  GetOption<Options, Name, Type>, never, {
-    ifTrue: BaseType;
-    ifFalse: ResolveValue<GetOption<Options, Name, Type>, BaseType>;
-  }
->;
+type ResolvedValue<
+  Options extends readonly unknown[], Name extends string, Type extends ApplicationCommandOptionType, BaseType
+> = IfExtendsNever<GetOption<Options, Name, Type>, {
+  ifTrue: BaseType;
+  ifFalse: ResolveValue<GetOption<Options, Name, Type>, BaseType>;
+}>;
 
 export type FallbackChannels<CT extends readonly CommandType[], CTX extends AllContexts>
   = ExtendsMultiMatch<CommandType, CT, [
@@ -108,7 +109,7 @@ export type FallbackChannels<CT extends readonly CommandType[], CTX extends AllC
   ]>['channel'];
 
 type IsRequired<Options extends readonly unknown[], Name extends string, Type extends ApplicationCommandOptionType>
-  = Not<Extends<Extract<Options[number], { name: Name; type: Type; required: true }>, never>>;
+  = Not<ExtendsNever<Extract<Options[number], { name: Name; type: Type; required: true }>>>;
 
 export type TypeSafeOptionResolver<Cached extends CacheType = CacheType, Options extends readonly unknown[] = unknown[]> = StrictOmit<
   CommandInteractionOptionResolver<Cached>, Extract<keyof CommandInteractionOptionResolver<Cached>, `get${string}${string}`>

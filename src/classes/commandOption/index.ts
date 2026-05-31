@@ -12,9 +12,8 @@ import type CooldownsManager from '../../utils/CooldownsManager.ts';
 import type { RunnableReturns } from '../command/utils.ts';
 import type { CommandType } from '../utils.ts';
 import type {
-  AutocompleteGeneratorOptions, ChannelCommandOptionConfig, CommandOptionConfig, FallbackChannels, NumericCommandOptionConfig,
-  PublicAutocompleteGeneratorOptions, ResolvedChannelType, StringCommandOptionConfig, SubcommandConfig, SubcommandGroupConfig,
-  autocompleteObject, autocompleteOptions
+  AutocompleteGeneratorOptions, ChannelCommandOptionConfig, CommandOptionConfig, FallbackChannels, MapChannelTypes, NumericCommandOptionConfig,
+  PublicAutocompleteGeneratorOptions, StringCommandOptionConfig, SubcommandConfig, SubcommandGroupConfig, autocompleteObject, autocompleteOptions
 } from './utils.ts';
 
 /* eslint-disable-next-line import-x/prefer-default-export -- simplifies re-export */
@@ -211,18 +210,32 @@ export class CommandOption<
     return this;
   }
 
-  getChannel<RetSelf extends boolean = false>(
+  getChannel<This, RetSelf extends boolean = false>(
+    this: This, // important for return type resolving
     interaction: ExtendsMultiMatch<CommandType, CT, [
       [CommandType.Slash, ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>],
       [CommandType.Prefix, Message<NoInfer<CTX>>]
     ]>, returnSelf: RetSelf
-  ): IfExtendsD<this['channelTypes'], readonly ChannelType[],
-    IfExtendsD<ChannelType, NonNullable<this['channelTypes']>[number],
-      FallbackChannels<NoInfer<CT>, NoInfer<CTX>>,
-      ResolvedChannelType<NonNullable<this['channelTypes']>[number]>
-    >,
-    FallbackChannels<NoInfer<CT>, NoInfer<CTX>>
-  > | IfD<RetSelf, ThisParameterType<NonNullable<this['run']>>['channel'], undefined> {
+  ): (
+  [ChannelType[]] extends [This extends { channelTypes: infer CHT } ? CHT : never]
+    ? FallbackChannels<NoInfer<CT>, NoInfer<CTX>>
+    : This extends { channelTypes: infer CHT extends readonly ChannelType[] }
+      ? MapChannelTypes<CHT>
+      : FallbackChannels<NoInfer<CT>, NoInfer<CTX>>
+  ) | IfD<RetSelf,
+    This extends { run?: unknown }
+      ? ThisParameterType<NonNullable<This['run']>> extends { channel: infer C } ? C : undefined
+      : undefined,
+    undefined
+  >;
+
+  getChannel(
+    interaction: ExtendsMultiMatch<CommandType, CT, [
+      [CommandType.Slash, ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>],
+      [CommandType.Prefix, Message<NoInfer<CTX>>]
+    ]>,
+    returnSelf = false
+  ): unknown {
     if (this.type != ApplicationCommandOptionType.Channel)
       throw new Error(`This method does not run on ${ApplicationCommandOptionType[this.type]} options!`);
 
@@ -232,9 +245,9 @@ export class CommandOption<
 
     if (!target && interaction instanceof _Message)
       target = interaction.guild?.channels.cache.find(e => [e.id, e.name].some(e => interaction.content.includes(e)));
-    if (target) return target as ReturnType<typeof this.getChannel<RetSelf>>;
+    if (target) return target;
 
-    return (returnSelf ? interaction.channel : undefined) as ReturnType<typeof this.getChannel<RetSelf>>;
+    return returnSelf ? interaction.channel : undefined;
   }
 
   #validate(): void {
