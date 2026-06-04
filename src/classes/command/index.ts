@@ -238,11 +238,7 @@ export class Command<
     if (interaction instanceof Discord.MessageComponentInteraction)
       interaction.commandName = this.name;
 
-    let commandType;
-    if (interaction instanceof Discord.ChatInputCommandInteraction) commandType = CommandType.Slash;
-    else if (interaction instanceof Discord.MessageComponentInteraction) commandType = CommandType.Component;
-    else commandType = CommandType.Prefix;
-
+    const commandType = CommandUninitialized.resolveCommandType(interaction);
     this.#logger.debug(`Executing ${commandType} command ${this.name}`);
 
     if (
@@ -561,5 +557,16 @@ export class CommandUninitialized<
 
   init(...args: ConstructorParameters<typeof Command<CT, CTX, Options>> extends [unknown, ...infer R] ? R : never): Command<CT, CTX, Options> {
     return new Command<CT, CTX, Options>(this, ...args);
+  }
+
+  static resolveCommandType<I>(interaction: I): ExtendsMatch<I, [
+    [Discord.ChatInputCommandInteraction | ChatInputCommandInteraction, CommandType.Slash],
+    [Discord.Message | Message, CommandType.Prefix],
+    [Discord.MessageComponentInteraction | MessageComponentInteraction, CommandType.Component]
+  ], undefined> {
+    if (interaction instanceof Discord.ChatInputCommandInteraction) return CommandType.Slash as ReturnType<typeof this.resolveCommandType<I>>;
+    if (interaction instanceof Discord.Message) return CommandType.Prefix as ReturnType<typeof this.resolveCommandType<I>>;
+    if (interaction instanceof Discord.MessageComponentInteraction) return CommandType.Component as ReturnType<typeof this.resolveCommandType<I>>;
+    return undefined as ReturnType<typeof this.resolveCommandType<I>>;
   }
 }
