@@ -1,16 +1,12 @@
 import * as Discord from 'discord.js';
-
-// @ts-expect-error Cannot augment that module
-import { getMilliseconds as getMilliseconds_ } from 'better-ms';
+import { toMS } from 'type-better-ms';
 
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  AllContexts, AutocompleteInteraction, BetterMS, ChatInputCommandInteraction, CommandInitialized as Command,
+  AllContexts, AutocompleteInteraction, ChatInputCommandInteraction, CommandInitialized as Command,
   CommandInteraction, CooldownType, Message, MessageComponentInteraction, validTimeString
 } from '../index.ts';
 import type { CommandOption } from './commandOption/index.ts';
-
-export const getMilliseconds = getMilliseconds_ as typeof BetterMS.getMilliseconds;
 
 export function equal(a: unknown, b: unknown): boolean {
   if (a === b) return true;
@@ -38,7 +34,7 @@ export function cooldownConverter(
 ): [keyof Command['cooldowns'], number] {
   if (!cooldown[k]) return [k, v];
 
-  const ms = getMilliseconds(cooldown[k]);
+  const ms = toMS(cooldown[k]);
   if (typeof ms != 'number') throw new TypeError(`Could not convert time string cooldowns.${k} "${cooldown[k]}" to milliseconds.`);
 
   return [k, ms];

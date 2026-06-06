@@ -52,12 +52,6 @@ export type ContextToCaching<CTX extends AllContexts>
     ifFalse: undefined;
   }>;
 
-export declare namespace BetterMS {
-  function getMilliseconds<
-    T extends validTimeString | number
-  >(val: T, options?: { long: boolean }): IfExtends<T, string, { ifTrue: number; ifFalse: string }> | undefined;
-}
-
 type BuildOrderedCooldown<T extends readonly string[]> = T extends [infer Head extends string, ...infer Tail extends string[]]
   ? `${number}${Head}` | `${number}${Head}${BuildOrderedCooldown<Tail>}` | BuildOrderedCooldown<Tail>
   : never;
