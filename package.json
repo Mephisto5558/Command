@@ -1,6 +1,6 @@
 {
   "name": "@mephisto5558/command",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Discord.js command class and registering logic for slash- and prefix commands",
   "keywords": [
     "command",
@@ -34,26 +34,26 @@
   },
   "dependencies": {
     "@mephisto5558/better-types": "file:../better-types",
-    "import-without-cache": "^0.2.5",
+    "import-without-cache": "0.4.x",
     "type-better-ms": "0.2.x"
   },
   "devDependencies": {
     "@mephisto5558/eslint-config": "file:../eslint-config",
     "@mephisto5558/i18n": "2.x",
-    "discord.js": "^14.x"
+    "discord.js": "14.x"
   },
   "peerDependencies": {
     "@mephisto5558/i18n": "2.x",
     "discord.js": "14.x"
   },
   "engines": {
-    "node": ">=22.15.0"
+    "node": ">=22.18.0"
   },
   "devEngines": {
     "runtime": {
       "name": "node",
       "onFail": "error",
-      "version": ">=22.15.0"
+      "version": ">=22.18.0"
     }
   }
 }
