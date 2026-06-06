@@ -62,6 +62,8 @@ export class Command<
   contexts: CTX;
 
   disabled: boolean;
+
+  /** Always present if `disabled` is `true` */
   disabledReason: string | undefined;
 
   noDefer: boolean;
@@ -161,7 +163,10 @@ export class Command<
   }
 
   #validate(): void {
-    if (this.disabled) return;
+    if (this.disabled) {
+      if (this.disabledReason) return;
+      throw new CommandValidationError('A disabled command requires a disabledReason!', this);
+    }
 
     if (!['function', 'async function', 'async run(', 'run('].some(e => String(this.run).startsWith(e)))
       throw new CommandValidationError(`The "run" method of command "${this.id}" is an arrow function! You cannot use arrow functions!`, this);
@@ -371,9 +376,8 @@ export class Command<
       || (isMessage(interaction) && interaction.guild?.members.me?.communicationDisabledUntil)
     ) return true;
     if (this.config.runBetaCommandsOnly && !this.beta) return this.config.replyOn.nonBeta ? ['nonBeta'] : true;
-    if (this.disabled) return this.config.replyOn.disabled ? ['disabled', this.disabledReason ?? 'Not provided'] : true;
-
-    // TODO: remove hardcoded "Not provided"
+    /* eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- validated in #validate() */
+    if (this.disabled) return this.config.replyOn.disabled ? ['disabled', this.disabledReason!] : true;
 
     if (isMessage(interaction) && !this.types.includes(CommandType.Prefix)) return ['slashOnly', this.mention()];
 

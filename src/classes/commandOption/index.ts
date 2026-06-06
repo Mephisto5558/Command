@@ -43,6 +43,8 @@ export class CommandOption<
   contexts: CTX;
 
   disabled!: boolean;
+
+  /** Always present if `disabled` is `true` */
   disabledReason: string | undefined;
 
   get autocomplete(): boolean { return !!this.autocompleteOptions; }
@@ -188,10 +190,13 @@ export class CommandOption<
   }
 
   #validate(): void {
-    if (/[A-Z]/.test(this.name)) {
-      if (!this.disabled)
-        this.#logger.error(`"${this.name}" (${this.id}.name) has uppercase letters! Fixing.`);
+    if (this.disabled) {
+      if (this.disabledReason) return;
+      throw new CommandValidationError('A disabled command requires a disabledReason!', this);
+    }
 
+    if (/[A-Z]/.test(this.name)) {
+      this.#logger.error(`"${this.name}" (${this.id}.name) has uppercase letters! Fixing.`);
       this.name = this.name.toLowerCase();
     }
 
