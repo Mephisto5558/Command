@@ -1,6 +1,6 @@
 import type * as Discord from 'discord.js';
 import type { MapChannelTypes, autocompleteOption } from './classes/commandOption/utils.ts';
-import type { AllContexts, ContextToCaching, ContextToInGuild, HasDM, HasGuild } from './index.ts';
+import type { AllContexts, ContextToCaching, ContextToInGuild, ContextType, HasDM, HasGuild } from './index.ts';
 
 export {
   PermissionFlagsBits as Permission,

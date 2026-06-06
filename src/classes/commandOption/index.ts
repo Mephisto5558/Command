@@ -2,6 +2,7 @@ import * as Discord from 'discord.js';
 import { ContextType, CooldownType, isSnowflake } from '../../index.ts';
 import { autocompleteOptionsMaxAmt, choiceValueMaxLength, choiceValueMinLength, choicesMaxAmt, descriptionMaxLength } from '../../utils/constants.ts';
 import { CommandValidationError, cooldownConverter, equal, isMessage } from '../utils.ts';
+import { DefaultContext } from './utils.ts';
 
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
@@ -12,7 +13,7 @@ import type CooldownsManager from '../../utils/CooldownsManager.ts';
 import type { RunnableReturns } from '../command/utils.ts';
 import type { CommandType } from '../utils.ts';
 import type {
-  AutocompleteGeneratorOptions, CommandOptionConfig, DefaultContext, FallbackChannels,
+  AutocompleteGeneratorOptions, CommandOptionConfig, FallbackChannels,
   MapChannelTypes, PublicAutocompleteGeneratorOptions, autocompleteObject
 } from './utils.ts';
 
