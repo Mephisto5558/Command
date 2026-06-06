@@ -18,7 +18,7 @@ function importDefault(obj?: unknown): unknown {
     : obj;
 }
 
-type CollectionMember<Ready extends boolean = true> = If<Ready, {
+export type CollectionMember<Ready extends boolean = true> = If<Ready, {
   ifTrue: Command<
     readonly CommandType[], AllContexts,
     readonly [] | readonly [CommandOptionConfig<readonly CommandType[], AllContexts>, ...CommandOptionConfig<readonly CommandType[], AllContexts>[]]
@@ -29,7 +29,6 @@ type CollectionMember<Ready extends boolean = true> = If<Ready, {
   >;
 }>;
 
-/* eslint-disable-next-line import-x/prefer-default-export -- simplifies re-export */
 export class CommandManager {
   commands = new Discord.Collection<CollectionMember['name'], { command: CollectionMember; filePath: string }>();
   client!: Discord.Client<true>;
@@ -149,7 +148,7 @@ export class CommandManager {
       // Handle Reload Logic (API Sync)
       const appCommand = await this.registerCommand(command, oldCommand);
       if (appCommand) command.commandId = appCommand.id;
-      else {
+      else if (command.types.includes(CommandType.Prefix)) {
         this.#logLoadMsg('Loaded', command.name);
         for (const alias of command.aliases.prefix)
           this.#logLoadMsg('Loaded', command.name, alias);
