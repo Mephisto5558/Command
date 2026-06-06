@@ -10,6 +10,7 @@ import type {
   Logger, Message, MessageComponentInteraction
 } from '../../index.ts';
 import type CooldownsManager from '../../utils/CooldownsManager.ts';
+import type { CommandUninitialized } from '../command/index.ts';
 import type { RunnableReturns } from '../command/utils.ts';
 import type { CommandType } from '../utils.ts';
 import type {
@@ -31,7 +32,7 @@ export class CommandOption<
   /** Currently not used */
   nameLocalizations?: Partial<Record<Locale, CommandOption['name']>>;
   description!: string;
-  descriptionLocalizations!: Partial<Record<Locale, string>>;
+  descriptionLocalizations: Partial<Record<Locale, string>> = {};
 
   type: T;
 
@@ -95,6 +96,7 @@ export class CommandOption<
   readonly #i18n: I18nProvider;
   readonly #cooldownsManager: CooldownsManager;
   readonly #logger: Logger;
+  readonly #messagePrefixesArePreRemoved: boolean;
 
   /**
    * {@link Command.init Commands} and not the user should initialize `CommandOption`s.
@@ -102,7 +104,12 @@ export class CommandOption<
   constructor(
     base: CommandOptionUninitialized<CT, CTX, AO, ChildrenOptions, T>,
     i18n: I18nProvider, parentId: Command['id'] | CommandOption['id'],
-    cooldownsManager: CooldownsManager, logger: Logger = console, position = 0
+    config: {
+      cooldownsManager: CooldownsManager;
+      logger?: Logger;
+      position?: number;
+      messagePrefixesArePreRemoved?: boolean;
+    }
   ) {
     this.type = base.type;
     this.name = base.name;
@@ -118,16 +125,23 @@ export class CommandOption<
     this.strictAutocomplete = base.strictAutocomplete;
     this.channelTypes = base.channelTypes;
     this.cooldowns = base.cooldowns;
-
+    this.#messagePrefixesArePreRemoved = !!config.messagePrefixesArePreRemoved;
 
     this.#i18n = i18n;
-    this.#logger = logger;
-    this.#cooldownsManager = cooldownsManager;
+    this.#logger = config.logger ?? console;
+    this.#cooldownsManager = config.cooldownsManager;
 
     this.id = `${parentId}.options.${this.name}`;
-    this.position = position;
+    this.position = config.position ?? 0;
 
-    if (base.options) this.options = base.options.map((e, i) => e.init(i18n, this.id, cooldownsManager, logger, i)) as typeof this.options;
+    if (base.options) {
+      this.options = base.options.map((e, i) => e.init(i18n, this.id, {
+        cooldownsManager: this.#cooldownsManager,
+        logger: this.#logger,
+        position: i,
+        messagePrefixesArePreRemoved: this.#messagePrefixesArePreRemoved
+      })) as typeof this.options;
+    }
 
     this.#validate();
     this.#localize();
@@ -181,18 +195,7 @@ export class CommandOption<
       this.name = this.name.toLowerCase();
     }
 
-    if (this.options?.length) {
-      let foundOptional = false;
-      for (const option of this.options) {
-        if (!option.required) foundOptional = true;
-        else if (foundOptional) {
-          throw new CommandValidationError(
-            `Invalid option order in subcommand(group) ${this.id}. Required options (${option.id}) cannot appear after optional options.`,
-            undefined, this
-          );
-        }
-      }
-    }
+    CommandOption.validateOptionOrder(this);
   }
 
   #localize(): void {
@@ -263,7 +266,7 @@ export class CommandOption<
     }
   }
 
-  async isRunnable(
+  async isRunable(
     interaction: ExtendsMultiMatch<CommandType, CT, [
       [CommandType.Slash, ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>],
       [CommandType.Prefix, Message<NoInfer<CTX>>]
@@ -277,9 +280,9 @@ export class CommandOption<
     ) return ['guildOnly'];
 
     if (this.type == Discord.ApplicationCommandOptionType.SubcommandGroup)
-      return this.#isRunnableSubcommandGroup(interaction, command, wrapperTranslator, args);
+      return this.#isRunableSubcommandGroup(interaction, command, wrapperTranslator, args);
     if (this.type == Discord.ApplicationCommandOptionType.Subcommand)
-      return this.#isRunnableSubcommand(interaction, command, wrapperTranslator, args);
+      return this.#isRunableSubcommand(interaction, command, wrapperTranslator, args);
 
     const
       option = isMessage(interaction)
@@ -333,7 +336,7 @@ export class CommandOption<
     return false;
   }
 
-  async #isRunnableSubcommandGroup(
+  async #isRunableSubcommandGroup(
     interaction: ExtendsMultiMatch<CommandType, CT, [
       [CommandType.Slash, ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>],
       [CommandType.Prefix, Message<NoInfer<CTX>>]
@@ -347,10 +350,10 @@ export class CommandOption<
         : (interaction as ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>).options.getSubcommand(true),
       subcommand = this.options?.find(e => e.name == subcommandName);
 
-    return subcommand?.isRunnable(interaction, command, wrapperTranslator, isMessage(interaction) ? args?.slice(1) : args) ?? false;
+    return subcommand?.isRunable(interaction, command, wrapperTranslator, isMessage(interaction) ? args?.slice(1) : args) ?? false;
   }
 
-  async #isRunnableSubcommand(
+  async #isRunableSubcommand(
     interaction: ExtendsMultiMatch<CommandType, CT, [
       [CommandType.Slash, ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>],
       [CommandType.Prefix, Message<NoInfer<CTX>>]
@@ -360,7 +363,7 @@ export class CommandOption<
   ): Promise<RunnableReturns | boolean> {
     if (!this.options) return false;
     for (const option of this.options) {
-      const err = await option.isRunnable(interaction, command, wrapperTranslator, args);
+      const err = await option.isRunable(interaction, command, wrapperTranslator, args);
       if (err) return err;
     }
 
@@ -411,14 +414,14 @@ export class CommandOption<
     return this.#cooldownsManager.update(this.id, interaction, this.cooldowns);
   }
 
-  isEqualTo(opt: CommandOption<CommandType[], AllContexts> | Discord.ApplicationCommandOption): boolean {
+  isEqualTo(opt: CommandOption<readonly CommandType[], AllContexts> | Discord.ApplicationCommandOption): boolean {
     for (const prop of ['name', 'description', 'type', 'autocomplete', 'required', 'minValue', 'maxValue', 'minLength', 'maxLength'] as const) {
       const optProp = prop in opt ? opt[prop as keyof typeof opt] : undefined;
       if (this[prop] != (typeof this[prop] == 'boolean' ? !!optProp : optProp)) return false;
     }
 
     if (
-      (this.options && 'options' in this.options ? this.options.length : 0) != ('options' in opt ? opt.options?.length : 0)
+      (this.options?.length ?? 0) != ('options' in opt && opt.options ? opt.options.length : 0)
       || !equal(this.nameLocalizations, opt.nameLocalizations)
       || !equal(this.descriptionLocalizations, opt.descriptionLocalizations)
       || ('choices' in opt && opt.choices && !this.#choicesEqualTo(opt.choices))
@@ -459,6 +462,40 @@ export class CommandOption<
   clone(): CommandOptionUninitialized<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>, NoInfer<ChildrenOptions>, NoInfer<T>> {
     /* eslint-disable-next-line @typescript-eslint/no-use-before-define -- fine with classes */
     return new CommandOptionUninitialized(this);
+  }
+
+  /**
+   * @throws {CommandValidationError} if the option order is not allowed
+   * @internal */
+  static validateOptionOrder<
+    CT extends readonly CommandType[], CTX extends AllContexts, AO
+  >(baseOption: CommandOption<CT, CTX, AO> | Command<CT, CTX>): void {
+    if (!baseOption.options?.length) return;
+
+    let optionalOption;
+    const optionMap = new Map<CommandOption['name'], CommandOption<CommandType[], AllContexts>>();
+
+    for (const option of baseOption.options) {
+      if (!option.required) optionalOption = option;
+      else if (optionalOption) {
+        throw new CommandValidationError(
+          `Invalid option order in command "${baseOption.id}".`
+          + `Required options ("${option.id}") cannot appear after optional options (${optionalOption.id}).`,
+          baseOption, option
+        );
+      }
+
+      if (optionMap.has(option.name)) {
+        throw new CommandValidationError(
+          'A option name must be unique across all subcommands of the same command.'
+          + `Found duplicate name "${option.name}": "${optionMap.get(option.name)!.id}" and "${option.id}".`,
+          baseOption, option
+        );
+      }
+      else optionMap.set(option.name, option);
+
+      if (!option.required) optionalOption = option;
+    }
   }
 }
 
@@ -526,11 +563,11 @@ export class CommandOptionUninitialized<
 
         if ('contexts' in config) this.contexts = config.contexts as typeof this.contexts;
         if ('options' in config) {
-          this.options = (config.options as (
-            CommandOptionUninitialized<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>> | CommandOptionConfig<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>>)[])
-            .map(opt => (
-              opt instanceof CommandOptionUninitialized ? opt : new CommandOptionUninitialized<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>>(opt)
-            )) as unknown as typeof this.options;
+          this.options = ((config.options ?? []) as (
+            CommandOptionUninitialized<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>> | CommandOptionConfig<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>>
+          )[]).map(opt => (
+            opt instanceof CommandOptionUninitialized ? opt : new CommandOptionUninitialized<NoInfer<CT>, NoInfer<CTX>, NoInfer<AO>>(opt)
+          )) as typeof this.options;
         }
 
         if ('run' in config) this.run = config.run as unknown as NonNullable<typeof this.run>;

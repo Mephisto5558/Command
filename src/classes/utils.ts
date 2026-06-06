@@ -18,12 +18,14 @@ export function equal(a: unknown, b: unknown): boolean {
   if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) return false;
 
   const
-    keysA = Object.keys(a),
-    keysB = Object.keys(b);
+    objA = a as Record<PropertyKey, unknown>,
+    objB = b as Record<PropertyKey, unknown>,
+    keysA = Object.entries(objA).filter(([,v]) => v !== undefined).map(e => e[0]),
+    keysB = Object.entries(objB).filter(([,v]) => v !== undefined).map(e => e[0]);
 
   if (keysA.length !== keysB.length) return false;
   for (const key of keysA)
-    if (!equal(a[key], b[key])) return false;
+    if (!equal(objA[key], objB[key])) return false;
 
   return true;
 }
