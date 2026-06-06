@@ -52,7 +52,7 @@
     "runtime": {
       "name": "node",
       "onFail": "error",
-      "version": ">=22.18.0"
+      "version": "^22.22.2 || >=24.15.0"
     }
   }
 }
