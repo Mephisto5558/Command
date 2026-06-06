@@ -34,6 +34,15 @@ export default [
     }
   },
   {
+    name: 'overwrite:schemata',
+    files: ['**/*Schema.jsonc'],
+    rules: {
+      [`${pluginNames.jsonc}/sort-keys`]: 'off',
+      [`${pluginNames.jsonc}/sort-array-values`]: 'off',
+      [`${pluginNames.jsonc}/key-name-casing`]: 'off'
+    }
+  },
+  {
     name: 'overwrite:Tests',
     files: [`./tests/**/*${jsGlob}`],
     rules: {
