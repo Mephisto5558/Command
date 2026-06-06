@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/language-file.schema.json",
+  "title": "LanguageFileSchema",
+  "type": "object",
+  "required": ["$schema", "categoryName", "categoryDescription"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "categoryName": { "type": "string" },
+    "categoryDescription": { "type": "string" }
+  },
+  "patternProperties": {
+    "^[\\p{Ll}0-9_-]+$": {
+      "type": "object",
+      "required": ["description"],
+      "properties": {
+        "description": { 
+          "type": "string", 
+          "maxLength": 100 
+        },
+        "usage": {
+          "type": "object",
+          "required": ["usage"],
+          "properties": {
+            "usage": { "type": "string" },
+            "examples": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "options": {
+          "type": "object",
+          "patternProperties": {
+            "^[\\p{Ll}0-9_-]+$": { "$ref": "#/$defs/optionLevel1" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "patternProperties": {
+        "^(?!\\$schema$|categoryName$|categoryDescription$|description$|usage$|options$)[a-zA-Z0-9_-]+$": {
+          "$ref": "#/$defs/deepRecord"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+
+  "$defs": {
+    "deepRecord": {
+      "anyOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } },
+        { 
+          "type": "object", 
+          "additionalProperties": { "$ref": "#/$defs/deepRecord" } 
+        }
+      ]
+    },
+    "choiceDefinition": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 32
+      }
+    },
+    "optionBase": {
+      "type": "object",
+      "required": ["description"],
+      "properties": {
+        "description": { 
+          "type": "string", 
+          "maxLength": 100 
+        },
+        "choices": { "$ref": "#/$defs/choiceDefinition" }
+      },
+      "allOf": [
+        {
+          "not": {
+            "required": ["options", "choices"]
+          }
+        }
+      ]
+    },
+    "optionLevel1": {
+      "allOf": [{ "$ref": "#/$defs/optionBase" }],
+      "properties": {
+        "options": {
+          "type": "object",
+          "patternProperties": {
+            "^[\\p{Ll}0-9_-]+$": { "$ref": "#/$defs/optionLevel2" }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "optionLevel2": {
+      "allOf": [{ "$ref": "#/$defs/optionBase" }],
+      "properties": {
+        "options": {
+          "type": "object",
+          "patternProperties": {
+            "^[\\p{Ll}0-9_-]+$": { "$ref": "#/$defs/optionLevel3" }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "optionLevel3": {
+      "allOf": [{ "$ref": "#/$defs/optionBase" }],
+      "properties": {},
+      "not": { "required": ["options"] }
+    }
+  }
+}
