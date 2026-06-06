@@ -4,7 +4,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 
 import { getDirectories, getFilename, loadFile } from '../../index.ts';
 import capitalize from '../../utils/capitalize.ts';
-import { Command } from '../command/index.ts';
+import { Command, CommandUninitialized } from '../command/index.ts';
 import { CommandType } from '../utils.ts';
 
 import type { I18nProvider } from '@mephisto5558/i18n';
@@ -18,10 +18,17 @@ function importDefault(obj?: unknown): unknown {
     : obj;
 }
 
-type CollectionMember = Command<
-  readonly CommandType[], AllContexts,
-  readonly [] | readonly [CommandOptionConfig<readonly CommandType[], AllContexts>, ...CommandOptionConfig<readonly CommandType[], AllContexts>[]]
->;
+type CollectionMember<Ready extends boolean = true> = If<Ready, {
+  ifTrue: Command<
+    readonly CommandType[], AllContexts,
+    readonly [] | readonly [CommandOptionConfig<readonly CommandType[], AllContexts>, ...CommandOptionConfig<readonly CommandType[], AllContexts>[]]
+  >;
+  ifFalse: CommandUninitialized<
+    readonly CommandType[], AllContexts,
+    readonly [] | readonly [CommandOptionConfig<readonly CommandType[], AllContexts>, ...CommandOptionConfig<readonly CommandType[], AllContexts>[]]
+  >;
+}>;
+
 /* eslint-disable-next-line import-x/prefer-default-export -- simplifies re-export */
 export class CommandManager {
   commands = new Discord.Collection<CollectionMember['name'], { command: CollectionMember; filePath: string }>();
@@ -30,6 +37,7 @@ export class CommandManager {
   doneFn: commandDoneFn | undefined;
   cooldownsManager!: CooldownsManager;
   i18n!: I18nProvider;
+  messagePrefixesArePreRemoved = false;
 
   #logger: Logger = console;
   #devIds = new Set<Snowflake>();
@@ -38,7 +46,9 @@ export class CommandManager {
   #replyOn: { disabled: boolean; nonBeta: boolean } = { disabled: false, nonBeta: false };
   #customPermissionChecks: customPermissionChecksFn | undefined;
 
-  init(
+  #appCommands?: Awaited<ReturnType<Discord.ApplicationCommandManager['fetch']>>;
+
+  async init(
     commandsPath: string,
     client: Discord.Client<true>,
     i18n: I18nProvider,
@@ -51,14 +61,16 @@ export class CommandManager {
       runBetaCommandsOnly?: boolean;
       replyOn?: { disabled?: boolean; nonBeta?: boolean };
       customPermissionChecks?: customPermissionChecksFn;
+      messagePrefixesArePreRemoved?: boolean;
     } = {}
-  ): this {
+  ): Promise<this> {
     if (config.logger) this.#logger = config.logger;
     if (config.cooldownsManager) this.cooldownsManager = config.cooldownsManager;
     if (config.devIds) this.#devIds = config.devIds;
     if (config.devOnlyCategories) this.#devOnlyCategories = config.devOnlyCategories;
     if (config.runBetaCommandsOnly) this.#runBetaCommandsOnly = config.runBetaCommandsOnly;
     if (config.replyOn) this.#replyOn = { disabled: !!config.replyOn.disabled, nonBeta: !!config.replyOn.nonBeta };
+    if (config.messagePrefixesArePreRemoved) this.messagePrefixesArePreRemoved = config.messagePrefixesArePreRemoved;
 
     this.commandsPath = commandsPath;
     this.client = client;
@@ -69,6 +81,7 @@ export class CommandManager {
     /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- validation */
     if (!this.client.application) throw new Error('Client#application must exist (Client must be logged in!)');
 
+    await this.loadAll();
     return this;
   }
 
@@ -104,16 +117,18 @@ export class CommandManager {
     return (command ? this.#loadCommand(command.filePath, command.command) : undefined) as ReturnType<typeof this.reload<CMD>>;
   }
 
-  static #isCollectionMember(obj: unknown): obj is CollectionMember {
-    return obj instanceof Command;
+  static #isCollectionMember<I extends boolean = boolean>(obj: unknown, initialized?: I): obj is CollectionMember<I> {
+    if (initialized == undefined) return this.#isCollectionMember(obj, true) || this.#isCollectionMember(obj, false);
+    return initialized ? obj instanceof Command : obj instanceof CommandUninitialized;
   }
 
   async #loadCommand(filePath: string, oldCommand?: CollectionMember): Promise<undefined | CollectionMember> {
     const commandFile = importDefault(await loadFile(filePath));
-    if (!CommandManager.#isCollectionMember(commandFile)) return;
+    if (!CommandManager.#isCollectionMember(commandFile, false)) return;
+    let command;
 
     try {
-      commandFile.init(this.i18n, getFilename(filePath).toLowerCase(), basename(dirname(filePath)), {
+      command = commandFile.init(this.i18n, getFilename(filePath).toLowerCase(), basename(dirname(filePath)), {
         logger: this.#logger,
         doneFn: this.doneFn,
         cooldownsManager: this.cooldownsManager,
@@ -121,7 +136,8 @@ export class CommandManager {
         devOnlyCategories: this.#devOnlyCategories,
         runBetaCommandsOnly: this.#runBetaCommandsOnly,
         replyOn: this.#replyOn,
-        customPermissionChecks: this.#customPermissionChecks
+        customPermissionChecks: this.#customPermissionChecks,
+        messagePrefixesArePreRemoved: this.messagePrefixesArePreRemoved
       });
     }
     catch (err) {
@@ -131,16 +147,21 @@ export class CommandManager {
 
     try {
       // Handle Reload Logic (API Sync)
-      const appCommand = await this.registerCommand(commandFile, oldCommand);
-      if (appCommand) commandFile.commandId = appCommand.id;
+      const appCommand = await this.registerCommand(command, oldCommand);
+      if (appCommand) command.commandId = appCommand.id;
+      else {
+        this.#logLoadMsg('Loaded', command.name);
+        for (const alias of command.aliases.prefix)
+          this.#logLoadMsg('Loaded', command.name, alias);
+      }
     }
     catch (err) {
       this.#logger.error(`Error on registering command file ${filePath}:\n`, err);
       return;
     }
 
-    this.commands.set(commandFile.name, { command: commandFile, filePath });
-    return commandFile;
+    this.commands.set(command.name, { command, filePath });
+    return command;
   }
 
   async #createCommand(
@@ -157,7 +178,11 @@ export class CommandManager {
     command: Pick<CollectionMember, 'commandId' | 'name'> | Pick<Discord.ApplicationCommand, 'id' | 'name'>,
     action: string, alias?: CollectionMember['name']
   ): Promise<void> {
-    await this.client.application.commands.delete('commandId' in command ? command.commandId : command.id);
+    let id;
+    if ('commandId' in command) id = command.commandId;
+    else if ('id' in command) ({ id } = command);
+
+    if (id) await this.client.application.commands.delete(id);
     this.#logLoadMsg(action, command.name, alias);
   }
 
@@ -174,9 +199,12 @@ export class CommandManager {
   async registerCommand(newCommand: CollectionMember, oldCommand?: CollectionMember): Promise<Discord.ApplicationCommand | undefined> {
     if (!newCommand.types.includes(CommandType.Slash)) return;
 
-    const
-      existingCommands = await this.client.application.commands.fetch(),
-      isEqual = !!oldCommand?.isEqualTo(newCommand);
+    if (!this.#appCommands) {
+      this.#appCommands = await this.client.application.commands.fetch({ withLocalizations: true });
+      setTimeout(() => this.#appCommands?.clear(), 300_000);
+    }
+
+    const isEqual = !!oldCommand?.isEqualTo(newCommand);
 
     let appCommand;
 
@@ -186,19 +214,21 @@ export class CommandManager {
       if (newCommand.disabled) {
         if (oldCommand?.commandId) await this.#deleteCommand(oldCommand, 'Deleted Disabled');
       }
-      else if (oldCommand?.commandId && isEqual && existingCommands.has(oldCommand.commandId))
-        appCommand = existingCommands.get(oldCommand.commandId);
+      else if (oldCommand?.commandId && isEqual && this.#appCommands.has(oldCommand.commandId))
+        appCommand = this.#appCommands.get(oldCommand.commandId);
       else {
         const
-          existing = existingCommands.find(e => e.name == newCommand.name),
+          existing = this.#appCommands.find(e => e.name == newCommand.name),
           commandData = newCommand as unknown as Discord.ChatInputApplicationCommandData;
 
-        appCommand = await (existing ? this.#editCommand(existing, commandData, 'Reloaded') : this.#createCommand(commandData, 'Created'));
+        if (!existing) appCommand = await this.#createCommand(commandData, 'Created');
+        else if (newCommand.isEqualTo(existing)) appCommand = existing;
+        else appCommand = await this.#editCommand(existing, commandData, 'Reloaded');
       }
     }
 
     for (const alias of new Set([...oldCommand?.aliases[CommandType.Slash] ?? [], ...newCommand.aliases[CommandType.Slash]]))
-      await this.#registerAlias(newCommand, oldCommand, alias, isEqual, existingCommands);
+      await this.#registerAlias(newCommand, oldCommand, alias, isEqual, this.#appCommands);
 
     return appCommand;
   }

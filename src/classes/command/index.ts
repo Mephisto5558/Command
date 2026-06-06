@@ -74,7 +74,8 @@ export class Command<
   config = {
     devIds: new Set<Discord.User['id']>(), devOnlyCategories: new Set<Command['category']>(),
     runBetaCommandsOnly: false,
-    replyOn: { disabled: true, nonBeta: true }
+    replyOn: { disabled: true, nonBeta: true },
+    messagePrefixesArePreRemoved: false
   };
 
   mention<
@@ -117,6 +118,7 @@ export class Command<
       runBetaCommandsOnly?: boolean | undefined;
       replyOn?: Partial<Command['config']['replyOn']> | undefined;
       cooldownsManager?: CooldownsManager | undefined;
+      messagePrefixesArePreRemoved?: boolean;
     } = {}
   ) {
     this.#cooldownsManager = config.cooldownsManager ?? new CooldownsManager();
@@ -146,6 +148,7 @@ export class Command<
 
     this.config.replyOn.disabled = !!config.replyOn?.disabled;
     this.config.replyOn.nonBeta = !!config.replyOn?.nonBeta;
+    this.config.messagePrefixesArePreRemoved = !!config.messagePrefixesArePreRemoved;
 
     this.name = name.toLowerCase();
     this.category = category.toLowerCase();
@@ -163,29 +166,7 @@ export class Command<
     if (!['function', 'async function', 'async run(', 'run('].some(e => String(this.run).startsWith(e)))
       throw new CommandValidationError(`The "run" method of command "${this.id}" is an arrow function! You cannot use arrow functions!`, this);
 
-    if (this.options.length) {
-      let foundOptional = false;
-      const optionMap = new Map<CommandOption['name'], CommandOption<CommandType[], AllContexts>>();
-      for (const option of this.options) {
-        if (foundOptional) {
-          throw new CommandValidationError(
-            `Invalid option order in command "${this.id}". Required options ("${option.id}") cannot appear after optional options.`,
-            this, option
-          );
-        }
-
-        if (optionMap.has(option.name)) {
-          throw new CommandValidationError(
-            'A option name must be unique across all subcommands of the same command.'
-            + `Found duplicate name "${option.name}": "${optionMap.get(option.name)!.id}" and "${option.id}".`,
-            this, option
-          );
-        }
-        else optionMap.set(option.name, option as unknown as CommandOption<CommandType[], AllContexts>);
-
-        if (!option.required) foundOptional = true;
-      }
-    }
+    CommandOption.validateOptionOrder(this);
   }
 
   #localize(): void {
@@ -229,7 +210,7 @@ export class Command<
     const
       wrapperTranslator = i18n.getTranslator({ locale, backupPaths: ['events.command'] }),
       commandTranslator = i18n.getTranslator({ locale, backupPaths: [this.id] }),
-      errorKey = await this.#isRunnable(interaction, wrapperTranslator);
+      errorKey = await this.#isRunable(interaction, wrapperTranslator);
 
     if (errorKey === true) return; // already handled by the function
     if (errorKey !== false) {
@@ -254,7 +235,7 @@ export class Command<
       await this.#doneFn?.call(interaction, this, commandTranslator);
     }
     catch (err) {
-      throw new CommandExecutionError(err instanceof Error ? err.message : JSON.stringify(err), interaction, wrapperTranslator, { cause: err });
+      throw new CommandExecutionError(Error.isError(err) ? err.message : JSON.stringify(err), interaction, wrapperTranslator, { cause: err });
     }
   }
 
@@ -298,7 +279,7 @@ export class Command<
 
     if (isMessage(interaction)) {
       const
-        args = interaction.content.split(/\s+/).slice(1),
+        args = interaction.content.split(/\s+/).slice(this.config.messagePrefixesArePreRemoved ? 0 : 1),
         option1 = this.options.find(e => e.name == args[0]);
 
       if (option1?.type == Discord.ApplicationCommandOptionType.Subcommand) return { group: undefined, subcommand: option1.name };
@@ -338,7 +319,7 @@ export class Command<
 
       try { await author.send({ content: isMessage(interaction) ? interaction.url : '', embeds: [embed] }); }
       catch (err) {
-        if (!(err instanceof Error && 'code' in err) || err.code != CANNOT_SEND_MESSAGE_API_ERR) throw err;
+        if (!(Error.isError(err) && 'code' in err) || err.code != CANNOT_SEND_MESSAGE_API_ERR) throw err;
       }
     }
     else if (isInteraction(interaction))
@@ -348,12 +329,12 @@ export class Command<
     return true;
   }
 
-  async #isRunnable(
+  async #isRunable(
     interaction: CommandInteraction, wrapperTranslator: Translator<false, Locale>
   ): Promise<RunnableReturns | boolean> {
     const
       author = isInteraction(interaction) ? interaction.user : interaction.author,
-      args = isMessage(interaction) ? interaction.content.split(/\s+/).slice(1) : undefined,
+      args = isMessage(interaction) ? interaction.content.split(/\s+/).slice(this.config.messagePrefixesArePreRemoved ? 0 : 1) : undefined,
       staticErr = this.#staticRunnableChecks(interaction, author);
 
     if (staticErr) return staticErr;
@@ -370,7 +351,7 @@ export class Command<
 
     const activeOption = this.#resolveActiveOption(interaction, args);
     for (const option of activeOption ? [activeOption] : this.options) {
-      const err = await option.isRunnable(interaction, this, wrapperTranslator, args?.slice(activeOption && isMessage(interaction) ? 1 : 0));
+      const err = await option.isRunable(interaction, this, wrapperTranslator, args?.slice(activeOption && isMessage(interaction) ? 1 : 0));
       if (err) return err;
     }
 
