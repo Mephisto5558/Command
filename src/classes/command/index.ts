@@ -1,11 +1,13 @@
 import * as Discord from 'discord.js';
+import { toMS } from 'type-better-ms';
+
 import { CommandExecutionError, ContextType, CooldownType, Permission, PermissionType } from '../../index.ts';
 import { descriptionMaxLength } from '../../utils/constants.ts';
 import { CooldownsManager } from '../../utils/index.ts';
 import { CommandOption, CommandOptionUninitialized } from '../commandOption/index.ts';
 import {
-  CommandType, CommandValidationError, cooldownConverter, equal, getMilliseconds,
-  isComponent, isSlash, resolveCommandType, isInteraction, isMessage
+  CommandType, CommandValidationError, cooldownConverter, equal,
+  isComponent, isInteraction, isMessage, isSlash, resolveCommandType
 } from '../utils.ts';
 
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
@@ -17,8 +19,7 @@ import type { CommandOptionConfig } from '../commandOption/utils.ts';
 import type { CommandConfig, CommandMention, DeepOptions, ResolvedOption, RunnableReturns } from './utils.ts';
 
 const
-  /* eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- this is never undefined */
-  msInSeconds = getMilliseconds('1s')!,
+  msInSeconds = toMS('1s'),
   CANNOT_SEND_MESSAGE_API_ERR = 50_007;
 
 

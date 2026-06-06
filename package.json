@@ -33,8 +33,8 @@
   },
   "dependencies": {
     "@mephisto5558/better-types": "file:../better-types",
-    "better-ms": "1.x",
-    "import-without-cache": "^0.2.5"
+    "import-without-cache": "^0.2.5",
+    "type-better-ms": "0.2.x"
   },
   "devDependencies": {
     "@mephisto5558/eslint-config": "file:../eslint-config",
