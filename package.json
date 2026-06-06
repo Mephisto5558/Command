@@ -1,6 +1,6 @@
 {
   "name": "@mephisto5558/command",
-  "version": "0.7.0",
+  "version": "0.7.1-0",
   "description": "Discord.js command class and registering logic for slash- and prefix commands",
   "keywords": [
     "command",
