@@ -1,10 +1,12 @@
+import * as Discord from 'discord.js';
+
 // @ts-expect-error Cannot augment that module
 import { getMilliseconds as getMilliseconds_ } from 'better-ms';
 
 import type { Locale, Translator } from '@mephisto5558/i18n';
 import type {
-  AllContexts, AutocompleteInteraction, BetterMS, CommandInitialized as Command,
-  CommandInteraction, CooldownType, validTimeString
+  AllContexts, AutocompleteInteraction, BetterMS, ChatInputCommandInteraction, CommandInitialized as Command,
+  CommandInteraction, CooldownType, Message, MessageComponentInteraction, validTimeString
 } from '../index.ts';
 import type { CommandOption } from './commandOption/index.ts';
 
@@ -83,4 +85,35 @@ export enum CommandType {
   Slash = 'slash',
   Prefix = 'prefix',
   Component = 'component'
+}
+
+export function resolveCommandType<I>(interaction: I): ExtendsMatch<I, [
+  [Discord.ChatInputCommandInteraction | ChatInputCommandInteraction, CommandType.Slash],
+  [Discord.Message | Message, CommandType.Prefix],
+  [Discord.MessageComponentInteraction | MessageComponentInteraction, CommandType.Component]
+]> {
+  if (interaction instanceof Discord.ChatInputCommandInteraction) return CommandType.Slash as ReturnType<typeof resolveCommandType<I>>;
+  if (interaction instanceof Discord.Message) return CommandType.Prefix as ReturnType<typeof resolveCommandType<I>>;
+  if (interaction instanceof Discord.MessageComponentInteraction) return CommandType.Component as ReturnType<typeof resolveCommandType<I>>;
+  return undefined as unknown as ReturnType<typeof resolveCommandType<I>>;
+}
+
+export function isMessage(interaction: unknown): interaction is Message | Discord.Message {
+  return resolveCommandType(interaction) == CommandType.Prefix
+    && interaction instanceof Discord.Message;
+}
+
+export function isInteraction(
+  interaction: unknown, commandType: CommandType | CommandType[] = [CommandType.Slash, CommandType.Component]
+): interaction is Discord.BaseInteraction {
+  return (Array.isArray(commandType) ? commandType : [commandType]).includes(resolveCommandType(interaction))
+    && interaction instanceof Discord.BaseInteraction;
+}
+
+export function isSlash(interaction: unknown): interaction is ChatInputCommandInteraction | Discord.ChatInputCommandInteraction {
+  return isInteraction(interaction, CommandType.Slash) && interaction.isChatInputCommand();
+}
+
+export function isComponent(interaction: unknown): interaction is MessageComponentInteraction | Discord.MessageComponentInteraction {
+  return isInteraction(interaction, CommandType.Component) && interaction.isMessageComponent();
 }

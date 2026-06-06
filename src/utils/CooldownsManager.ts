@@ -1,6 +1,6 @@
 /* eslint-disable unicorn/filename-case -- class export */
 
-import * as Discord from 'discord.js';
+import { isMessage } from '../classes/utils.ts';
 import { CooldownType } from '../index.ts';
 
 import type { CommandType } from '../classes/utils.ts';
@@ -26,7 +26,7 @@ export default class CooldownsManager {
       let areaId: Snowflake | undefined;
       switch (cdName) {
         case CooldownType.User:
-          areaId = context instanceof Discord.Message ? context.author.id : context.user.id;
+          areaId = isMessage(context) ? context.author.id : context.user.id;
           break;
         case CooldownType.Guild:
           areaId = context.guildId ?? undefined;

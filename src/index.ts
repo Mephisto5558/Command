@@ -22,7 +22,7 @@ export { CommandOptionUninitialized as CommandOption } from './classes/commandOp
 export type { CommandOption as CommandOptionInitialized } from './classes/commandOption/index.ts';
 
 export { CommandManager } from './classes/commandManager/index.ts';
-export { CommandExecutionError, CommandType } from './classes/utils.ts';
+export { CommandExecutionError, CommandType, isComponent, isInteraction, isMessage, isSlash, resolveCommandType } from './classes/utils.ts';
 
 export enum PermissionType {
   Client = 0,
