@@ -1,7 +1,7 @@
 import * as Discord from 'discord.js';
 import { ContextType, CooldownType, isSnowflake } from '../../index.ts';
 import { autocompleteOptionsMaxAmt, choiceValueMaxLength, choiceValueMinLength, choicesMaxAmt, descriptionMaxLength } from '../../utils/constants.ts';
-import { CommandValidationError, cooldownConverter, equal } from '../utils.ts';
+import { CommandValidationError, cooldownConverter, equal, isMessage } from '../utils.ts';
 
 import type { I18nProvider, Locale, Translator } from '@mephisto5558/i18n';
 import type {
@@ -161,11 +161,11 @@ export class CommandOption<
     if (this.type != Discord.ApplicationCommandOptionType.Channel)
       throw new Error(`This method does not run on ${Discord.ApplicationCommandOptionType[this.type]} options!`);
 
-    let target = interaction instanceof Discord.Message
+    let target = isMessage(interaction)
       ? interaction.mentions.channels.first()
       : (interaction as ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>).options.getChannel(this.name, false, this.channelTypes);
 
-    if (!target && interaction instanceof Discord.Message)
+    if (!target && isMessage(interaction))
       target = interaction.guild?.channels.cache.find(e => [e.id, e.name].some(e => interaction.content.includes(e)));
     if (target) return target;
 
@@ -281,7 +281,7 @@ export class CommandOption<
       return this.#isRunnableSubcommand(interaction, command, wrapperTranslator, args);
 
     const
-      option = interaction instanceof Discord.Message
+      option = isMessage(interaction)
         ? undefined
         : (interaction as ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>).options.get(this.name)?.value,
       arg = args?.[this.position];
@@ -294,7 +294,7 @@ export class CommandOption<
       }];
     }
 
-    if (interaction instanceof Discord.Message && arg) { // if it's an interaction then these checks will be done by Discord
+    if (isMessage(interaction) && arg) { // if it's an interaction then these checks will be done by Discord
       if (this.type == Discord.ApplicationCommandOptionType.Channel && this.channelTypes) {
         let channel;
         if (isSnowflake(arg)) channel = interaction.guild?.channels.cache.get(arg);
@@ -341,15 +341,12 @@ export class CommandOption<
     wrapperTranslator: Translator<false, Locale>, args?: string[]
   ): Promise<RunnableReturns | boolean> {
     const
-      subcommandName = interaction instanceof Discord.Message
+      subcommandName = isMessage(interaction)
         ? args?.[this.position]
         : (interaction as ChatInputCommandInteraction<NoInfer<CTX>, NoInfer<ChildrenOptions>>).options.getSubcommand(true),
       subcommand = this.options?.find(e => e.name == subcommandName);
 
-    return subcommand?.isRunnable(
-      interaction, command, wrapperTranslator,
-      interaction instanceof Discord.Message ? args?.slice(1) : args
-    ) ?? false;
+    return subcommand?.isRunnable(interaction, command, wrapperTranslator, isMessage(interaction) ? args?.slice(1) : args) ?? false;
   }
 
   async #isRunnableSubcommand(
