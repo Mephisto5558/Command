@@ -87,6 +87,7 @@ export class Command<
     const path = [this.name, subcommandGroup, subcommand].filter(Boolean).join(' ');
 
     // using `0` here to not break the mention in Discord
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- this is safe */
     return `</${path}:${this.commandId ?? 0}>` as CommandMention<SubCommandGroupName, SubcommandName, NoInfer<CT>>;
   }
 
