@@ -16,8 +16,7 @@ export default class CooldownsManager {
   ): number {
     const
       createdAt = context.createdAt.getTime(),
-      /* eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- this is safe */
-      timeStamps = this.cache.get(name) ?? this.cache.set(name, new Map()).get(name)!,
+      timeStamps = this.cache.getOrInsertComputed(name, () => new Map()),
       currentCooldowns = [];
 
     for (const [cdName, value] of Object.entries(cooldowns)) {
@@ -39,8 +38,7 @@ export default class CooldownsManager {
       if (!areaId) continue;
 
       const
-        /* eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- this is safe */
-        typeCache = timeStamps.get(cdName) ?? timeStamps.set(cdName, new Map()).get(cdName)!,
+        typeCache = timeStamps.getOrInsertComputed(cdName, () => new Map()),
         timestamp = typeCache.get(areaId) ?? 0;
 
       if (timestamp > createdAt) currentCooldowns.push(timestamp - createdAt);
